@@ -1,0 +1,12 @@
+{
+  "build": {
+    "builder": "@vercel/python",
+    "install": "pip install -r requirements.txt"
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/app.py"
+    }
+  ]
+}
