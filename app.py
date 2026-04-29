@@ -207,7 +207,7 @@ if current == "开发信":
         tone = tone_map[tone]
         company_name = st.text_input("公司名称 (可选)", placeholder="您的公司名称", key="email_company")
     
-    features_text = st.text_area("产品卖点 *", placeholder="每行一条卖点，例如：\n• 10年工厂经验\n• CE/RoHS/FCC认证\n• 支持OEM/ODM", height=4, key="email_features")
+    features_text = st.text_area("产品卖点 *", placeholder="每行一条卖点，例如：\n• 10年工厂经验\n• CE/RoHS/FCC认证\n• 支持OEM/ODM\n• 快速交货\n• 免费样品", height=150, key="email_features")
     
     generate_btn = st.button("🚀 生成开发信", type="primary", use_container_width=True)
     
@@ -237,7 +237,7 @@ elif current == "询盘回复":
     
     col1, col2 = st.columns(2)
     with col1:
-        inquiry = st.text_area("客户询盘内容 *", height=5, placeholder="粘贴客户发来的完整邮件内容...", key="inquiry_text")
+        inquiry = st.text_area("客户询盘内容 *", height=150, placeholder="粘贴客户发来的完整邮件内容...", key="inquiry_text")
     with col2:
         customer_name = st.text_input("客户名称 (可选)", placeholder="例如: Mike Johnson", key="inquiry_customer")
         your_name = st.text_input("你的名称 (可选)", placeholder="您的名字", key="inquiry_yourname")
@@ -323,7 +323,7 @@ elif current == "产品介绍":
     col1, col2 = st.columns(2)
     with col1:
         product = st.text_input("产品名称 *", key="intro_product")
-        features = st.text_area("产品特点 *", height=4, placeholder="每行一条特点，例如：\n• 节能90%\n• 5年质保", key="intro_features")
+        features = st.text_area("产品特点 *", height=150, placeholder="每行一条特点，例如：\n• 节能90%\n• 5年质保\n• 欧盟认证\n• 环保材料", key="intro_features")
     with col2:
         target = st.selectbox("目标市场", ["美国", "欧洲", "南美", "东南亚", "全球"], key="intro_target")
         lang = st.multiselect("输出语言", ["英语", "西班牙语", "法语", "德语", "日语"], default=["英语"], key="intro_lang")
