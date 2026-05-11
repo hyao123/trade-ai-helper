@@ -15,8 +15,9 @@ import types
 from typing import Generator
 
 import streamlit as st
+from utils.secrets import get_secret
 
-APP_PASSWORD = os.getenv("APP_PASSWORD", "")
+APP_PASSWORD = get_secret("APP_PASSWORD")
 
 # ---------------------------------------------------------------------------
 # 全局 CSS
@@ -135,7 +136,8 @@ def check_auth() -> None:
     - 已通过验证 → 直接通过
     - 未通过 → 渲染登录框并 st.stop()
     """
-    if not APP_PASSWORD:
+    app_password = get_secret("APP_PASSWORD")
+    if not app_password:
         st.session_state.authenticated = True
         return
     if st.session_state.get("authenticated"):
@@ -152,7 +154,7 @@ def check_auth() -> None:
     with st.form("login_form"):
         pwd = st.text_input("访问密码", type="password", placeholder="请输入密码")
         if st.form_submit_button("🔐 登录", use_container_width=True, type="primary"):
-            if pwd == APP_PASSWORD:
+            if pwd == app_password:
                 st.session_state.authenticated = True
                 st.rerun()
             else:

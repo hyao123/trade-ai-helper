@@ -18,7 +18,6 @@ import types
 from collections import defaultdict
 from typing import Generator
 
-from dotenv import load_dotenv
 from openai import OpenAI, AuthenticationError, RateLimitError, APIStatusError, APITimeoutError
 
 from config.prompts import (
@@ -27,15 +26,14 @@ from config.prompts import (
     build_product_intro_prompt,
     build_followup_prompt,
 )
-
-load_dotenv()
+from utils.secrets import get_secret
 
 # ---------------------------------------------------------------------------
 # 客户端单例
 # ---------------------------------------------------------------------------
-_API_KEY  = os.getenv("KIMI_API_KEY", "")
+_API_KEY  = get_secret("KIMI_API_KEY")
 _API_BASE = "https://api.moonshot.cn/v1"
-_MODEL    = os.getenv("KIMI_MODEL", "moonshot-v1-8k")
+_MODEL    = get_secret("KIMI_MODEL", "moonshot-v1-8k")
 
 _client: OpenAI | None = None
 
@@ -43,8 +41,8 @@ _client: OpenAI | None = None
 def _get_client() -> OpenAI:
     """返回全局单例 OpenAI 客户端，避免每次调用新建连接池。"""
     global _client, _API_KEY
-    # 若 API Key 在运行时通过环境变量变更，重建客户端
-    current_key = os.getenv("KIMI_API_KEY", "")
+    # 若 API Key 在运行时变更（如从 Streamlit Secrets 延迟加载），重建客户端
+    current_key = get_secret("KIMI_API_KEY")
     if _client is None or current_key != _API_KEY:
         _API_KEY = current_key
         _client = OpenAI(api_key=_API_KEY, base_url=_API_BASE)
@@ -56,8 +54,8 @@ def _get_client() -> OpenAI:
 # ---------------------------------------------------------------------------
 _call_times: dict[str, list[float]] = defaultdict(list)
 
-RATE_LIMIT_MAX_CALLS = int(os.getenv("RATE_LIMIT_MAX_CALLS", "20"))
-RATE_LIMIT_WINDOW    = int(os.getenv("RATE_LIMIT_WINDOW", "3600"))
+RATE_LIMIT_MAX_CALLS = int(get_secret("RATE_LIMIT_MAX_CALLS", "20"))
+RATE_LIMIT_WINDOW    = int(get_secret("RATE_LIMIT_WINDOW", "3600"))
 
 
 def _rate_limit_check(user_id: str = "default") -> tuple[bool, int]:
@@ -80,8 +78,8 @@ def get_rate_limit_remaining(user_id: str = "default") -> int:
 
 def _check_preconditions(user_id: str = "default") -> str | None:
     """返回错误信息字符串；None 表示可以继续调用。"""
-    if not os.getenv("KIMI_API_KEY", ""):
-        return "⚠️ 请先在 .env 文件中设置 KIMI_API_KEY 环境变量"
+    if not get_secret("KIMI_API_KEY"):
+        return "⚠️ 请先设置 KIMI_API_KEY（.env 文件或 Streamlit Cloud Secrets）"
     allowed, _ = _rate_limit_check(user_id)
     if not allowed:
         wait_min = RATE_LIMIT_WINDOW // 60
