@@ -1,13 +1,15 @@
 """
 utils/ai_client.py
 ------------------
-Kimi (Moonshot) API 调用层。
+NVIDIA NIM API 调用层（OpenAI 兼容接口）。
 
-- 使用 openai SDK（Moonshot 兼容 OpenAI 接口）
-- call_kimi()      非流式，返回 str
-- stream_kimi()    流式，返回 Generator[str]，供 st.write_stream() 消费
+- 使用 openai SDK（NVIDIA NIM 完全兼容 OpenAI 接口）
+- call_llm()       非流式，返回 str
+- stream_llm()     流式，返回 Generator[str]，供 st.write_stream() 消费
 - Rate Limiting 基于内存 sliding-window（注：多进程/重启后计数重置）
 - 所有 Prompt 模板从 config.prompts 导入
+
+NVIDIA NIM API 文档：https://docs.api.nvidia.com/nim/docs/api-quickstart
 """
 
 from __future__ import annotations
@@ -31,9 +33,10 @@ from utils.secrets import get_secret
 # ---------------------------------------------------------------------------
 # 客户端单例
 # ---------------------------------------------------------------------------
-_API_KEY  = get_secret("KIMI_API_KEY")
-_API_BASE = "https://api.moonshot.cn/v1"
-_MODEL    = get_secret("KIMI_MODEL", "moonshot-v1-8k")
+_API_KEY  = get_secret("NVIDIA_API_KEY")
+_API_BASE = "https://integrate.api.nvidia.com/v1"
+# 默认使用 meta/llama-3.3-70b-instruct，可通过环境变量覆盖
+_MODEL    = get_secret("NVIDIA_MODEL", "meta/llama-3.3-70b-instruct")
 
 _client: OpenAI | None = None
 
@@ -42,7 +45,7 @@ def _get_client() -> OpenAI:
     """返回全局单例 OpenAI 客户端，避免每次调用新建连接池。"""
     global _client, _API_KEY
     # 若 API Key 在运行时变更（如从 Streamlit Secrets 延迟加载），重建客户端
-    current_key = get_secret("KIMI_API_KEY")
+    current_key = get_secret("NVIDIA_API_KEY")
     if _client is None or current_key != _API_KEY:
         _API_KEY = current_key
         _client = OpenAI(api_key=_API_KEY, base_url=_API_BASE)
@@ -78,8 +81,8 @@ def get_rate_limit_remaining(user_id: str = "default") -> int:
 
 def _check_preconditions(user_id: str = "default") -> str | None:
     """返回错误信息字符串；None 表示可以继续调用。"""
-    if not get_secret("KIMI_API_KEY"):
-        return "⚠️ 请先设置 KIMI_API_KEY（.env 文件或 Streamlit Cloud Secrets）"
+    if not get_secret("NVIDIA_API_KEY"):
+        return "⚠️ 请先设置 NVIDIA_API_KEY（.env 文件或 Streamlit Cloud Secrets）"
     allowed, _ = _rate_limit_check(user_id)
     if not allowed:
         wait_min = RATE_LIMIT_WINDOW // 60
@@ -89,20 +92,20 @@ def _check_preconditions(user_id: str = "default") -> str | None:
 
 def _handle_api_error(e: Exception) -> str:
     if isinstance(e, AuthenticationError):
-        return "⚠️ API Key 无效，请检查 KIMI_API_KEY 是否正确。"
+        return "⚠️ NVIDIA API Key 无效，请检查 NVIDIA_API_KEY 是否正确。"
     if isinstance(e, RateLimitError):
-        return "⚠️ API 调用超出 Kimi 平台限额，请稍后重试或升级套餐。"
+        return "⚠️ API 调用超出 NVIDIA NIM 平台限额，请稍后重试或升级套餐。"
     if isinstance(e, APITimeoutError):
         return "⚠️ 请求超时，请检查网络连接后重试。"
     if isinstance(e, APIStatusError):
-        return f"⚠️ Kimi 服务器错误 ({e.status_code})，请稍后重试。"
+        return f"⚠️ NVIDIA NIM 服务器错误 ({e.status_code})，请稍后重试。"
     return f"⚠️ 调用失败: {e}"
 
 
 # ---------------------------------------------------------------------------
 # 核心调用 — 非流式
 # ---------------------------------------------------------------------------
-def call_kimi(
+def call_llm(
     prompt: str,
     system_prompt: str | None = None,
     user_id: str = "default",
@@ -129,10 +132,14 @@ def call_kimi(
         return _handle_api_error(e)
 
 
+# 向后兼容别名
+call_kimi = call_llm
+
+
 # ---------------------------------------------------------------------------
 # 核心调用 — 流式
 # ---------------------------------------------------------------------------
-def stream_kimi(
+def stream_llm(
     prompt: str,
     system_prompt: str | None = None,
     user_id: str = "default",
@@ -168,6 +175,10 @@ def stream_kimi(
         yield _handle_api_error(e)
 
 
+# 向后兼容别名
+stream_kimi = stream_llm
+
+
 def _is_generator(obj: object) -> bool:
     """精确判断是否为生成器对象。"""
     return isinstance(obj, types.GeneratorType)
@@ -186,7 +197,7 @@ def generate_email(
     user_id: str = "default",
 ) -> str | Generator[str, None, None]:
     prompt, system = build_email_prompt(product, customer, features, tone)
-    return stream_kimi(prompt, system, user_id) if stream else call_kimi(prompt, system, user_id)
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
 
 
 def reply_inquiry(
@@ -198,7 +209,7 @@ def reply_inquiry(
     user_id: str = "default",
 ) -> str | Generator[str, None, None]:
     prompt, system = build_inquiry_prompt(inquiry, customer_name, your_name, company_name)
-    return stream_kimi(prompt, system, user_id) if stream else call_kimi(prompt, system, user_id)
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
 
 
 def generate_product_intro(
@@ -210,7 +221,7 @@ def generate_product_intro(
     user_id: str = "default",
 ) -> str | Generator[str, None, None]:
     prompt, system = build_product_intro_prompt(product, features, target, languages)
-    return stream_kimi(prompt, system, user_id) if stream else call_kimi(prompt, system, user_id)
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
 
 
 def generate_followup(
@@ -221,4 +232,4 @@ def generate_followup(
     user_id: str = "default",
 ) -> str | Generator[str, None, None]:
     prompt, system = build_followup_prompt(customer, stage, product)
-    return stream_kimi(prompt, system, user_id) if stream else call_kimi(prompt, system, user_id)
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
