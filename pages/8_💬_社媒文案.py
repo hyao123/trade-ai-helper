@@ -78,7 +78,7 @@ if generate_clicked:
                 product, features, platform, audience, promo,
                 stream=True, user_id=get_user_id(),
             )
-            show_result(result, "social", label="📝 社媒文案", file_name=fname, height=350)
+            show_result(result, "social", label="📝 社媒文案", file_name=fname, height=350, history_feature="社媒文案", history_title=product[:25])
         else:
             with st.spinner("🤖 AI 正在生成文案..."):
                 result = generate_social_post(
@@ -86,7 +86,7 @@ if generate_clicked:
                     stream=False, user_id=get_user_id(),
                 )
             st.session_state.results["social"] = result
-            show_result(result, "social", label="📝 社媒文案", file_name=fname, height=350, balloons=True)
+            show_result(result, "social", label="📝 社媒文案", file_name=fname, height=350, balloons=True, history_feature="社媒文案", history_title=product[:25])
 
 elif st.session_state.results.get("social"):
     show_result(

@@ -116,12 +116,12 @@ if generate_clicked:
 
         if stream_mode:
             result = generate_email(product, customer, features_text, tone, language, stream=True, user_id=get_user_id())
-            show_result(result, "email", label="📝 开发信正文", file_name=f"开发信_{product}.txt", show_subject_line=True)
+            show_result(result, "email", label="📝 开发信正文", file_name=f"开发信_{product}.txt", show_subject_line=True, history_feature="开发信", history_title=f"{product} → {customer[:20]}")
         else:
             with st.spinner("🤖 AI 正在生成..."):
                 result = generate_email(product, customer, features_text, tone, language, stream=False, user_id=get_user_id())
             st.session_state.results["email"] = result
-            show_result(result, "email", label="📝 开发信正文", file_name=f"开发信_{product}.txt", balloons=True, show_subject_line=True)
+            show_result(result, "email", label="📝 开发信正文", file_name=f"开发信_{product}.txt", balloons=True, show_subject_line=True, history_feature="开发信", history_title=f"{product} → {customer[:20]}")
 
 elif st.session_state.results.get("email"):
     show_result(

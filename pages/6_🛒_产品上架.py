@@ -83,7 +83,7 @@ if generate_clicked:
                 product, keywords, features, platform, category,
                 stream=True, user_id=get_user_id(),
             )
-            show_result(result, "listing", label="📝 Listing 文案", file_name=fname, height=350)
+            show_result(result, "listing", label="📝 Listing 文案", file_name=fname, height=350, history_feature="产品上架", history_title=product[:30])
         else:
             with st.spinner("🤖 AI 正在生成 Listing..."):
                 result = generate_listing(
@@ -91,7 +91,7 @@ if generate_clicked:
                     stream=False, user_id=get_user_id(),
                 )
             st.session_state.results["listing"] = result
-            show_result(result, "listing", label="📝 Listing 文案", file_name=fname, height=350, balloons=True)
+            show_result(result, "listing", label="📝 Listing 文案", file_name=fname, height=350, balloons=True, history_feature="产品上架", history_title=product[:30])
 
 elif st.session_state.results.get("listing"):
     show_result(

@@ -338,6 +338,8 @@ def show_result(
     height: int = 220,
     balloons: bool = True,
     show_subject_line: bool = False,
+    history_feature: str = "",
+    history_title: str = "",
 ) -> None:
     """
     统一渲染生成结果区域。
@@ -345,10 +347,12 @@ def show_result(
     流式模式（result 是 GeneratorType）：
       1. 显示"⚡ 正在生成中..."提示
       2. 在干净容器内调用 st.write_stream()，token 实时滚动显示
-      3. 流式完成后：保存到 session_state，渲染 Subject Line + 下载/复制按钮
+      3. 流式完成后：保存到 session_state + 历史记录，渲染结果
 
     非流式模式（result 是 str）：
       直接调用 _render_result_area() 展示。
+
+    history_feature/history_title: 如果传入则自动保存到历史记录。
     """
     if not result:
         return
@@ -376,12 +380,22 @@ def show_result(
         # 4. 保存结果
         st.session_state.results[result_key] = full_text
 
+        # 5. 保存到历史记录
+        if history_feature and full_text and not full_text.startswith("⚠️"):
+            from utils.history import add_to_history
+            add_to_history(history_feature, history_title or result_key, full_text)
+
         if balloons:
             st.balloons()
 
-        # 5. 渲染静态结果区（Subject Line + 下载 + 复制）
+        # 6. 渲染静态结果区（Subject Line + 下载 + 复制）
         _render_result_area(full_text, result_key, label, file_name, height, show_subject_line)
         return
 
     # ── 非流式模式 ────────────────────────────────────
+    # 保存到历史记录
+    if history_feature and result and not result.startswith("⚠️"):
+        from utils.history import add_to_history
+        add_to_history(history_feature, history_title or result_key, result)
+
     _render_result_area(result, result_key, label, file_name, height, show_subject_line)
