@@ -110,7 +110,7 @@ with col_add:
         st.rerun()
 with col_total:
     if subtotal > 0:
-        st.metric("💰 报价总额", f"${subtotal:,.2f} USD")
+        st.metric("💰 报价总额", f"${subtotal:,.2f}")
 
 st.markdown('<hr style="margin:1.2rem 0;border-top:1px dashed #e5e7eb;">', unsafe_allow_html=True)
 
@@ -134,11 +134,17 @@ col_t1, col_t2, col_t3, col_t4 = st.columns(4)
 with col_t1:
     payment  = st.selectbox("付款方式", ["T/T 30%", "T/T 50%", "L/C at sight", "D/P", "PayPal", "Western Union"])
 with col_t2:
-    delivery = st.text_input("交货期", value="15-20 days")
+    currency = st.selectbox("币种", ["USD", "EUR", "GBP", "CNY", "AUD", "CAD"], help="选择报价币种")
 with col_t3:
-    validity = st.text_input("报价有效期", value="30 days")
+    delivery = st.text_input("交货期", value="15-20 days")
 with col_t4:
+    validity = st.text_input("报价有效期", value="30 days")
+
+col_t5, col_t6 = st.columns(2)
+with col_t5:
     shipping = st.text_input("发货港口", placeholder="Shanghai, China")
+with col_t6:
+    quote_notes = st.text_input("备注（可选）", placeholder="MOQ 500pcs, 包装: 独立彩盒")
 
 st.markdown('<hr style="margin:1.2rem 0;border-top:1px dashed #e5e7eb;">', unsafe_allow_html=True)
 
@@ -173,6 +179,12 @@ if generate_clicked:
         st.session_state["quote_buyer_contact"] = buyer_contact
         st.session_state["quote_buyer_email"]   = buyer_email
 
+        # 报价单编号自增
+        if "quote_number" not in st.session_state:
+            st.session_state["quote_number"] = 0
+        st.session_state["quote_number"] += 1
+        quote_no = f"Q-2026-{st.session_state['quote_number']:03d}"
+
         with st.spinner("📄 正在生成 PDF..."):
             pdf_bytes = generate_quote_pdf(
                 skus=valid_skus,
@@ -192,7 +204,10 @@ if generate_clicked:
         st.session_state.results["quote_pdf"]      = pdf_bytes
         st.session_state.results["quote_subtotal"] = sum(s["price"] * s["quantity"] for s in valid_skus)
         st.session_state.results["quote_sku_count"]= len(valid_skus)
-        st.session_state.results["quote_just_gen"] = True   # flag：刚生成，触发一次气球
+        st.session_state.results["quote_just_gen"] = True
+        st.session_state.results["quote_number"]   = quote_no
+        st.session_state.results["quote_currency"] = currency
+        st.session_state.results["quote_notes"]    = quote_notes
 
 # ── 展示已生成的 PDF ──────────────────────────────────
 if st.session_state.results.get("quote_pdf"):
@@ -202,10 +217,13 @@ if st.session_state.results.get("quote_pdf"):
 
     subtotal_saved   = st.session_state.results.get("quote_subtotal", 0.0)
     sku_count_saved  = st.session_state.results.get("quote_sku_count", 1)
+    quote_no_saved   = st.session_state.results.get("quote_number", "Q-2026-001")
+    currency_saved   = st.session_state.results.get("quote_currency", "USD")
 
-    c1, c2 = st.columns(2)
-    c1.metric("📦 产品种数", f"{sku_count_saved} 种")
-    c2.metric("💰 报价总额", f"${subtotal_saved:,.2f} USD")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("📋 报价单号", quote_no_saved)
+    c2.metric("📦 产品种数", f"{sku_count_saved} 种")
+    c3.metric("💰 报价总额", f"{currency_saved} {subtotal_saved:,.2f}")
 
     st.markdown(
         '<div class="success-box">'

@@ -28,7 +28,7 @@ st.markdown("""
 # ── Stats ─────────────────────────────────────────────────────────────────
 c1, c2, c3, c4, c5 = st.columns(5)
 for col, val, label in [
-    (c1, "6",      "核心功能"),
+    (c1, "7",      "核心功能"),
     (c2, "5+",     "语种支持"),
     (c3, "⚡ 流式", "实时输出"),
     (c4, "Listing","Amazon/Shopify"),
@@ -90,9 +90,16 @@ FEATURES = [
         "badge": "🔥 跨境电商",
         "page": "pages/6_🛒_产品上架.py",
     },
+    {
+        "icon": "📇",
+        "title": "客户管理",
+        "desc": "轻量 CRM，记录客户信息，追踪阶段，一键生成邮件",
+        "badge": "🆕 CRM",
+        "page": "pages/7_📇_客户管理.py",
+    },
 ]
 
-cols = st.columns(6)
+cols = st.columns(7)
 for col, feat in zip(cols, FEATURES):
     with col:
         st.markdown(
