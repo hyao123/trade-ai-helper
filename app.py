@@ -60,19 +60,6 @@ st.markdown("""
     .stat-value { font-size: 1.6rem; font-weight: 700; color: #1e3a5f; }
     .stat-label { font-size: 0.8rem; color: #666; margin-top: 0.25rem; }
     
-    .feature-nav {
-        display: flex;
-        gap: 0.75rem;
-        margin-bottom: 1.5rem;
-    }
-    .feature-btn {
-        flex: 1;
-        padding: 1rem;
-        border-radius: 12px;
-        font-weight: 500;
-        transition: all 0.2s;
-    }
-    
     .main-form {
         background: white;
         border-radius: 16px;
@@ -145,17 +132,99 @@ st.markdown("""
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #1e3a5f 0%, #0f172a 100%);
     }
+
+    /* 登录页样式 */
+    .login-box {
+        max-width: 400px;
+        margin: 6rem auto;
+        background: white;
+        border-radius: 20px;
+        padding: 2.5rem;
+        box-shadow: 0 8px 40px rgba(0,0,0,0.12);
+        border: 1px solid #e5e7eb;
+        text-align: center;
+    }
+    .login-title { font-size: 1.4rem; font-weight: 700; color: #1e3a5f; margin-bottom: 0.5rem; }
+    .login-sub { color: #6b7280; font-size: 0.9rem; margin-bottom: 1.5rem; }
     
     @media (max-width: 768px) {
         .block-container { padding: 0.75rem !important; }
-        .feature-nav { flex-direction: column; }
     }
 </style>
 """, unsafe_allow_html=True)
 
-if 'current_feature' not in st.session_state:
+# ---------------------------------------------------------------------------
+# P0: 访问鉴权
+# ---------------------------------------------------------------------------
+APP_PASSWORD = os.getenv("APP_PASSWORD", "")
+
+def check_auth():
+    """密码验证 —— 仅当设置了 APP_PASSWORD 时启用"""
+    if not APP_PASSWORD:
+        # 未配置密码则跳过鉴权（本地开发友好）
+        st.session_state.authenticated = True
+        return
+
+    if st.session_state.get("authenticated"):
+        return
+
+    st.markdown("""
+    <div class="login-box">
+        <div style="font-size:2.5rem;">💼</div>
+        <div class="login-title">外贸AI助手</div>
+        <div class="login-sub">请输入访问密码继续使用</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.form("login_form"):
+        pwd = st.text_input("访问密码", type="password", placeholder="请输入密码")
+        submitted = st.form_submit_button("🔐 登录", use_container_width=True, type="primary")
+        if submitted:
+            if pwd == APP_PASSWORD:
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("❌ 密码错误，请重试")
+    st.stop()
+
+check_auth()
+
+# ---------------------------------------------------------------------------
+# Session state 初始化
+# ---------------------------------------------------------------------------
+if "current_feature" not in st.session_state:
     st.session_state.current_feature = "开发信"
 
+# 存储生成结果，切换 Tab 不丢失
+if "results" not in st.session_state:
+    st.session_state.results = {}
+
+# ---------------------------------------------------------------------------
+# 复制到剪贴板 helper
+# ---------------------------------------------------------------------------
+def copy_button(text: str, key: str):
+    """渲染一个"复制"按钮，点击后通过 JS 将文本写入剪贴板"""
+    safe_text = text.replace("`", "\\`").replace("\\", "\\\\")
+    btn_id = f"copy_btn_{key}"
+    st.components.v1.html(
+        f"""
+        <button
+            id="{btn_id}"
+            onclick="navigator.clipboard.writeText(`{safe_text}`).then(()=>{{
+                document.getElementById('{btn_id}').innerText='✅ 已复制';
+                setTimeout(()=>document.getElementById('{btn_id}').innerText='📋 复制到剪贴板',2000);
+            }})"
+            style="width:100%;padding:0.55rem 1rem;border-radius:8px;border:1.5px solid #3b82f6;
+                   background:white;color:#3b82f6;font-weight:600;cursor:pointer;font-size:0.9rem;">
+            📋 复制到剪贴板
+        </button>
+        """,
+        height=48,
+    )
+
+# ---------------------------------------------------------------------------
+# Hero & Stats
+# ---------------------------------------------------------------------------
 st.markdown("""
 <div class="hero-section">
     <h1 class="hero-title">💼 外贸AI助手</h1>
@@ -176,15 +245,18 @@ with col4: st.markdown('<div class="stat-card"><div class="stat-value">PDF</div>
 
 st.markdown("---")
 
-features = [
+# ---------------------------------------------------------------------------
+# 功能导航
+# ---------------------------------------------------------------------------
+features_nav = [
     ("📧", "开发信生成", "开发信"),
-    ("📩", "询盘回复", "询盘回复"),
-    ("📄", "报价单", "报价单"),
-    ("📑", "产品介绍", "产品介绍")
+    ("📩", "询盘回复",   "询盘回复"),
+    ("📄", "报价单",     "报价单"),
+    ("📑", "产品介绍",   "产品介绍")
 ]
 
 cols = st.columns(4)
-for i, (icon, text, key) in enumerate(features):
+for i, (icon, text, key) in enumerate(features_nav):
     with cols[i]:
         btn_type = "primary" if st.session_state.current_feature == key else "secondary"
         if st.button(f"{icon} {text}", key=f"nav_{key}", use_container_width=True, type=btn_type):
@@ -193,101 +265,118 @@ for i, (icon, text, key) in enumerate(features):
 
 current = st.session_state.current_feature
 
+# ---------------------------------------------------------------------------
+# 开发信
+# ---------------------------------------------------------------------------
 if current == "开发信":
     st.markdown('<div class="main-form"><div class="form-title">📧 开发信生成</div>', unsafe_allow_html=True)
     st.markdown('<div class="tip-card">💡 填写详细的产品信息和卖点，生成更精准的开发信。</div>', unsafe_allow_html=True)
-    
+
     col1, col2 = st.columns(2)
     with col1:
         product = st.text_input("产品名称 *", placeholder="例如: LED Desk Lamp", key="email_product")
         customer = st.text_input("目标客户 *", placeholder="例如: John Smith, ABC Company", key="email_customer")
     with col2:
-        tone = st.selectbox("选择风格", ["简洁专业 (50-80词)", "正式商务 (100-150词)", "亲切友好 (80-100词)"], key="email_tone")
+        tone_label = st.selectbox("选择风格", ["简洁专业 (50-80词)", "正式商务 (100-150词)", "亲切友好 (80-100词)"], key="email_tone")
         tone_map = {"简洁专业 (50-80词)": "简洁专业", "正式商务 (100-150词)": "正式商务", "亲切友好 (80-100词)": "亲切友好"}
-        tone = tone_map[tone]
-        company_name = st.text_input("公司名称 (可选)", placeholder="您的公司名称", key="email_company")
-    
-    features_text = st.text_area("产品卖点 *", placeholder="每行一条卖点，例如：\n• 10年工厂经验\n• CE/RoHS/FCC认证\n• 支持OEM/ODM\n• 快速交货\n• 免费样品", height=150, key="email_features")
-    
-    generate_btn = st.button("🚀 生成开发信", type="primary", use_container_width=True)
-    
-    if generate_btn:
+        tone = tone_map[tone_label]
+        st.text_input("公司名称 (可选)", placeholder="您的公司名称", key="email_company")
+
+    features_text = st.text_area(
+        "产品卖点 *",
+        placeholder="每行一条卖点，例如：\n• 10年工厂经验\n• CE/RoHS/FCC认证\n• 支持OEM/ODM\n• 快速交货\n• 免费样品",
+        height=150, key="email_features"
+    )
+
+    if st.button("🚀 生成开发信", type="primary", use_container_width=True):
         if not product or not customer:
             st.warning("⚠️ 请填写产品名称和目标客户")
         else:
             with st.spinner("🤖 AI正在生成..."):
                 result = generate_email(product, customer, features_text, tone)
-            
-            st.markdown('<div class="success-box"><div style="font-size:1.5rem;">✅</div><div class="success-title">开发信生成完成！</div></div>', unsafe_allow_html=True)
-            st.balloons()
-            
-            st.markdown('<div class="result-area">', unsafe_allow_html=True)
-            st.text_area("📝 生成结果", result, height=200, key="email_result")
-            col_d1, col_d2 = st.columns(2)
-            with col_d1:
-                st.download_button("📥 下载", result, file_name=f"开发信_{product}.txt", mime="text/plain", use_container_width=True)
-            with col_d2:
-                st.button("📋 复制", use_container_width=True)
-            st.markdown('</div></div>', unsafe_allow_html=True)
+            st.session_state.results["email"] = result
+
+    result = st.session_state.results.get("email")
+    if result:
+        st.markdown('<div class="success-box"><div style="font-size:1.5rem;">✅</div><div class="success-title">开发信生成完成！</div></div>', unsafe_allow_html=True)
+        st.balloons()
+        st.markdown('<div class="result-area">', unsafe_allow_html=True)
+        st.text_area("📝 生成结果", result, height=200, key="email_result_display")
+        col_d1, col_d2 = st.columns(2)
+        with col_d1:
+            st.download_button("📥 下载", result, file_name=f"开发信_{product if product else 'result'}.txt", mime="text/plain", use_container_width=True)
+        with col_d2:
+            copy_button(result, "email")
+        st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
+# ---------------------------------------------------------------------------
+# 询盘回复
+# ---------------------------------------------------------------------------
 elif current == "询盘回复":
     st.markdown('<div class="main-form"><div class="form-title">📩 询盘回复</div>', unsafe_allow_html=True)
     st.markdown('<div class="tip-card">💡 粘贴客户询盘邮件，AI生成专业回复草稿。</div>', unsafe_allow_html=True)
-    
+
     col1, col2 = st.columns(2)
     with col1:
         inquiry = st.text_area("客户询盘内容 *", height=150, placeholder="粘贴客户发来的完整邮件内容...", key="inquiry_text")
     with col2:
         customer_name = st.text_input("客户名称 (可选)", placeholder="例如: Mike Johnson", key="inquiry_customer")
-        your_name = st.text_input("你的名称 (可选)", placeholder="您的名字", key="inquiry_yourname")
-        your_company = st.text_input("公司名称", placeholder="您的公司", key="inquiry_company")
-    
-    reply_btn = st.button("🚀 生成回复", type="primary", use_container_width=True)
-    
-    if reply_btn:
+        your_name     = st.text_input("你的名称 (可选)", placeholder="您的名字", key="inquiry_yourname")
+        st.text_input("公司名称", placeholder="您的公司", key="inquiry_company")
+
+    if st.button("🚀 生成回复", type="primary", use_container_width=True):
         if not inquiry:
             st.warning("⚠️ 请粘贴客户询盘内容")
         else:
             with st.spinner("🤖 AI正在生成..."):
                 result = reply_inquiry(inquiry, customer_name, your_name)
-            
-            st.markdown('<div class="success-box"><div style="font-size:1.5rem;">✅</div><div class="success-title">回复草稿生成完成！</div></div>', unsafe_allow_html=True)
-            
-            st.markdown('<div class="result-area">', unsafe_allow_html=True)
-            st.text_area("📝 回复草稿", result, height=200, key="reply_result")
+            st.session_state.results["inquiry"] = result
+
+    result = st.session_state.results.get("inquiry")
+    if result:
+        st.markdown('<div class="success-box"><div style="font-size:1.5rem;">✅</div><div class="success-title">回复草稿生成完成！</div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="result-area">', unsafe_allow_html=True)
+        st.text_area("📝 回复草稿", result, height=200, key="reply_result_display")
+        col_d1, col_d2 = st.columns(2)
+        with col_d1:
             st.download_button("📥 下载", result, file_name="回复.txt", mime="text/plain", use_container_width=True)
-            st.markdown('</div></div>', unsafe_allow_html=True)
+        with col_d2:
+            copy_button(result, "inquiry")
+        st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
+# ---------------------------------------------------------------------------
+# 报价单
+# ---------------------------------------------------------------------------
 elif current == "报价单":
     st.markdown('<div class="main-form"><div class="form-title">📄 报价单生成</div>', unsafe_allow_html=True)
-    
+
     col1, col2 = st.columns(2)
     with col1:
         product_name = st.text_input("产品名称 *", key="quote_product")
-        model = st.text_input("型号/规格", key="quote_model")
-        price = st.number_input("单价 (USD) *", min_value=0.0, value=0.0, step=0.01, key="quote_price")
+        model        = st.text_input("型号/规格", key="quote_model")
+        price        = st.number_input("单价 (USD) *", min_value=0.0, value=0.0, step=0.01, key="quote_price")
     with col2:
         quantity = st.number_input("数量 *", min_value=1, value=100, key="quote_qty")
-        unit = st.selectbox("单位", ["PCS", "SETS", "BOX", "CARTON", "PALLET"], key="quote_unit")
-    
-    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+        unit     = st.selectbox("单位", ["PCS", "SETS", "BOX", "CARTON", "PALLET"], key="quote_unit")
+
+    st.markdown('<hr style="margin:1.2rem 0;border-top:1px dashed #e5e7eb;">', unsafe_allow_html=True)
     st.markdown("### 📦 交易条款")
-    
+
     col_t1, col_t2, col_t3 = st.columns(3)
     with col_t1:
-        payment = st.selectbox("付款方式", ["T/T 30%", "T/T 50%", "L/C", "D/P", "PayPal"], key="quote_payment")
+        payment  = st.selectbox("付款方式", ["T/T 30%", "T/T 50%", "L/C", "D/P", "PayPal"], key="quote_payment")
     with col_t2:
         delivery = st.text_input("交货期", value="15-20 days", key="quote_delivery")
     with col_t3:
         validity = st.text_input("有效期", value="30 days", key="quote_validity")
-    
+
     shipping = st.text_input("发货港口", placeholder="例如: Shanghai, China", key="quote_shipping")
-    
-    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+
+    st.markdown('<hr style="margin:1.2rem 0;border-top:1px dashed #e5e7eb;">', unsafe_allow_html=True)
     st.markdown("### 🏢 公司信息")
-    
+
     col_c1, col_c2 = st.columns(2)
     with col_c1:
         company_name = st.text_input("公司名称", value="Your Company", key="quote_company")
@@ -295,56 +384,79 @@ elif current == "报价单":
     with col_c2:
         email = st.text_input("邮箱", value="sales@company.com", key="quote_email")
         phone = st.text_input("电话", value="+86-XXX-XXXXXXX", key="quote_phone")
-    
-    quote_btn = st.button("🚀 生成报价单 (PDF)", type="primary", use_container_width=True)
-    
-    if quote_btn:
+
+    if st.button("🚀 生成报价单 (PDF)", type="primary", use_container_width=True):
         if not product_name or price <= 0:
             st.warning("⚠️ 请填写产品名称和单价")
         else:
             with st.spinner("📄 生成中..."):
-                pdf_data = generate_quote_pdf(product_name, model, price, quantity, unit, payment, delivery, validity, shipping, company_name, contact_name, email, phone)
-            
-            st.balloons()
-            total = price * quantity
-            col_s1, col_s2, col_s3 = st.columns(3)
-            with col_s1: st.metric("💵 单价", f"${price:,.2f}")
-            with col_s2: st.metric("📦 数量", f"{quantity}")
-            with col_s3: st.metric("💰 总金额", f"${total:,.2f}")
-            
-            st.markdown('<div class="success-box"><div style="font-size:1.5rem;">✅</div><div class="success-title">报价单生成完成！</div></div>', unsafe_allow_html=True)
-            st.download_button("📥 下载报价单 (PDF)", pdf_data, file_name=f"报价单_{product_name}.pdf", mime="application/pdf", use_container_width=True)
+                pdf_data = generate_quote_pdf(
+                    product_name, model, price, quantity, unit,
+                    payment, delivery, validity, shipping,
+                    company_name, contact_name, email, phone
+                )
+            st.session_state.results["quote_pdf"]     = pdf_data
+            st.session_state.results["quote_product"] = product_name
+            st.session_state.results["quote_price"]   = price
+            st.session_state.results["quote_qty"]     = quantity
+
+    if st.session_state.results.get("quote_pdf"):
+        pdf_data     = st.session_state.results["quote_pdf"]
+        q_product    = st.session_state.results.get("quote_product", "product")
+        q_price      = st.session_state.results.get("quote_price", 0)
+        q_qty        = st.session_state.results.get("quote_qty", 0)
+        st.balloons()
+        col_s1, col_s2, col_s3 = st.columns(3)
+        with col_s1: st.metric("💵 单价", f"${q_price:,.2f}")
+        with col_s2: st.metric("📦 数量", f"{q_qty}")
+        with col_s3: st.metric("💰 总金额", f"${q_price * q_qty:,.2f}")
+        st.markdown('<div class="success-box"><div style="font-size:1.5rem;">✅</div><div class="success-title">报价单生成完成！</div></div>', unsafe_allow_html=True)
+        st.download_button("📥 下载报价单 (PDF)", pdf_data, file_name=f"报价单_{q_product}.pdf", mime="application/pdf", use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
+# ---------------------------------------------------------------------------
+# 产品介绍
+# ---------------------------------------------------------------------------
 elif current == "产品介绍":
     st.markdown('<div class="main-form"><div class="form-title">📑 产品介绍生成</div>', unsafe_allow_html=True)
     st.markdown('<div class="tip-card">💡 输入产品信息，生成多语种产品介绍文案。</div>', unsafe_allow_html=True)
-    
+
     col1, col2 = st.columns(2)
     with col1:
-        product = st.text_input("产品名称 *", key="intro_product")
-        features = st.text_area("产品特点 *", height=150, placeholder="每行一条特点，例如：\n• 节能90%\n• 5年质保\n• 欧盟认证\n• 环保材料", key="intro_features")
+        product  = st.text_input("产品名称 *", key="intro_product")
+        features = st.text_area(
+            "产品特点 *", height=150,
+            placeholder="每行一条特点，例如：\n• 节能90%\n• 5年质保\n• 欧盟认证\n• 环保材料",
+            key="intro_features"
+        )
     with col2:
-        target = st.selectbox("目标市场", ["美国", "欧洲", "南美", "东南亚", "全球"], key="intro_target")
-        lang = st.multiselect("输出语言", ["英语", "西班牙语", "法语", "德语", "日语"], default=["英语"], key="intro_lang")
-    
-    lang_list = lang if lang else ["英语"]
-    intro_btn = st.button("🚀 生成介绍", type="primary", use_container_width=True)
-    
-    if intro_btn:
+        target   = st.selectbox("目标市场", ["美国", "欧洲", "南美", "东南亚", "全球"], key="intro_target")
+        lang     = st.multiselect("输出语言", ["英语", "西班牙语", "法语", "德语", "日语"], default=["英语"], key="intro_lang")
+
+    if st.button("🚀 生成介绍", type="primary", use_container_width=True):
         if not product or not features:
             st.warning("⚠️ 请填写产品名称和特点")
         else:
+            lang_list = lang if lang else ["英语"]
             with st.spinner("🤖 AI生成中..."):
                 result = generate_product_intro(product, features, target, lang_list)
-            
-            st.markdown('<div class="success-box"><div style="font-size:1.5rem;">✅</div><div class="success-title">产品介绍生成完成！</div></div>', unsafe_allow_html=True)
-            
-            st.markdown('<div class="result-area">', unsafe_allow_html=True)
-            st.text_area("📝 产品介绍", result, height=250, key="intro_result")
+            st.session_state.results["intro"] = result
+
+    result = st.session_state.results.get("intro")
+    if result:
+        st.markdown('<div class="success-box"><div style="font-size:1.5rem;">✅</div><div class="success-title">产品介绍生成完成！</div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="result-area">', unsafe_allow_html=True)
+        st.text_area("📝 产品介绍", result, height=250, key="intro_result_display")
+        col_d1, col_d2 = st.columns(2)
+        with col_d1:
             st.download_button("📥 下载", result, file_name=f"{product}_介绍.txt", mime="text/plain", use_container_width=True)
-            st.markdown('</div></div>', unsafe_allow_html=True)
+        with col_d2:
+            copy_button(result, "intro")
+        st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
+# ---------------------------------------------------------------------------
+# Footer
+# ---------------------------------------------------------------------------
 st.markdown("---")
 st.markdown('<div class="footer"><p>💡 外贸AI助手 | 让外贸更简单</p></div>', unsafe_allow_html=True)
