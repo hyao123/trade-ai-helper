@@ -3,7 +3,7 @@ pages/2_📩_询盘回复.py
 粘贴客户询盘，AI 生成专业英文回复草稿，支持流式输出。
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, show_result
+from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id
 from utils.ai_client import reply_inquiry
 
 st.set_page_config(page_title="询盘回复 | 外贸AI助手", page_icon="📩", layout="wide")
@@ -59,11 +59,11 @@ if generate_clicked:
 
         fname = f"询盘回复_{customer_name or '客户'}.txt"
         if stream_mode:
-            result = reply_inquiry(inquiry, customer_name, your_name, company_name, stream=True)
+            result = reply_inquiry(inquiry, customer_name, your_name, company_name, stream=True, user_id=get_user_id())
             show_result(result, "inquiry", label="📝 回复草稿", file_name=fname)
         else:
             with st.spinner("🤖 AI 正在生成..."):
-                result = reply_inquiry(inquiry, customer_name, your_name, company_name, stream=False)
+                result = reply_inquiry(inquiry, customer_name, your_name, company_name, stream=False, user_id=get_user_id())
             st.session_state.results["inquiry"] = result
             show_result(result, "inquiry", label="📝 回复草稿", file_name=fname, balloons=True)
 

@@ -128,11 +128,20 @@ def inject_css() -> None:
 # ---------------------------------------------------------------------------
 # 侧栏信息（Rate Limit 剩余次数）
 # ---------------------------------------------------------------------------
+def _get_session_user_id() -> str:
+    """获取当前 session 唯一 ID 作为 rate-limit user_id（per-session 限速）。"""
+    if "user_session_id" not in st.session_state:
+        import uuid
+        st.session_state["user_session_id"] = str(uuid.uuid4())[:8]
+    return st.session_state["user_session_id"]
+
+
 def show_sidebar_info() -> None:
     """在侧栏显示剩余 API 调用次数和重置倒计时。"""
     from utils.ai_client import get_rate_limit_remaining, RATE_LIMIT_MAX_CALLS, RATE_LIMIT_WINDOW, _call_times
 
-    remaining = get_rate_limit_remaining()
+    uid = _get_session_user_id()
+    remaining = get_rate_limit_remaining(uid)
     used = RATE_LIMIT_MAX_CALLS - remaining
 
     with st.sidebar:
@@ -142,13 +151,18 @@ def show_sidebar_info() -> None:
         st.caption(f"已用 **{used}** / {RATE_LIMIT_MAX_CALLS} 次（每 {RATE_LIMIT_WINDOW // 60} 分钟重置）")
 
         # 计算最早 slot 何时过期
-        if _call_times.get("default"):
+        if _call_times.get(uid):
             now = time.time()
-            earliest = min(_call_times["default"])
+            earliest = min(_call_times[uid])
             reset_in = max(0, int(RATE_LIMIT_WINDOW - (now - earliest)))
             minutes, seconds = divmod(reset_in, 60)
             st.caption(f"🕐 最早释放: {minutes}分{seconds}秒后")
         st.markdown("---")
+
+
+def get_user_id() -> str:
+    """获取当前用户的 session-level user ID（供 AI 业务函数传递给 rate limiter）。"""
+    return _get_session_user_id()
 
 
 # ---------------------------------------------------------------------------

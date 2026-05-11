@@ -1,0 +1,7 @@
+# Ruff configuration
+[lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]  # Allow long lines (CSS strings, prompts)
+
+[lint.per-file-ignores]
+"tests/*" = ["E402"]  # Allow sys.path manipulation in tests

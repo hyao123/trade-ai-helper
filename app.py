@@ -19,9 +19,8 @@ st.markdown("""
     <h1 class="hero-title">💼 外贸AI助手</h1>
     <p class="hero-subtitle">AI 赋能外贸 · 开发信 · 询盘回复 · 报价单 · 多语种产品介绍</p>
     <div class="price-tag">
-        <span>🎁 首单特惠</span>
-        <span style="font-weight:700;font-size:1.1rem;">¥29</span>
-        <span>/ 年</span>
+        <span>🆓 免费试用</span>
+        <span style="font-weight:700;font-size:1.1rem;">每小时20次</span>
     </div>
 </div>
 """, unsafe_allow_html=True)

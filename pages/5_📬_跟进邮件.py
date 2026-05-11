@@ -3,7 +3,7 @@ pages/5_📬_跟进邮件.py
 根据跟进阶段生成专业英文跟进邮件，支持流式输出。
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, show_result
+from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id
 from utils.ai_client import generate_followup
 from config.prompts import FOLLOWUP_STAGES
 
@@ -67,11 +67,11 @@ if generate_clicked:
 
         fname = f"跟进邮件_{customer}_{stage}.txt"
         if stream_mode:
-            result = generate_followup(customer, stage, product, stream=True)
+            result = generate_followup(customer, stage, product, stream=True, user_id=get_user_id())
             show_result(result, "followup", label="📝 跟进邮件", file_name=fname)
         else:
             with st.spinner("🤖 AI 正在生成..."):
-                result = generate_followup(customer, stage, product, stream=False)
+                result = generate_followup(customer, stage, product, stream=False, user_id=get_user_id())
             st.session_state.results["followup"] = result
             show_result(result, "followup", label="📝 跟进邮件", file_name=fname, balloons=True)
 

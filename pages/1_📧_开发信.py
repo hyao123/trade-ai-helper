@@ -3,7 +3,7 @@ pages/1_📧_开发信.py
 生成外贸开发信（含邮件主题行），支持流式输出。
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, show_result
+from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id
 from utils.ai_client import generate_email
 
 st.set_page_config(page_title="开发信生成 | 外贸AI助手", page_icon="📧", layout="wide")
@@ -69,7 +69,7 @@ if generate_clicked:
         st.session_state.results.pop("email", None)
 
         if stream_mode:
-            result = generate_email(product, customer, features_text, tone, stream=True)
+            result = generate_email(product, customer, features_text, tone, stream=True, user_id=get_user_id())
             show_result(
                 result, "email",
                 label="📝 开发信正文",
@@ -78,7 +78,7 @@ if generate_clicked:
             )
         else:
             with st.spinner("🤖 AI 正在生成..."):
-                result = generate_email(product, customer, features_text, tone, stream=False)
+                result = generate_email(product, customer, features_text, tone, stream=False, user_id=get_user_id())
             st.session_state.results["email"] = result
             show_result(
                 result, "email",

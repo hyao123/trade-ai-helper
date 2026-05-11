@@ -3,7 +3,7 @@ pages/4_📑_产品介绍.py
 生成多语种产品介绍文案，支持流式输出。
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, show_result
+from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id
 from utils.ai_client import generate_product_intro
 
 st.set_page_config(page_title="产品介绍 | 外贸AI助手", page_icon="📑", layout="wide")
@@ -61,11 +61,11 @@ if generate_clicked:
 
         fname = f"{product}_产品介绍.txt"
         if stream_mode:
-            result = generate_product_intro(product, features, target, lang_list, stream=True)
+            result = generate_product_intro(product, features, target, lang_list, stream=True, user_id=get_user_id())
             show_result(result, "intro", label="📝 产品介绍文案", file_name=fname, height=300)
         else:
             with st.spinner("🤖 AI 生成中..."):
-                result = generate_product_intro(product, features, target, lang_list, stream=False)
+                result = generate_product_intro(product, features, target, lang_list, stream=False, user_id=get_user_id())
             st.session_state.results["intro"] = result
             show_result(result, "intro", label="📝 产品介绍文案", file_name=fname, height=300, balloons=True)
 

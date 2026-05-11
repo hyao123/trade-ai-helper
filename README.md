@@ -30,9 +30,9 @@ pip install -r requirements.txt
 # 复制示例文件
 cp .env.example .env
 
-# 编辑 .env，填入你的 Kimi API Key
-# 获取地址：https://platform.moonshot.cn/
-KIMI_API_KEY=your_api_key_here
+# 编辑 .env，填入你的 NVIDIA NIM API Key
+# 获取地址：https://build.nvidia.com → 选任意模型 → Get API Key
+NVIDIA_API_KEY=nvapi-xxxxxxxx
 
 # 可选：设置访问密码（部署时防止他人滥用 API）
 APP_PASSWORD=your_password
