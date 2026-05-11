@@ -8,6 +8,7 @@ NVIDIA NIM API 调用层（OpenAI 兼容接口）。
 - stream_llm()     流式，返回 Generator[str]，供 st.write_stream() 消费
 - Rate Limiting 基于内存 sliding-window（注：多进程/重启后计数重置）
 - 所有 Prompt 模板从 config.prompts 导入
+- Rate-limit slot 仅在 API 成功时消耗（失败自动回滚）
 
 NVIDIA NIM API 文档：https://docs.api.nvidia.com/nim/docs/api-quickstart
 """
@@ -34,7 +35,6 @@ from utils.secrets import get_secret
 # ---------------------------------------------------------------------------
 _API_KEY  = get_secret("NVIDIA_API_KEY")
 _API_BASE = "https://integrate.api.nvidia.com/v1"
-# 默认使用 meta/llama-3.3-70b-instruct，可通过环境变量覆盖
 _MODEL    = get_secret("NVIDIA_MODEL", "meta/llama-3.3-70b-instruct")
 
 _client: OpenAI | None = None
@@ -43,7 +43,6 @@ _client: OpenAI | None = None
 def _get_client() -> OpenAI:
     """返回全局单例 OpenAI 客户端，避免每次调用新建连接池。"""
     global _client, _API_KEY
-    # 若 API Key 在运行时变更（如从 Streamlit Secrets 延迟加载），重建客户端
     current_key = get_secret("NVIDIA_API_KEY")
     if _client is None or current_key != _API_KEY:
         _API_KEY = current_key
@@ -60,15 +59,15 @@ RATE_LIMIT_MAX_CALLS = int(get_secret("RATE_LIMIT_MAX_CALLS", "20"))
 RATE_LIMIT_WINDOW    = int(get_secret("RATE_LIMIT_WINDOW", "3600"))
 
 
-def _rate_limit_check(user_id: str = "default") -> tuple[bool, int]:
-    """Sliding-window rate limit. 返回 (allowed, remaining)."""
-    now = time.time()
-    _call_times[user_id] = [t for t in _call_times[user_id] if now - t < RATE_LIMIT_WINDOW]
-    remaining = RATE_LIMIT_MAX_CALLS - len(_call_times[user_id])
-    if remaining <= 0:
-        return False, 0
-    _call_times[user_id].append(now)
-    return True, remaining - 1
+def _rate_limit_consume(user_id: str) -> None:
+    """消耗一个 rate-limit slot。"""
+    _call_times[user_id].append(time.time())
+
+
+def _rate_limit_rollback(user_id: str) -> None:
+    """回滚最近一个 slot（API 调用失败时调用）。"""
+    if _call_times[user_id]:
+        _call_times[user_id].pop()
 
 
 def get_rate_limit_remaining(user_id: str = "default") -> int:
@@ -78,11 +77,20 @@ def get_rate_limit_remaining(user_id: str = "default") -> int:
     return max(0, RATE_LIMIT_MAX_CALLS - used)
 
 
+def get_rate_limit_reset_seconds(user_id: str = "default") -> int:
+    """返回最早 slot 释放的剩余秒数（供 UI 显示倒计时）。"""
+    now = time.time()
+    active = [t for t in _call_times[user_id] if now - t < RATE_LIMIT_WINDOW]
+    if not active:
+        return 0
+    earliest = min(active)
+    return max(0, int(RATE_LIMIT_WINDOW - (now - earliest)))
+
+
 def _check_preconditions(user_id: str = "default") -> str | None:
     """返回错误信息字符串；None 表示可以继续调用。不消耗 rate limit slot。"""
     if not get_secret("NVIDIA_API_KEY"):
         return "⚠️ 请先设置 NVIDIA_API_KEY（.env 文件或 Streamlit Cloud Secrets）"
-    # 先检查是否还有余量（不消耗 slot），通过后在调用时才消耗
     now = time.time()
     _call_times[user_id] = [t for t in _call_times[user_id] if now - t < RATE_LIMIT_WINDOW]
     if len(_call_times[user_id]) >= RATE_LIMIT_MAX_CALLS:
@@ -110,29 +118,36 @@ def call_llm(
     prompt: str,
     system_prompt: str | None = None,
     user_id: str = "default",
+    temperature: float = 0.7,
+    max_tokens: int | None = None,
 ) -> str:
-    """非流式调用，返回完整文本字符串。"""
+    """非流式调用，返回完整文本字符串。失败时自动回滚 rate-limit slot。"""
     err = _check_preconditions(user_id)
     if err:
         return err
 
-    # 通过前置检查后，正式消耗一个 rate-limit slot
-    _rate_limit_check(user_id)
+    # 先消耗 slot，失败则回滚
+    _rate_limit_consume(user_id)
 
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt})
 
+    kwargs: dict = {
+        "model": _MODEL,
+        "messages": messages,
+        "temperature": temperature,
+        "timeout": 60,
+    }
+    if max_tokens:
+        kwargs["max_tokens"] = max_tokens
+
     try:
-        resp = _get_client().chat.completions.create(
-            model=_MODEL,
-            messages=messages,
-            temperature=0.7,
-            timeout=60,
-        )
+        resp = _get_client().chat.completions.create(**kwargs)
         return resp.choices[0].message.content or ""
     except Exception as e:
+        _rate_limit_rollback(user_id)  # 失败回滚
         return _handle_api_error(e)
 
 
@@ -147,38 +162,46 @@ def stream_llm(
     prompt: str,
     system_prompt: str | None = None,
     user_id: str = "default",
+    temperature: float = 0.7,
+    max_tokens: int | None = None,
 ) -> Generator[str, None, None]:
     """
     流式调用，返回文本 token 的生成器。
-    供 Streamlit st.write_stream() 消费。
-    若发生错误，yield 错误消息字符串后结束。
+    仅在收到第一个 token 后才消耗 rate-limit slot。
     """
     err = _check_preconditions(user_id)
     if err:
         yield err
         return
 
-    # 通过前置检查后，正式消耗一个 rate-limit slot
-    _rate_limit_check(user_id)
-
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt})
 
+    kwargs: dict = {
+        "model": _MODEL,
+        "messages": messages,
+        "temperature": temperature,
+        "stream": True,
+        "timeout": 90,
+    }
+    if max_tokens:
+        kwargs["max_tokens"] = max_tokens
+
     try:
-        stream = _get_client().chat.completions.create(
-            model=_MODEL,
-            messages=messages,
-            temperature=0.7,
-            stream=True,
-            timeout=90,
-        )
+        stream = _get_client().chat.completions.create(**kwargs)
+        slot_consumed = False
         for chunk in stream:
             delta = chunk.choices[0].delta.content
             if delta:
+                if not slot_consumed:
+                    _rate_limit_consume(user_id)  # 第一个 token 到达才消耗
+                    slot_consumed = True
                 yield delta
+        # 如果流完全没产出 token（空响应），不消耗 slot
     except Exception as e:
+        # 流式失败不消耗 slot（slot_consumed 为 False 时已不消耗）
         yield _handle_api_error(e)
 
 
@@ -238,7 +261,6 @@ def generate_followup(
     return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
 
 
-
 def generate_listing(
     product: str,
     keywords: str,
@@ -251,7 +273,6 @@ def generate_listing(
     from config.prompts import build_listing_prompt
     prompt, system = build_listing_prompt(product, keywords, features, platform, category)
     return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
 
 
 def generate_social_post(

@@ -8,15 +8,18 @@ utils/secrets.py
 
 用法：
     from utils.secrets import get_secret
-    api_key = get_secret("KIMI_API_KEY")
+    api_key = get_secret("NVIDIA_API_KEY")
 """
 
 from __future__ import annotations
 
 import os
+import logging
 from dotenv import load_dotenv
 
 load_dotenv()
+
+_logger = logging.getLogger(__name__)
 
 
 def get_secret(key: str, default: str = "") -> str:
@@ -32,8 +35,14 @@ def get_secret(key: str, default: str = "") -> str:
         val = st.secrets.get(key, None)
         if val is not None:
             return str(val)
-    except Exception:
+    except (ImportError, AttributeError, FileNotFoundError):
+        # ImportError: streamlit 未安装（测试环境）
+        # AttributeError: st.secrets 不可用（非 Streamlit 运行时）
+        # FileNotFoundError: secrets.toml 不存在
         pass
+    except Exception as e:
+        # 记录意外错误但不中断
+        _logger.warning(f"Unexpected error reading st.secrets[{key!r}]: {e}")
 
     # 2. 从环境变量读取
     val = os.getenv(key, "")

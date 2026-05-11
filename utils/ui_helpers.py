@@ -137,8 +137,8 @@ def _get_session_user_id() -> str:
 
 
 def show_sidebar_info() -> None:
-    """在侧栏显示剩余 API 调用次数和重置倒计时。"""
-    from utils.ai_client import get_rate_limit_remaining, RATE_LIMIT_MAX_CALLS, RATE_LIMIT_WINDOW, _call_times
+    """在侧栏显示剩余 API 调用次数和重置倒计时（仅使用公共 API）。"""
+    from utils.ai_client import get_rate_limit_remaining, get_rate_limit_reset_seconds, RATE_LIMIT_MAX_CALLS, RATE_LIMIT_WINDOW
 
     uid = _get_session_user_id()
     remaining = get_rate_limit_remaining(uid)
@@ -150,12 +150,9 @@ def show_sidebar_info() -> None:
         st.progress(used / RATE_LIMIT_MAX_CALLS if RATE_LIMIT_MAX_CALLS > 0 else 0)
         st.caption(f"已用 **{used}** / {RATE_LIMIT_MAX_CALLS} 次（每 {RATE_LIMIT_WINDOW // 60} 分钟重置）")
 
-        # 计算最早 slot 何时过期
-        if _call_times.get(uid):
-            now = time.time()
-            earliest = min(_call_times[uid])
-            reset_in = max(0, int(RATE_LIMIT_WINDOW - (now - earliest)))
-            minutes, seconds = divmod(reset_in, 60)
+        reset_secs = get_rate_limit_reset_seconds(uid)
+        if reset_secs > 0:
+            minutes, seconds = divmod(reset_secs, 60)
             st.caption(f"🕐 最早释放: {minutes}分{seconds}秒后")
         st.markdown("---")
 
