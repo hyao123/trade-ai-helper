@@ -224,3 +224,54 @@ def build_listing_prompt(
     return prompt, system
 
 
+
+
+
+# ---------------------------------------------------------------------------
+# 社媒文案生成（LinkedIn / Instagram / Facebook）
+# ---------------------------------------------------------------------------
+SOCIAL_PLATFORMS: dict[str, str] = {
+    "LinkedIn": "LinkedIn post for B2B professionals",
+    "Instagram": "Instagram caption with hashtags",
+    "Facebook Ad": "Facebook ad copy (short + long versions)",
+    "All Platforms": "content for LinkedIn, Instagram, and Facebook",
+}
+
+
+def build_social_post_prompt(
+    product: str,
+    features: str,
+    platform: str = "LinkedIn",
+    audience: str = "",
+    promo: str = "",
+) -> tuple[str, str | None]:
+    """构建社媒文案 Prompt。"""
+    platform_desc = SOCIAL_PLATFORMS.get(platform, "social media post")
+    audience_info = f"\n目标受众: {audience}" if audience else ""
+    promo_info = f"\n促销/活动: {promo}" if promo else ""
+    system = (
+        "你是一位精通跨境电商社交媒体营销的文案专家，"
+        "擅长为 B2B/B2C 产品撰写高互动率的社媒内容。"
+    )
+    prompt = f"""请为以下产品生成 {platform_desc} 文案：
+
+产品: {product}
+产品卖点: {features}{audience_info}{promo_info}
+
+请按以下格式输出：
+
+## LinkedIn Post
+[100-150词，专业 B2B 风格，突出产品价值和行业洞察，含 CTA，适当使用换行提升可读性]
+
+## Instagram Caption
+[简短有力，含emoji，3-5个产品相关 hashtag + 3-5个行业通用 hashtag，含 CTA]
+
+## Facebook Ad Copy
+Short Version (25词以内):
+[精炼广告标题，吸引点击]
+
+Long Version (80-120词):
+[详细广告正文，讲故事+痛点+解决方案+CTA]
+
+输出纯英文，只输出文案内容。"""
+    return prompt, system

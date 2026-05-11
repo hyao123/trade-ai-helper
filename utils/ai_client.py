@@ -251,3 +251,18 @@ def generate_listing(
     from config.prompts import build_listing_prompt
     prompt, system = build_listing_prompt(product, keywords, features, platform, category)
     return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
+
+
+
+def generate_social_post(
+    product: str,
+    features: str,
+    platform: str = "All Platforms",
+    audience: str = "",
+    promo: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    from config.prompts import build_social_post_prompt
+    prompt, system = build_social_post_prompt(product, features, platform, audience, promo)
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)

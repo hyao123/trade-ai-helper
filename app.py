@@ -28,7 +28,7 @@ st.markdown("""
 # ── Stats ─────────────────────────────────────────────────────────────────
 c1, c2, c3, c4, c5 = st.columns(5)
 for col, val, label in [
-    (c1, "7",      "核心功能"),
+    (c1, "8",      "核心功能"),
     (c2, "5+",     "语种支持"),
     (c3, "⚡ 流式", "实时输出"),
     (c4, "Listing","Amazon/Shopify"),
@@ -97,9 +97,16 @@ FEATURES = [
         "badge": "🆕 CRM",
         "page": "pages/7_📇_客户管理.py",
     },
+    {
+        "icon": "💬",
+        "title": "社媒文案",
+        "desc": "生成 LinkedIn/Instagram/Facebook 营销文案，含 hashtag",
+        "badge": "🔥 获客利器",
+        "page": "pages/8_💬_社媒文案.py",
+    },
 ]
 
-cols = st.columns(7)
+cols = st.columns(4)
 for col, feat in zip(cols, FEATURES):
     with col:
         st.markdown(
