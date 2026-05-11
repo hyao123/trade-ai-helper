@@ -1,166 +1,226 @@
+"""
+utils/ai_client.py
+------------------
+Kimi (Moonshot) API 调用层。
+
+- 使用 openai SDK（Moonshot 兼容 OpenAI 接口）
+- call_kimi()      非流式，返回 str
+- stream_kimi()    流式，返回 Generator[str]，供 st.write_stream() 消费
+- Rate Limiting 基于内存 sliding-window（注：多进程/重启后计数重置）
+- 所有 Prompt 模板从 config.prompts 导入
+"""
+
+from __future__ import annotations
+
 import os
-import json
-import requests
+import time
+import types
+from collections import defaultdict
+from typing import Generator
 
-API_KEY = os.getenv("KIMI_API_KEY", "")
-API_BASE = "https://api.moonshot.cn/v1"
+from dotenv import load_dotenv
+from openai import OpenAI, AuthenticationError, RateLimitError, APIStatusError, APITimeoutError
 
-EMAIL_STYLES = {
-    "简洁专业": "简洁有力，50-80词，直接说明产品优势和合作邀请",
-    "正式商务": "正式专业，100-150词，详细介绍产品资质和公司实力",
-    "亲切友好": "友好亲切，80-100词，建立个人关系， softer tone"
-}
+from config.prompts import (
+    build_email_prompt,
+    build_inquiry_prompt,
+    build_product_intro_prompt,
+    build_followup_prompt,
+)
 
-def call_kimi(prompt, system_prompt=None):
-    """调用Kimi API"""
-    if not API_KEY:
-        return "⚠️ 请先设置 KIMI_API_KEY 环境变量"
-    
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {API_KEY}"
-    }
-    
+load_dotenv()
+
+# ---------------------------------------------------------------------------
+# 客户端单例
+# ---------------------------------------------------------------------------
+_API_KEY  = os.getenv("KIMI_API_KEY", "")
+_API_BASE = "https://api.moonshot.cn/v1"
+_MODEL    = os.getenv("KIMI_MODEL", "moonshot-v1-8k")
+
+_client: OpenAI | None = None
+
+
+def _get_client() -> OpenAI:
+    """返回全局单例 OpenAI 客户端，避免每次调用新建连接池。"""
+    global _client, _API_KEY
+    # 若 API Key 在运行时通过环境变量变更，重建客户端
+    current_key = os.getenv("KIMI_API_KEY", "")
+    if _client is None or current_key != _API_KEY:
+        _API_KEY = current_key
+        _client = OpenAI(api_key=_API_KEY, base_url=_API_BASE)
+    return _client
+
+
+# ---------------------------------------------------------------------------
+# Rate Limiting（内存 sliding-window）
+# ---------------------------------------------------------------------------
+_call_times: dict[str, list[float]] = defaultdict(list)
+
+RATE_LIMIT_MAX_CALLS = int(os.getenv("RATE_LIMIT_MAX_CALLS", "20"))
+RATE_LIMIT_WINDOW    = int(os.getenv("RATE_LIMIT_WINDOW", "3600"))
+
+
+def _rate_limit_check(user_id: str = "default") -> tuple[bool, int]:
+    """Sliding-window rate limit. 返回 (allowed, remaining)."""
+    now = time.time()
+    _call_times[user_id] = [t for t in _call_times[user_id] if now - t < RATE_LIMIT_WINDOW]
+    remaining = RATE_LIMIT_MAX_CALLS - len(_call_times[user_id])
+    if remaining <= 0:
+        return False, 0
+    _call_times[user_id].append(now)
+    return True, remaining - 1
+
+
+def get_rate_limit_remaining(user_id: str = "default") -> int:
+    """返回当前窗口内剩余调用次数（不消耗配额）。"""
+    now = time.time()
+    used = len([t for t in _call_times[user_id] if now - t < RATE_LIMIT_WINDOW])
+    return max(0, RATE_LIMIT_MAX_CALLS - used)
+
+
+def _check_preconditions(user_id: str = "default") -> str | None:
+    """返回错误信息字符串；None 表示可以继续调用。"""
+    if not os.getenv("KIMI_API_KEY", ""):
+        return "⚠️ 请先在 .env 文件中设置 KIMI_API_KEY 环境变量"
+    allowed, _ = _rate_limit_check(user_id)
+    if not allowed:
+        wait_min = RATE_LIMIT_WINDOW // 60
+        return f"⚠️ 调用频率超限，每 {wait_min} 分钟最多 {RATE_LIMIT_MAX_CALLS} 次，请稍后再试。"
+    return None
+
+
+def _handle_api_error(e: Exception) -> str:
+    if isinstance(e, AuthenticationError):
+        return "⚠️ API Key 无效，请检查 KIMI_API_KEY 是否正确。"
+    if isinstance(e, RateLimitError):
+        return "⚠️ API 调用超出 Kimi 平台限额，请稍后重试或升级套餐。"
+    if isinstance(e, APITimeoutError):
+        return "⚠️ 请求超时，请检查网络连接后重试。"
+    if isinstance(e, APIStatusError):
+        return f"⚠️ Kimi 服务器错误 ({e.status_code})，请稍后重试。"
+    return f"⚠️ 调用失败: {e}"
+
+
+# ---------------------------------------------------------------------------
+# 核心调用 — 非流式
+# ---------------------------------------------------------------------------
+def call_kimi(
+    prompt: str,
+    system_prompt: str | None = None,
+    user_id: str = "default",
+) -> str:
+    """非流式调用，返回完整文本字符串。"""
+    err = _check_preconditions(user_id)
+    if err:
+        return err
+
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt})
-    
-    data = {
-        "model": "moonshot-v1-8k",
-        "messages": messages,
-        "temperature": 0.7
-    }
-    
+
     try:
-        response = requests.post(
-            f"{API_BASE}/chat/completions",
-            headers=headers,
-            json=data,
-            timeout=30
+        resp = _get_client().chat.completions.create(
+            model=_MODEL,
+            messages=messages,
+            temperature=0.7,
+            timeout=60,
         )
-        if response.status_code == 200:
-            result = response.json()
-            return result["choices"][0]["message"]["content"]
-        else:
-            return f"⚠️ API错误: {response.status_code}"
+        return resp.choices[0].message.content or ""
     except Exception as e:
-        return f"⚠️ 调用失败: {str(e)}"
+        return _handle_api_error(e)
 
 
-def generate_email(product, customer, features, tone="简洁专业"):
-    """生成开发信"""
-    style = EMAIL_STYLES.get(tone, EMAIL_STYLES["简洁专业"])
-    
-    prompt = f"""请根据以下信息生成一封专业英文开发信：
+# ---------------------------------------------------------------------------
+# 核心调用 — 流式
+# ---------------------------------------------------------------------------
+def stream_kimi(
+    prompt: str,
+    system_prompt: str | None = None,
+    user_id: str = "default",
+) -> Generator[str, None, None]:
+    """
+    流式调用，返回文本 token 的生成器。
+    供 Streamlit st.write_stream() 消费。
+    若发生错误，yield 错误消息字符串后结束。
+    """
+    err = _check_preconditions(user_id)
+    if err:
+        yield err
+        return
 
-- 产品: {product}
-- 目标客户: {customer}
-- 产品卖点: {features}
-- 风格: {style}
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
 
-要求：
-1. 开头问候并说明如何得知客户
-2. 简明介绍产品优势
-3. 突出差异化卖点
-4. 结尾Call to Action（邀请回复/视频会议）
-5. 签名占位 [Your Name]
-6. 公司信息占位 [Your Company]
-
-输出纯文本开发信，不需要格式符号。"""
-    
-    return call_kimi(prompt)
-
-
-def reply_inquiry(inquiry, customer_name="", your_name=""):
-    """生成询盘回复"""
-    customer_info = f"客户: {customer_name}" if customer_name else "某客户"
-    
-    prompt = f"""你是一位专业外贸业务员。请回复以下客户询盘：
-
-{customer_info}的询盘内容：
-{inquiry}
-
-请生成专业回复，包含：
-1. 感谢客户询盘
-2. 回答客户问题
-3. 提供合理报价区间（如不确定则给范围）
-4. 询问其他需求
-5. 邀请进一步沟通
-
-{"签名: " + your_name if your_name else "签名: [Your Name]"}
-"""
-    
-    return call_kimi(prompt)
+    try:
+        stream = _get_client().chat.completions.create(
+            model=_MODEL,
+            messages=messages,
+            temperature=0.7,
+            stream=True,
+            timeout=90,
+        )
+        for chunk in stream:
+            delta = chunk.choices[0].delta.content
+            if delta:
+                yield delta
+    except Exception as e:
+        yield _handle_api_error(e)
 
 
-def generate_product_intro(product, features, target, languages):
-    """生成多语种产品介绍"""
-    lang_map = {
-        "英语": "English",
-        "西班牙语": "Spanish",
-        "法语": "French", 
-        "德语": "German",
-        "日语": "Japanese"
-    }
-    
-    langs = [lang_map[l] for l in languages]
-    lang_str = ", ".join(langs)
-    
-    prompt = f"""请为以下产品生成{lang_str}的产品介绍文案：
-
-产品: {product}
-特点: {features}
-目标市场: {target}
-
-要求：
-1. 简洁专业
-2. 突出产品优势
-3. 适合B2B外贸场景
-4. 每种语言单独输出，标注语言名称
-5. 包含产品描述、优势、应用领域"""
-    
-    return call_kimi(prompt)
+def _is_generator(obj: object) -> bool:
+    """精确判断是否为生成器对象。"""
+    return isinstance(obj, types.GeneratorType)
 
 
-def generate_follow_up(customer, stage):
-    """生成跟进邮件"""
-    stages = {
-        "已报价": "报价后跟进，确认客户意向",
-        "已发样": "样品跟进，询问反馈",
-        "已谈判": "价格谈判，促成订单",
-        "已下单": "订单确认，感谢下单"
-    }
-    
-    context = stages.get(stage, "常规跟进")
-    
-    prompt = f"""请生成一封跟进邮件：
-- 客户: {customer}
-- 阶段: {context}
+# ---------------------------------------------------------------------------
+# 业务函数
+# ---------------------------------------------------------------------------
 
-要求：
-1. 根据阶段选择合适内容
-2. 专业但不过分催促
-3. 包含明确的下一步行动邀请"""
-    
-    return call_kimi(prompt)
+def generate_email(
+    product: str,
+    customer: str,
+    features: str,
+    tone: str = "简洁专业",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    prompt, system = build_email_prompt(product, customer, features, tone)
+    return stream_kimi(prompt, system, user_id) if stream else call_kimi(prompt, system, user_id)
 
 
-def generate_linkedin_message(profile_info, purpose="connect"):
-    """生成领英消息"""
-    purposes = {
-        "connect": "建立联系",
-        "introduce": "自我介绍",
-        "followup": "跟进"
-    }
-    
-    prompt = f"""请生成一条LinkedIn消息：
-- 目的: {purposes.get(purpose, purpose)}
-- 对方信息: {profile_info}
+def reply_inquiry(
+    inquiry: str,
+    customer_name: str = "",
+    your_name: str = "",
+    company_name: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    prompt, system = build_inquiry_prompt(inquiry, customer_name, your_name, company_name)
+    return stream_kimi(prompt, system, user_id) if stream else call_kimi(prompt, system, user_id)
 
-要求：
-1. 简短（50词内）
-2. 专业友好
-3. 有明确的连接原因"""
-    
-    return call_kimi(prompt)
+
+def generate_product_intro(
+    product: str,
+    features: str,
+    target: str,
+    languages: list[str],
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    prompt, system = build_product_intro_prompt(product, features, target, languages)
+    return stream_kimi(prompt, system, user_id) if stream else call_kimi(prompt, system, user_id)
+
+
+def generate_followup(
+    customer: str,
+    stage: str,
+    product: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    prompt, system = build_followup_prompt(customer, stage, product)
+    return stream_kimi(prompt, system, user_id) if stream else call_kimi(prompt, system, user_id)
