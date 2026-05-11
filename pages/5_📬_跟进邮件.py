@@ -22,7 +22,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ── 阶段说明卡 ────────────────────────────────────────
+# ── 阶段说明 ──────────────────────────────────────────
 with st.expander("📖 各跟进阶段说明", expanded=False):
     for stage, desc in FOLLOWUP_STAGES.items():
         st.markdown(f"- **{stage}**：{desc}")
@@ -51,7 +51,6 @@ with col2:
     )
     stream_mode = st.toggle("⚡ 流式输出（实时显示）", value=True)
 
-# 阶段场景提示
 st.info(f"**当前阶段说明：** {FOLLOWUP_STAGES.get(stage, '')}")
 
 generate_clicked = st.button("🚀 生成跟进邮件", type="primary", use_container_width=True)
@@ -64,24 +63,17 @@ if generate_clicked:
     else:
         st.session_state["followup_customer_val"] = customer
         st.session_state["followup_product_val"]  = product
+        st.session_state.results.pop("followup", None)
 
+        fname = f"跟进邮件_{customer}_{stage}.txt"
         if stream_mode:
             result = generate_followup(customer, stage, product, stream=True)
-            show_result(
-                result, "followup",
-                label="📝 跟进邮件",
-                file_name=f"跟进邮件_{customer}_{stage}.txt",
-            )
+            show_result(result, "followup", label="📝 跟进邮件", file_name=fname)
         else:
             with st.spinner("🤖 AI 正在生成..."):
                 result = generate_followup(customer, stage, product, stream=False)
             st.session_state.results["followup"] = result
-            show_result(
-                result, "followup",
-                label="📝 跟进邮件",
-                file_name=f"跟进邮件_{customer}_{stage}.txt",
-                balloons=True,
-            )
+            show_result(result, "followup", label="📝 跟进邮件", file_name=fname, balloons=True)
 
 elif st.session_state.results.get("followup"):
     show_result(

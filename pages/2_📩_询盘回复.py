@@ -31,11 +31,15 @@ with col1:
         "客户询盘内容 *",
         height=200,
         placeholder="粘贴客户发来的完整邮件内容...\n\nHi, I'm interested in your LED desk lamps...",
+        value=st.session_state.get("inquiry_text_val", ""),
     )
 with col2:
-    customer_name = st.text_input("客户姓名（可选）", placeholder="例如: Mike Johnson")
-    your_name     = st.text_input("你的姓名（可选）", placeholder="签名用，例如: Tom")
-    company_name  = st.text_input("公司名称（可选）", placeholder="您的公司名称，用于签名")
+    customer_name = st.text_input("客户姓名（可选）", placeholder="例如: Mike Johnson",
+                                   value=st.session_state.get("inquiry_customer_val", ""))
+    your_name     = st.text_input("你的姓名（可选）", placeholder="签名用，例如: Tom",
+                                   value=st.session_state.get("inquiry_your_name_val", ""))
+    company_name  = st.text_input("公司名称（可选）", placeholder="您的公司名称，用于签名",
+                                   value=st.session_state.get("inquiry_company_val", ""))
     stream_mode   = st.toggle("⚡ 流式输出（实时显示）", value=True)
 
 generate_clicked = st.button("🚀 生成回复", type="primary", use_container_width=True)
@@ -46,23 +50,22 @@ if generate_clicked:
     if not inquiry.strip():
         st.warning("⚠️ 请粘贴客户询盘内容")
     else:
+        # 保存表单值
+        st.session_state["inquiry_text_val"]      = inquiry
+        st.session_state["inquiry_customer_val"]  = customer_name
+        st.session_state["inquiry_your_name_val"] = your_name
+        st.session_state["inquiry_company_val"]   = company_name
+        st.session_state.results.pop("inquiry", None)
+
+        fname = f"询盘回复_{customer_name or '客户'}.txt"
         if stream_mode:
             result = reply_inquiry(inquiry, customer_name, your_name, company_name, stream=True)
-            show_result(
-                result, "inquiry",
-                label="📝 回复草稿",
-                file_name=f"询盘回复_{customer_name or '客户'}.txt",
-            )
+            show_result(result, "inquiry", label="📝 回复草稿", file_name=fname)
         else:
             with st.spinner("🤖 AI 正在生成..."):
                 result = reply_inquiry(inquiry, customer_name, your_name, company_name, stream=False)
             st.session_state.results["inquiry"] = result
-            show_result(
-                result, "inquiry",
-                label="📝 回复草稿",
-                file_name=f"询盘回复_{customer_name or '客户'}.txt",
-                balloons=True,
-            )
+            show_result(result, "inquiry", label="📝 回复草稿", file_name=fname, balloons=True)
 
 elif st.session_state.results.get("inquiry"):
     show_result(

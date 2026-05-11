@@ -61,10 +61,12 @@ if generate_clicked:
     elif not features_text.strip():
         st.warning("⚠️ 请填写产品卖点，内容越详细生成效果越好")
     else:
-        # 保存表单值，避免生成后重渲染丢失
+        # 保存表单值，避免生成后重渲染丢失输入
         st.session_state["email_product_val"]  = product
         st.session_state["email_customer_val"] = customer
         st.session_state["email_features_val"] = features_text
+        # 清除上次结果，避免新旧结果同时显示
+        st.session_state.results.pop("email", None)
 
         if stream_mode:
             result = generate_email(product, customer, features_text, tone, stream=True)
@@ -92,7 +94,7 @@ elif st.session_state.results.get("email"):
         st.session_state.results["email"],
         "email",
         label="📝 开发信正文（上次结果）",
-        file_name="开发信_上次结果.txt",
+        file_name=f"开发信_{st.session_state.get('email_product_val', '结果')}.txt",
         balloons=False,
         show_subject_line=True,
     )

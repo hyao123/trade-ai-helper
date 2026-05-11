@@ -2,22 +2,19 @@
 utils/ui_helpers.py
 -------------------
 所有页面共享的 UI 组件：
-- inject_css()   注入全局样式（幂等，多次调用安全）
+- inject_css()   注入全局样式（幂等，用 session_state 控制）
 - check_auth()   访问密码鉴权
 - copy_button()  真实可用的"复制到剪贴板"按钮
-- show_result()  统一渲染生成结果区域（支持流式 & 非流式）
+- show_result()  统一渲染生成结果区域（流式/非流式均正确处理）
 """
 
 from __future__ import annotations
 
-import os
+import json
 import types
-from typing import Generator
 
 import streamlit as st
 from utils.secrets import get_secret
-
-APP_PASSWORD = get_secret("APP_PASSWORD")
 
 # ---------------------------------------------------------------------------
 # 全局 CSS
@@ -30,7 +27,6 @@ _CSS = """
     .block-container { padding: 2rem 3rem !important; max-width: 1400px !important; }
     h1, h2, h3 { font-weight: 600 !important; }
 
-    /* Hero */
     .hero-section {
         background: linear-gradient(135deg, #1e3a5f 0%, #3b82f6 50%, #8b5cf6 100%);
         padding: 2rem; border-radius: 16px; color: white; margin-bottom: 1.5rem;
@@ -43,7 +39,6 @@ _CSS = """
         gap: 0.5rem; margin-top: 0.75rem; font-size: 0.9rem;
     }
 
-    /* Stats */
     .stat-card {
         background: white; border-radius: 14px; padding: 1.25rem;
         text-align: center; box-shadow: 0 2px 12px rgba(0,0,0,0.06);
@@ -52,7 +47,6 @@ _CSS = """
     .stat-value { font-size: 1.6rem; font-weight: 700; color: #1e3a5f; }
     .stat-label { font-size: 0.8rem; color: #666; margin-top: 0.25rem; }
 
-    /* Form card */
     .main-form {
         background: white; border-radius: 16px; padding: 2rem;
         box-shadow: 0 2px 16px rgba(0,0,0,0.06); border: 1px solid #e5e7eb;
@@ -60,7 +54,6 @@ _CSS = """
     }
     .form-title { color: #1e3a5f; font-size: 1.15rem; font-weight: 600; margin-bottom: 1.25rem; }
 
-    /* Inputs */
     .stTextInput > div > div > input,
     .stTextArea  > div > div > textarea {
         border-radius: 8px; border: 1.5px solid #e5e7eb; padding: 0.6rem 0.85rem;
@@ -71,7 +64,6 @@ _CSS = """
     }
     .stButton > button { border-radius: 8px; font-weight: 600; padding: 0.6rem 1.25rem; }
 
-    /* Tip / Success */
     .tip-card {
         background: #fef9c3; border-radius: 8px; padding: 0.75rem 1rem;
         border-left: 3px solid #f59e0b; margin-bottom: 1rem; font-size: 0.85rem;
@@ -96,7 +88,14 @@ _CSS = """
                      text-transform: uppercase; letter-spacing: 0.05em; }
     .subject-text  { font-size: 1rem; font-weight: 600; color: #1e3a5f; margin-top: 0.25rem; }
 
-    /* Login */
+    /* 流式输出区域 */
+    .stream-container {
+        background: #f8fafc; border-radius: 10px; padding: 1.25rem;
+        border: 1.5px dashed #bfdbfe; margin: 0.75rem 0;
+        min-height: 60px; line-height: 1.7; white-space: pre-wrap;
+        font-size: 0.95rem; color: #1e3a5f;
+    }
+
     .login-box {
         max-width: 400px; margin: 6rem auto; background: white;
         border-radius: 20px; padding: 2.5rem;
@@ -105,25 +104,19 @@ _CSS = """
     .login-title { font-size: 1.4rem; font-weight: 700; color: #1e3a5f; margin-bottom: 0.5rem; }
     .login-sub   { color: #6b7280; font-size: 0.9rem; margin-bottom: 1.5rem; }
 
-    /* Sidebar */
     [data-testid="stSidebar"] { background: linear-gradient(180deg, #1e3a5f 0%, #0f172a 100%); }
-
-    /* Footer */
     .footer { text-align: center; padding: 1.5rem; color: #9ca3af; font-size: 0.8rem; }
 
     @media (max-width: 768px) { .block-container { padding: 0.75rem !important; } }
 </style>
 """
 
-_css_injected = False
-
 
 def inject_css() -> None:
-    """注入全局 CSS（幂等，同一 session 内多次调用只注入一次）。"""
-    global _css_injected
-    if not _css_injected:
+    """注入全局 CSS（幂等：用 session_state 控制，每次 session 只注入一次）。"""
+    if not st.session_state.get("_css_injected"):
         st.markdown(_CSS, unsafe_allow_html=True)
-        _css_injected = True
+        st.session_state["_css_injected"] = True
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +125,7 @@ def inject_css() -> None:
 def check_auth() -> None:
     """
     密码验证。
-    - APP_PASSWORD 未设置 → 直接通过（本地开发友好）
+    - APP_PASSWORD 未设置 → 直接通过
     - 已通过验证 → 直接通过
     - 未通过 → 渲染登录框并 st.stop()
     """
@@ -163,16 +156,16 @@ def check_auth() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 复制按钮
+# 复制按钮（用 json.dumps 安全转义，防止 JS 注入）
 # ---------------------------------------------------------------------------
 def copy_button(text: str, key: str) -> None:
-    """使用 navigator.clipboard JS API 实现真实复制，2s 后按钮文字恢复。"""
-    safe = text.replace("\\", "\\\\").replace("`", "\\`").replace("'", "\\'")
+    """使用 navigator.clipboard JS API 实现真实复制，2s 后恢复。"""
+    safe_js = json.dumps(text)   # 自动处理所有转义：\n \\ " 等
     btn_id = f"copy_btn_{key}"
     st.components.v1.html(
         f"""
         <button id="{btn_id}"
-            onclick="navigator.clipboard.writeText(`{safe}`).then(()=>{{
+            onclick="navigator.clipboard.writeText({safe_js}).then(()=>{{
                 var b=document.getElementById('{btn_id}');
                 b.innerText='✅ 已复制';
                 b.style.background='#dcfce7';b.style.borderColor='#22c55e';b.style.color='#166534';
@@ -192,17 +185,25 @@ def copy_button(text: str, key: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Subject Line 提取与展示
+# Subject Line 提取
 # ---------------------------------------------------------------------------
 def extract_subject(text: str) -> tuple[str, str]:
     """
-    若文本首行以 'Subject:' 开头，提取并返回 (subject, body)。
+    若文本首行以 'Subject:' 开头，返回 (subject, body)。
     否则返回 ('', text)。
+    同时跳过 Subject 行后的空行。
     """
     lines = text.strip().splitlines()
-    if lines and lines[0].lower().startswith("subject:"):
-        subject = lines[0][len("subject:"):].strip()
-        body = "\n".join(lines[1:]).strip()
+    if not lines:
+        return "", text
+    first = lines[0].strip()
+    if first.lower().startswith("subject:"):
+        subject = first[len("subject:"):].strip()
+        # 跳过 subject 行之后的空行
+        rest_lines = lines[1:]
+        while rest_lines and not rest_lines[0].strip():
+            rest_lines = rest_lines[1:]
+        body = "\n".join(rest_lines).strip()
         return subject, body
     return "", text
 
@@ -222,45 +223,17 @@ def show_subject(subject: str, key: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 生成结果区域（流式 + 非流式统一入口）
+# 结果展示区（静态：非流式 or 流式完成后）
 # ---------------------------------------------------------------------------
-def show_result(
-    result: str | types.GeneratorType,
+def _render_result_area(
+    text: str,
     result_key: str,
-    label: str = "📝 生成结果",
-    file_name: str = "result.txt",
-    height: int = 220,
-    balloons: bool = True,
-    show_subject_line: bool = False,
+    label: str,
+    file_name: str,
+    height: int,
+    show_subject_line: bool,
 ) -> None:
-    """
-    统一渲染生成结果区域。
-    - result 是 GeneratorType → 流式渲染，完成后存入 session_state.results
-    - result 是 str           → 直接展示
-    - show_subject_line=True  → 自动提取并高亮显示 Subject Line
-    """
-    if not result:
-        return
-
-    if "results" not in st.session_state:
-        st.session_state.results = {}
-
-    # --- 流式模式 ---
-    if isinstance(result, types.GeneratorType):
-        st.markdown(
-            '<div class="success-box">'
-            '<div style="font-size:1.5rem;">⚡</div>'
-            '<div class="success-title">正在生成中...</div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-        full_text: str = st.write_stream(result)  # type: ignore[arg-type]
-        st.session_state.results[result_key] = full_text
-        result = full_text
-        if balloons:
-            st.balloons()
-
-    # --- 成功提示 ---
+    """渲染成功提示 + 可选 Subject Line + 文本区 + 下载/复制按钮。"""
     st.markdown(
         '<div class="success-box">'
         '<div style="font-size:1.5rem;">✅</div>'
@@ -269,15 +242,12 @@ def show_result(
         unsafe_allow_html=True,
     )
 
-    # --- Subject Line 提取（开发信专用）---
-    display_text = result
-    subject = ""
+    display_text = text
     if show_subject_line:
-        subject, display_text = extract_subject(result)
+        subject, display_text = extract_subject(text)
         if subject:
             show_subject(subject, result_key)
 
-    # --- 正文展示 ---
     st.markdown('<div class="result-area">', unsafe_allow_html=True)
     st.text_area(label, display_text, height=height, key=f"display_{result_key}")
     col1, col2 = st.columns(2)
@@ -290,3 +260,77 @@ def show_result(
     with col2:
         copy_button(display_text, result_key)
     st.markdown("</div>", unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------------------------
+# 流式渲染（核心修复：让 st.write_stream 在干净容器里运行）
+# ---------------------------------------------------------------------------
+def _stream_into_container(generator: types.GeneratorType) -> str:
+    """
+    在一个干净的 st.container() 内运行 st.write_stream()。
+    避免周围 HTML/markdown 块干扰 Streamlit 的增量更新机制。
+    返回完整文本。
+    """
+    with st.container():
+        full_text: str = st.write_stream(generator)  # type: ignore[arg-type]
+    return full_text
+
+
+# ---------------------------------------------------------------------------
+# 统一入口：show_result
+# ---------------------------------------------------------------------------
+def show_result(
+    result: str | types.GeneratorType,
+    result_key: str,
+    label: str = "📝 生成结果",
+    file_name: str = "result.txt",
+    height: int = 220,
+    balloons: bool = True,
+    show_subject_line: bool = False,
+) -> None:
+    """
+    统一渲染生成结果区域。
+
+    流式模式（result 是 GeneratorType）：
+      1. 显示"⚡ 正在生成中..."提示
+      2. 在干净容器内调用 st.write_stream()，token 实时滚动显示
+      3. 流式完成后：保存到 session_state，渲染 Subject Line + 下载/复制按钮
+
+    非流式模式（result 是 str）：
+      直接调用 _render_result_area() 展示。
+    """
+    if not result:
+        return
+
+    if "results" not in st.session_state:
+        st.session_state.results = {}
+
+    # ── 流式模式 ──────────────────────────────────────
+    if isinstance(result, types.GeneratorType):
+        # 1. 状态提示（放在流式区域之前，不影响 write_stream）
+        status_placeholder = st.empty()
+        status_placeholder.markdown(
+            '<div class="success-box">'
+            '<div style="font-size:1.2rem;">⚡ 正在生成中，请稍候...</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        # 2. 流式输出（独立容器，避免 HTML 块干扰）
+        full_text = _stream_into_container(result)
+
+        # 3. 清除"正在生成"提示
+        status_placeholder.empty()
+
+        # 4. 保存结果
+        st.session_state.results[result_key] = full_text
+
+        if balloons:
+            st.balloons()
+
+        # 5. 渲染静态结果区（Subject Line + 下载 + 复制）
+        _render_result_area(full_text, result_key, label, file_name, height, show_subject_line)
+        return
+
+    # ── 非流式模式 ────────────────────────────────────
+    _render_result_area(result, result_key, label, file_name, height, show_subject_line)
