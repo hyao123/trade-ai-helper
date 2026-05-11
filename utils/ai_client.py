@@ -195,10 +195,11 @@ def generate_email(
     customer: str,
     features: str,
     tone: str = "简洁专业",
+    language: str = "英语",
     stream: bool = False,
     user_id: str = "default",
 ) -> str | Generator[str, None, None]:
-    prompt, system = build_email_prompt(product, customer, features, tone)
+    prompt, system = build_email_prompt(product, customer, features, tone, language)
     return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
 
 
@@ -234,4 +235,19 @@ def generate_followup(
     user_id: str = "default",
 ) -> str | Generator[str, None, None]:
     prompt, system = build_followup_prompt(customer, stage, product)
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
+
+
+
+def generate_listing(
+    product: str,
+    keywords: str,
+    features: str,
+    platform: str = "Amazon",
+    category: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    from config.prompts import build_listing_prompt
+    prompt, system = build_listing_prompt(product, keywords, features, platform, category)
     return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)

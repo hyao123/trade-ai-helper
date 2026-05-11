@@ -42,6 +42,11 @@ with col2:
         "亲切友好 (80-100词)": "亲切友好",
     }
     tone = tone_map[tone_label]
+    language = st.selectbox(
+        "输出语言",
+        ["英语", "西班牙语", "法语", "德语", "葡萄牙语", "阿拉伯语", "俄语"],
+        help="选择目标市场的语言，AI 会用该语言撰写邮件",
+    )
     stream_mode = st.toggle("⚡ 流式输出（实时显示）", value=True)
 
 features_text = st.text_area(
@@ -69,7 +74,7 @@ if generate_clicked:
         st.session_state.results.pop("email", None)
 
         if stream_mode:
-            result = generate_email(product, customer, features_text, tone, stream=True, user_id=get_user_id())
+            result = generate_email(product, customer, features_text, tone, language, stream=True, user_id=get_user_id())
             show_result(
                 result, "email",
                 label="📝 开发信正文",
@@ -78,7 +83,7 @@ if generate_clicked:
             )
         else:
             with st.spinner("🤖 AI 正在生成..."):
-                result = generate_email(product, customer, features_text, tone, stream=False, user_id=get_user_id())
+                result = generate_email(product, customer, features_text, tone, language, stream=False, user_id=get_user_id())
             st.session_state.results["email"] = result
             show_result(
                 result, "email",

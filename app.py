@@ -28,11 +28,11 @@ st.markdown("""
 # ── Stats ─────────────────────────────────────────────────────────────────
 c1, c2, c3, c4, c5 = st.columns(5)
 for col, val, label in [
-    (c1, "5",      "核心功能"),
+    (c1, "6",      "核心功能"),
     (c2, "5+",     "语种支持"),
     (c3, "⚡ 流式", "实时输出"),
-    (c4, "PDF",    "多SKU报价单"),
-    (c5, "Subject","主题行生成"),
+    (c4, "Listing","Amazon/Shopify"),
+    (c5, "PDF",    "多SKU报价单"),
 ]:
     col.markdown(
         f'<div class="stat-card">'
@@ -83,9 +83,16 @@ FEATURES = [
         "badge": "⚡ 流式输出",
         "page": "pages/5_📬_跟进邮件.py",
     },
+    {
+        "icon": "🛒",
+        "title": "产品上架",
+        "desc": "生成 Amazon/Shopify Listing（标题+卖点+描述+搜索词）",
+        "badge": "🔥 跨境电商",
+        "page": "pages/6_🛒_产品上架.py",
+    },
 ]
 
-cols = st.columns(5)
+cols = st.columns(6)
 for col, feat in zip(cols, FEATURES):
     with col:
         st.markdown(

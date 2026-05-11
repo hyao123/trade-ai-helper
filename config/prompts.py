@@ -14,26 +14,39 @@ EMAIL_STYLES: dict[str, str] = {
     "亲切友好": "友好亲切，80-100词，建立个人关系，softer tone",
 }
 
+EMAIL_LANGUAGES: dict[str, str] = {
+    "英语": "English",
+    "西班牙语": "Spanish",
+    "法语": "French",
+    "德语": "German",
+    "葡萄牙语": "Portuguese",
+    "阿拉伯语": "Arabic",
+    "俄语": "Russian",
+}
+
 
 def build_email_prompt(
     product: str,
     customer: str,
     features: str,
     tone: str = "简洁专业",
+    language: str = "英语",
 ) -> tuple[str, str | None]:
     style = EMAIL_STYLES.get(tone, EMAIL_STYLES["简洁专业"])
-    system = "你是一位有10年经验的外贸业务员，擅长撰写高转化率的英文开发信。"
-    prompt = f"""请根据以下信息生成一封专业英文开发信，同时生成一个吸引人的邮件主题行（Subject Line）：
+    lang_name = EMAIL_LANGUAGES.get(language, "English")
+    system = f"你是一位有10年经验的外贸业务员，擅长撰写高转化率的{lang_name}开发信。"
+    prompt = f"""请根据以下信息生成一封专业的{lang_name}开发信，同时生成一个吸引人的邮件主题行（Subject Line）：
 
 - 产品: {product}
 - 目标客户: {customer}
 - 产品卖点: {features}
 - 风格要求: {style}
+- 输出语言: {lang_name}
 
 输出格式（严格按此格式）：
-Subject: [邮件主题行，不超过60字符，突出核心价值]
+Subject: [邮件主题行，不超过60字符，用{lang_name}写，突出核心价值]
 
-[邮件正文开始]
+[邮件正文开始，用{lang_name}写]
 ...邮件内容...
 [Your Name]
 [Your Company]
@@ -44,6 +57,7 @@ Subject: [邮件主题行，不超过60字符，突出核心价值]
 3. 简明介绍产品核心优势（2-3点）
 4. 突出差异化卖点
 5. 结尾包含明确的 Call to Action
+6. 全文使用{lang_name}撰写
 
 只输出纯文本，不要加 markdown 符号。"""
     return prompt, system
@@ -151,3 +165,62 @@ def build_followup_prompt(
 
 只输出英文邮件正文，不要加 markdown 符号。"""
     return prompt, system
+
+
+
+# ---------------------------------------------------------------------------
+# Amazon / Shopify Listing 生成
+# ---------------------------------------------------------------------------
+LISTING_PLATFORMS: dict[str, str] = {
+    "Amazon": "Amazon product listing",
+    "Shopify": "Shopify product page",
+    "Amazon + Shopify": "both Amazon listing and Shopify product page",
+}
+
+
+def build_listing_prompt(
+    product: str,
+    keywords: str,
+    features: str,
+    platform: str = "Amazon",
+    category: str = "",
+) -> tuple[str, str | None]:
+    """构建产品上架 Listing 文案的 Prompt。"""
+    platform_desc = LISTING_PLATFORMS.get(platform, "Amazon product listing")
+    category_info = f"\n产品类目: {category}" if category else ""
+    system = (
+        "你是一位有5年经验的跨境电商运营专家，"
+        "精通 Amazon SEO 和 Shopify 产品页面优化，擅长撰写高转化率的产品 Listing。"
+    )
+    prompt = f"""请为以下产品生成 {platform_desc} 的完整文案：
+
+产品名称: {product}
+核心关键词: {keywords}
+产品卖点/参数: {features}{category_info}
+
+请严格按以下格式输出（每个部分用标题标注）：
+
+## Title
+[产品标题，200字符以内，自然嵌入3-5个核心关键词，格式：品牌+核心关键词+主要特点+适用场景]
+
+## Bullet Points
+[5条卖点，每条以大写字母开头，80-150字符，突出不同维度：功能/材质/场景/售后/差异化]
+• [第1条]
+• [第2条]
+• [第3条]
+• [第4条]
+• [第5条]
+
+## Product Description
+[150-300词产品描述，分2-3段，自然融入关键词，讲产品故事+解决什么问题+为什么选我们]
+
+## Search Terms
+[后台搜索词，用逗号分隔，总计不超过249字符，不要重复标题中已有的词]
+
+## SEO Meta Description
+[Shopify SEO 描述，155字符以内，含CTA]
+
+输出纯英文，不要加 markdown 以外的格式符号。"""
+    return prompt, system
+
+
