@@ -27,12 +27,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ── Stats ─────────────────────────────────────────────────────────────────
-c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3, c4, c5 = st.columns(5)
 for col, val, label in [
-    (c1, "4",    "核心功能"),
-    (c2, "5+",   "语种支持"),
+    (c1, "5",      "核心功能"),
+    (c2, "5+",     "语种支持"),
     (c3, "⚡ 流式", "实时输出"),
-    (c4, "PDF",  "专业报价单"),
+    (c4, "PDF",    "多SKU报价单"),
+    (c5, "Subject","主题行生成"),
 ]:
     col.markdown(
         f'<div class="stat-card">'
@@ -51,7 +52,7 @@ FEATURES = [
     {
         "icon": "📧",
         "title": "开发信生成",
-        "desc": "输入产品和客户信息，AI 生成高转化英文开发信，支持3种风格",
+        "desc": "输入产品和客户信息，AI 生成高转化英文开发信 + 邮件主题行，支持3种风格",
         "badge": "⚡ 流式输出",
         "page": "pages/1_📧_开发信.py",
     },
@@ -65,8 +66,8 @@ FEATURES = [
     {
         "icon": "📄",
         "title": "报价单 PDF",
-        "desc": "填写产品与交易条款，一键生成可下载的专业 PDF 报价单",
-        "badge": "📥 PDF 导出",
+        "desc": "支持多产品 SKU，填写交易条款，一键生成专业 PDF 报价单",
+        "badge": "📥 多SKU · PDF",
         "page": "pages/3_📄_报价单.py",
     },
     {
@@ -76,9 +77,16 @@ FEATURES = [
         "badge": "🌍 5 种语言",
         "page": "pages/4_📑_产品介绍.py",
     },
+    {
+        "icon": "📬",
+        "title": "跟进邮件",
+        "desc": "按跟进阶段（已报价/发样/谈判/下单/未回复）智能生成跟进邮件",
+        "badge": "⚡ 流式输出",
+        "page": "pages/5_📬_跟进邮件.py",
+    },
 ]
 
-cols = st.columns(4)
+cols = st.columns(5)
 for col, feat in zip(cols, FEATURES):
     with col:
         st.markdown(
@@ -103,12 +111,14 @@ for col, feat in zip(cols, FEATURES):
 # ── 使用提示 ─────────────────────────────────────────────────────────────
 st.markdown("---")
 st.markdown("### 💡 使用提示")
-t1, t2, t3 = st.columns(3)
+t1, t2, t3, t4 = st.columns(4)
 with t1:
-    st.info("**⚡ 流式输出**\n\n开发信、询盘回复、产品介绍均支持实时流式显示，无需等待即可看到内容逐字输出。")
+    st.info("**⚡ 流式输出**\n\n开发信、询盘回复、产品介绍、跟进邮件均支持实时流式显示，无需等待即可看到内容逐字输出。")
 with t2:
-    st.info("**📋 一键复制**\n\n所有生成结果均可一键复制到剪贴板，也可下载为 .txt 文件存档。")
+    st.info("**📌 邮件主题行**\n\n开发信页面会同时生成 Subject Line，提高开信率，可一键复制直接使用。")
 with t3:
+    st.info("**📋 一键复制**\n\n所有生成结果均可一键复制到剪贴板，也可下载为 .txt 文件存档。")
+with t4:
     st.info("**💾 结果保留**\n\n切换页面后生成结果不会丢失，回到对应页面仍可查看上次结果。")
 
 # ── Footer ────────────────────────────────────────────────────────────────

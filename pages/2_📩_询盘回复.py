@@ -35,7 +35,7 @@ with col1:
 with col2:
     customer_name = st.text_input("客户姓名（可选）", placeholder="例如: Mike Johnson")
     your_name     = st.text_input("你的姓名（可选）", placeholder="签名用，例如: Tom")
-    st.text_input("公司名称（可选）", placeholder="您的公司名称", key="inquiry_company")
+    company_name  = st.text_input("公司名称（可选）", placeholder="您的公司名称，用于签名")
     stream_mode   = st.toggle("⚡ 流式输出（实时显示）", value=True)
 
 generate_clicked = st.button("🚀 生成回复", type="primary", use_container_width=True)
@@ -43,22 +43,32 @@ st.markdown("</div>", unsafe_allow_html=True)
 
 # ── 生成逻辑 ──────────────────────────────────────────
 if generate_clicked:
-    if not inquiry:
+    if not inquiry.strip():
         st.warning("⚠️ 请粘贴客户询盘内容")
     else:
         if stream_mode:
-            result = reply_inquiry(inquiry, customer_name, your_name, stream=True)
-            show_result(result, "inquiry", label="📝 回复草稿", file_name="询盘回复.txt")
+            result = reply_inquiry(inquiry, customer_name, your_name, company_name, stream=True)
+            show_result(
+                result, "inquiry",
+                label="📝 回复草稿",
+                file_name=f"询盘回复_{customer_name or '客户'}.txt",
+            )
         else:
             with st.spinner("🤖 AI 正在生成..."):
-                result = reply_inquiry(inquiry, customer_name, your_name, stream=False)
+                result = reply_inquiry(inquiry, customer_name, your_name, company_name, stream=False)
             st.session_state.results["inquiry"] = result
+            show_result(
+                result, "inquiry",
+                label="📝 回复草稿",
+                file_name=f"询盘回复_{customer_name or '客户'}.txt",
+                balloons=True,
+            )
 
-if not generate_clicked and st.session_state.results.get("inquiry"):
+elif st.session_state.results.get("inquiry"):
     show_result(
         st.session_state.results["inquiry"],
         "inquiry",
-        label="📝 回复草稿",
+        label="📝 回复草稿（上次结果）",
         file_name="询盘回复.txt",
         balloons=False,
     )

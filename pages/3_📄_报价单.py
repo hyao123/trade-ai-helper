@@ -1,7 +1,9 @@
 """
 pages/3_📄_报价单.py
-填写产品与交易条款，生成专业 PDF 报价单。
+支持多产品（多行 SKU）填写，生成专业 PDF 报价单。
 """
+from __future__ import annotations
+
 import streamlit as st
 from utils.ui_helpers import inject_css, check_auth
 from utils.pdf_gen import generate_quote_pdf
@@ -17,33 +19,107 @@ if "results" not in st.session_state:
 st.markdown("""
 <div class="hero-section">
     <h1 class="hero-title">📄 报价单生成</h1>
-    <p class="hero-subtitle">填写产品信息，一键生成专业 PDF 报价单</p>
+    <p class="hero-subtitle">支持多产品 SKU，一键生成专业 PDF 报价单</p>
 </div>
 """, unsafe_allow_html=True)
+
+# ── SKU 列表管理 ──────────────────────────────────────
+if "sku_list" not in st.session_state:
+    st.session_state.sku_list = [
+        {"product": "", "model": "", "price": 0.0, "quantity": 100, "unit": "PCS"}
+    ]
+
+
+def add_sku():
+    st.session_state.sku_list.append(
+        {"product": "", "model": "", "price": 0.0, "quantity": 100, "unit": "PCS"}
+    )
+
+
+def remove_sku(idx: int):
+    if len(st.session_state.sku_list) > 1:
+        st.session_state.sku_list.pop(idx)
+
 
 # ── 表单 ──────────────────────────────────────────────
 st.markdown('<div class="main-form">', unsafe_allow_html=True)
 
-st.markdown("#### 🛒 产品信息")
-col1, col2, col3 = st.columns(3)
-with col1:
-    product_name = st.text_input("产品名称 *", placeholder="LED Desk Lamp")
-    model        = st.text_input("型号 / 规格", placeholder="Model XR-200")
-with col2:
-    price    = st.number_input("单价 (USD) *", min_value=0.0, value=0.0, step=0.01, format="%.2f")
-    quantity = st.number_input("数量 *", min_value=1, value=100, step=1)
-with col3:
-    unit    = st.selectbox("单位", ["PCS", "SETS", "BOX", "CARTON", "PALLET"])
-    st.markdown("<br>", unsafe_allow_html=True)
-    if price > 0 and quantity > 0:
-        st.metric("💰 预计总额", f"${price * quantity:,.2f} USD")
+# --- 产品列表 ---
+st.markdown("#### 🛒 产品明细")
+
+UNITS = ["PCS", "SETS", "BOX", "CARTON", "PALLET", "KG", "MT"]
+
+sku_list = st.session_state.sku_list
+subtotal = 0.0
+
+for i, sku in enumerate(sku_list):
+    cols = st.columns([3, 2, 1.5, 1.5, 1.5, 0.7])
+    with cols[0]:
+        sku["product"] = st.text_input(
+            "产品名称 *" if i == 0 else " ",
+            value=sku["product"],
+            placeholder="Product Name",
+            key=f"sku_product_{i}",
+            label_visibility="visible" if i == 0 else "hidden",
+        )
+    with cols[1]:
+        sku["model"] = st.text_input(
+            "型号/规格" if i == 0 else " ",
+            value=sku["model"],
+            placeholder="Model/Spec",
+            key=f"sku_model_{i}",
+            label_visibility="visible" if i == 0 else "hidden",
+        )
+    with cols[2]:
+        sku["price"] = st.number_input(
+            "单价 (USD)" if i == 0 else " ",
+            min_value=0.0, value=float(sku["price"]),
+            step=0.01, format="%.2f",
+            key=f"sku_price_{i}",
+            label_visibility="visible" if i == 0 else "hidden",
+        )
+    with cols[3]:
+        sku["quantity"] = st.number_input(
+            "数量" if i == 0 else " ",
+            min_value=1, value=int(sku["quantity"]),
+            key=f"sku_qty_{i}",
+            label_visibility="visible" if i == 0 else "hidden",
+        )
+    with cols[4]:
+        sku["unit"] = st.selectbox(
+            "单位" if i == 0 else " ",
+            UNITS,
+            index=UNITS.index(sku["unit"]) if sku["unit"] in UNITS else 0,
+            key=f"sku_unit_{i}",
+            label_visibility="visible" if i == 0 else "hidden",
+        )
+    with cols[5]:
+        if i == 0:
+            st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🗑️", key=f"del_sku_{i}", help="删除此行",
+                     disabled=(len(sku_list) == 1)):
+            remove_sku(i)
+            st.rerun()
+
+    subtotal += sku["price"] * sku["quantity"]
+
+col_add, col_total = st.columns([2, 3])
+with col_add:
+    if st.button("➕ 添加产品行", use_container_width=True):
+        add_sku()
+        st.rerun()
+with col_total:
+    if subtotal > 0:
+        st.metric("💰 报价总额", f"${subtotal:,.2f} USD")
 
 st.markdown('<hr style="margin:1.2rem 0;border-top:1px dashed #e5e7eb;">', unsafe_allow_html=True)
+
+# --- 交易条款 ---
 st.markdown("#### 📦 交易条款")
 
 col_t1, col_t2, col_t3, col_t4 = st.columns(4)
 with col_t1:
-    payment  = st.selectbox("付款方式", ["T/T 30%", "T/T 50%", "L/C at sight", "D/P", "PayPal"])
+    payment  = st.selectbox("付款方式", ["T/T 30%", "T/T 50%", "L/C at sight", "D/P", "PayPal", "Western Union"])
 with col_t2:
     delivery = st.text_input("交货期", value="15-20 days")
 with col_t3:
@@ -52,47 +128,65 @@ with col_t4:
     shipping = st.text_input("发货港口", placeholder="Shanghai, China")
 
 st.markdown('<hr style="margin:1.2rem 0;border-top:1px dashed #e5e7eb;">', unsafe_allow_html=True)
+
+# --- 公司信息 ---
 st.markdown("#### 🏢 公司信息")
 
 col_c1, col_c2 = st.columns(2)
 with col_c1:
-    company_name = st.text_input("公司名称", value="Your Company Name")
-    contact_name = st.text_input("联系人姓名", value="Your Name")
+    company_name = st.text_input("公司名称", value=st.session_state.get("quote_company_saved", "Your Company Name"))
+    contact_name = st.text_input("联系人姓名", value=st.session_state.get("quote_contact_saved", "Your Name"))
 with col_c2:
-    email = st.text_input("联系邮箱", value="sales@yourcompany.com")
-    phone = st.text_input("联系电话", value="+86-XXX-XXXXXXX")
+    email = st.text_input("联系邮箱", value=st.session_state.get("quote_email_saved", "sales@yourcompany.com"))
+    phone = st.text_input("联系电话", value=st.session_state.get("quote_phone_saved", "+86-XXX-XXXXXXX"))
 
 generate_clicked = st.button("🚀 生成报价单 (PDF)", type="primary", use_container_width=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
 # ── 生成逻辑 ──────────────────────────────────────────
 if generate_clicked:
-    if not product_name or price <= 0:
-        st.warning("⚠️ 请填写产品名称和单价")
+    valid_skus = [s for s in sku_list if s["product"].strip()]
+    if not valid_skus:
+        st.warning("⚠️ 请填写至少一个产品名称")
+    elif all(s["price"] <= 0 for s in valid_skus):
+        st.warning("⚠️ 请为至少一个产品填写单价")
     else:
+        # 保存公司信息
+        st.session_state["quote_company_saved"] = company_name
+        st.session_state["quote_contact_saved"] = contact_name
+        st.session_state["quote_email_saved"]   = email
+        st.session_state["quote_phone_saved"]   = phone
+
         with st.spinner("📄 正在生成 PDF..."):
             pdf_bytes = generate_quote_pdf(
-                product_name, model, price, quantity, unit,
-                payment, delivery, validity, shipping,
-                company_name, contact_name, email, phone,
+                skus=valid_skus,
+                payment=payment,
+                delivery=delivery,
+                validity=validity,
+                shipping=shipping,
+                company_name=company_name,
+                contact_name=contact_name,
+                email=email,
+                phone=phone,
             )
-        st.session_state.results["quote_pdf"]     = pdf_bytes
-        st.session_state.results["quote_product"] = product_name
-        st.session_state.results["quote_price"]   = price
-        st.session_state.results["quote_qty"]     = quantity
+
+        st.session_state.results["quote_pdf"]      = pdf_bytes
+        st.session_state.results["quote_subtotal"] = sum(s["price"] * s["quantity"] for s in valid_skus)
+        st.session_state.results["quote_sku_count"]= len(valid_skus)
+        st.session_state.results["quote_just_gen"] = True   # flag：刚生成，触发一次气球
 
 # ── 展示已生成的 PDF ──────────────────────────────────
 if st.session_state.results.get("quote_pdf"):
-    pdf_bytes = st.session_state.results["quote_pdf"]
-    q_product = st.session_state.results.get("quote_product", "product")
-    q_price   = st.session_state.results.get("quote_price", 0.0)
-    q_qty     = st.session_state.results.get("quote_qty", 0)
+    # 气球只在刚生成时触发一次
+    if st.session_state.results.pop("quote_just_gen", False):
+        st.balloons()
 
-    st.balloons()
-    c1, c2, c3 = st.columns(3)
-    c1.metric("💵 单价",   f"${q_price:,.2f}")
-    c2.metric("📦 数量",   f"{q_qty}")
-    c3.metric("💰 总金额", f"${q_price * q_qty:,.2f}")
+    subtotal_saved   = st.session_state.results.get("quote_subtotal", 0.0)
+    sku_count_saved  = st.session_state.results.get("quote_sku_count", 1)
+
+    c1, c2 = st.columns(2)
+    c1.metric("📦 产品种数", f"{sku_count_saved} 种")
+    c2.metric("💰 报价总额", f"${subtotal_saved:,.2f} USD")
 
     st.markdown(
         '<div class="success-box">'
@@ -101,10 +195,11 @@ if st.session_state.results.get("quote_pdf"):
         '</div>',
         unsafe_allow_html=True,
     )
+    first_product = (sku_list[0]["product"] or "报价单") if sku_list else "报价单"
     st.download_button(
         "📥 下载报价单 PDF",
-        pdf_bytes,
-        file_name=f"报价单_{q_product}.pdf",
+        st.session_state.results["quote_pdf"],
+        file_name=f"报价单_{first_product}.pdf",
         mime="application/pdf",
         use_container_width=True,
     )

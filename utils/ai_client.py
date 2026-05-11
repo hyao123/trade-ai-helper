@@ -4,9 +4,9 @@ utils/ai_client.py
 Kimi (Moonshot) API 调用层。
 
 - 使用 openai SDK（Moonshot 兼容 OpenAI 接口）
-- call_kimi()      非流式，返回 str（供 PDF 等不需要流的场景使用）
+- call_kimi()      非流式，返回 str
 - stream_kimi()    流式，返回 Generator[str]，供 st.write_stream() 消费
-- Rate Limiting 基于内存 sliding-window，可通过环境变量配置
+- Rate Limiting 基于内存 sliding-window（注：多进程/重启后计数重置）
 - 所有 Prompt 模板从 config.prompts 导入
 """
 
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import time
+import types
 from collections import defaultdict
 from typing import Generator
 
@@ -30,18 +31,28 @@ from config.prompts import (
 load_dotenv()
 
 # ---------------------------------------------------------------------------
-# 客户端初始化
+# 客户端单例
 # ---------------------------------------------------------------------------
 _API_KEY  = os.getenv("KIMI_API_KEY", "")
 _API_BASE = "https://api.moonshot.cn/v1"
 _MODEL    = os.getenv("KIMI_MODEL", "moonshot-v1-8k")
 
+_client: OpenAI | None = None
+
+
 def _get_client() -> OpenAI:
-    return OpenAI(api_key=_API_KEY, base_url=_API_BASE)
+    """返回全局单例 OpenAI 客户端，避免每次调用新建连接池。"""
+    global _client, _API_KEY
+    # 若 API Key 在运行时通过环境变量变更，重建客户端
+    current_key = os.getenv("KIMI_API_KEY", "")
+    if _client is None or current_key != _API_KEY:
+        _API_KEY = current_key
+        _client = OpenAI(api_key=_API_KEY, base_url=_API_BASE)
+    return _client
 
 
 # ---------------------------------------------------------------------------
-# Rate Limiting
+# Rate Limiting（内存 sliding-window）
 # ---------------------------------------------------------------------------
 _call_times: dict[str, list[float]] = defaultdict(list)
 
@@ -60,9 +71,16 @@ def _rate_limit_check(user_id: str = "default") -> tuple[bool, int]:
     return True, remaining - 1
 
 
+def get_rate_limit_remaining(user_id: str = "default") -> int:
+    """返回当前窗口内剩余调用次数（不消耗配额）。"""
+    now = time.time()
+    used = len([t for t in _call_times[user_id] if now - t < RATE_LIMIT_WINDOW])
+    return max(0, RATE_LIMIT_MAX_CALLS - used)
+
+
 def _check_preconditions(user_id: str = "default") -> str | None:
     """返回错误信息字符串；None 表示可以继续调用。"""
-    if not _API_KEY:
+    if not os.getenv("KIMI_API_KEY", ""):
         return "⚠️ 请先在 .env 文件中设置 KIMI_API_KEY 环境变量"
     allowed, _ = _rate_limit_check(user_id)
     if not allowed:
@@ -77,7 +95,7 @@ def _handle_api_error(e: Exception) -> str:
     if isinstance(e, RateLimitError):
         return "⚠️ API 调用超出 Kimi 平台限额，请稍后重试或升级套餐。"
     if isinstance(e, APITimeoutError):
-        return "⚠️ 请求超时（30s），请检查网络连接后重试。"
+        return "⚠️ 请求超时，请检查网络连接后重试。"
     if isinstance(e, APIStatusError):
         return f"⚠️ Kimi 服务器错误 ({e.status_code})，请稍后重试。"
     return f"⚠️ 调用失败: {e}"
@@ -106,7 +124,7 @@ def call_kimi(
             model=_MODEL,
             messages=messages,
             temperature=0.7,
-            timeout=30,
+            timeout=60,
         )
         return resp.choices[0].message.content or ""
     except Exception as e:
@@ -142,7 +160,7 @@ def stream_kimi(
             messages=messages,
             temperature=0.7,
             stream=True,
-            timeout=60,
+            timeout=90,
         )
         for chunk in stream:
             delta = chunk.choices[0].delta.content
@@ -152,8 +170,13 @@ def stream_kimi(
         yield _handle_api_error(e)
 
 
+def _is_generator(obj: object) -> bool:
+    """精确判断是否为生成器对象。"""
+    return isinstance(obj, types.GeneratorType)
+
+
 # ---------------------------------------------------------------------------
-# 业务函数 — 统一使用 config.prompts 构建 prompt
+# 业务函数
 # ---------------------------------------------------------------------------
 
 def generate_email(
@@ -165,22 +188,19 @@ def generate_email(
     user_id: str = "default",
 ) -> str | Generator[str, None, None]:
     prompt, system = build_email_prompt(product, customer, features, tone)
-    if stream:
-        return stream_kimi(prompt, system, user_id)
-    return call_kimi(prompt, system, user_id)
+    return stream_kimi(prompt, system, user_id) if stream else call_kimi(prompt, system, user_id)
 
 
 def reply_inquiry(
     inquiry: str,
     customer_name: str = "",
     your_name: str = "",
+    company_name: str = "",
     stream: bool = False,
     user_id: str = "default",
 ) -> str | Generator[str, None, None]:
-    prompt, system = build_inquiry_prompt(inquiry, customer_name, your_name)
-    if stream:
-        return stream_kimi(prompt, system, user_id)
-    return call_kimi(prompt, system, user_id)
+    prompt, system = build_inquiry_prompt(inquiry, customer_name, your_name, company_name)
+    return stream_kimi(prompt, system, user_id) if stream else call_kimi(prompt, system, user_id)
 
 
 def generate_product_intro(
@@ -192,9 +212,7 @@ def generate_product_intro(
     user_id: str = "default",
 ) -> str | Generator[str, None, None]:
     prompt, system = build_product_intro_prompt(product, features, target, languages)
-    if stream:
-        return stream_kimi(prompt, system, user_id)
-    return call_kimi(prompt, system, user_id)
+    return stream_kimi(prompt, system, user_id) if stream else call_kimi(prompt, system, user_id)
 
 
 def generate_followup(
@@ -205,6 +223,4 @@ def generate_followup(
     user_id: str = "default",
 ) -> str | Generator[str, None, None]:
     prompt, system = build_followup_prompt(customer, stage, product)
-    if stream:
-        return stream_kimi(prompt, system, user_id)
-    return call_kimi(prompt, system, user_id)
+    return stream_kimi(prompt, system, user_id) if stream else call_kimi(prompt, system, user_id)

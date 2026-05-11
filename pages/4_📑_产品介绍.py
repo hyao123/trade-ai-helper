@@ -34,12 +34,14 @@ with col1:
         placeholder="每行一条，例如：\n• 200W 高功率，适合大型路段\n• IP67 防水等级\n• 5年质保\n• CE / RoHS 认证\n• 太阳能供电，零电费",
     )
 with col2:
-    target      = st.selectbox("目标市场", ["美国", "欧洲", "南美", "东南亚", "中东", "非洲", "全球"])
-    languages   = st.multiselect(
+    target    = st.selectbox("目标市场", ["美国", "欧洲", "南美", "东南亚", "中东", "非洲", "全球"])
+    languages = st.multiselect(
         "输出语言（可多选）",
         ["英语", "西班牙语", "法语", "德语", "日语"],
         default=["英语"],
     )
+    if not languages:
+        st.warning("⚠️ 请至少选择一种输出语言，已自动使用英语")
     stream_mode = st.toggle("⚡ 流式输出（实时显示）", value=True)
 
 generate_clicked = st.button("🚀 生成产品介绍", type="primary", use_container_width=True)
@@ -47,7 +49,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 
 # ── 生成逻辑 ──────────────────────────────────────────
 if generate_clicked:
-    if not product or not features:
+    if not product or not features.strip():
         st.warning("⚠️ 请填写产品名称和产品特点")
     else:
         lang_list = languages if languages else ["英语"]
@@ -63,12 +65,19 @@ if generate_clicked:
             with st.spinner("🤖 AI 生成中..."):
                 result = generate_product_intro(product, features, target, lang_list, stream=False)
             st.session_state.results["intro"] = result
+            show_result(
+                result, "intro",
+                label="📝 产品介绍文案",
+                file_name=f"{product}_产品介绍.txt",
+                height=300,
+                balloons=True,
+            )
 
-if not generate_clicked and st.session_state.results.get("intro"):
+elif st.session_state.results.get("intro"):
     show_result(
         st.session_state.results["intro"],
         "intro",
-        label="📝 产品介绍文案",
+        label="📝 产品介绍文案（上次结果）",
         file_name="产品介绍.txt",
         height=300,
         balloons=False,
