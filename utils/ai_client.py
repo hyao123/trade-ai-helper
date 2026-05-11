@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import os
 import time
-import types
 from collections import defaultdict
 from typing import Generator
 
@@ -80,11 +79,13 @@ def get_rate_limit_remaining(user_id: str = "default") -> int:
 
 
 def _check_preconditions(user_id: str = "default") -> str | None:
-    """返回错误信息字符串；None 表示可以继续调用。"""
+    """返回错误信息字符串；None 表示可以继续调用。不消耗 rate limit slot。"""
     if not get_secret("NVIDIA_API_KEY"):
         return "⚠️ 请先设置 NVIDIA_API_KEY（.env 文件或 Streamlit Cloud Secrets）"
-    allowed, _ = _rate_limit_check(user_id)
-    if not allowed:
+    # 先检查是否还有余量（不消耗 slot），通过后在调用时才消耗
+    now = time.time()
+    _call_times[user_id] = [t for t in _call_times[user_id] if now - t < RATE_LIMIT_WINDOW]
+    if len(_call_times[user_id]) >= RATE_LIMIT_MAX_CALLS:
         wait_min = RATE_LIMIT_WINDOW // 60
         return f"⚠️ 调用频率超限，每 {wait_min} 分钟最多 {RATE_LIMIT_MAX_CALLS} 次，请稍后再试。"
     return None
@@ -114,6 +115,9 @@ def call_llm(
     err = _check_preconditions(user_id)
     if err:
         return err
+
+    # 通过前置检查后，正式消耗一个 rate-limit slot
+    _rate_limit_check(user_id)
 
     messages = []
     if system_prompt:
@@ -154,6 +158,9 @@ def stream_llm(
         yield err
         return
 
+    # 通过前置检查后，正式消耗一个 rate-limit slot
+    _rate_limit_check(user_id)
+
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
@@ -177,11 +184,6 @@ def stream_llm(
 
 # 向后兼容别名
 stream_kimi = stream_llm
-
-
-def _is_generator(obj: object) -> bool:
-    """精确判断是否为生成器对象。"""
-    return isinstance(obj, types.GeneratorType)
 
 
 # ---------------------------------------------------------------------------
