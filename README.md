@@ -65,7 +65,7 @@ streamlit run app.py
 1. 推送代码到 GitHub
 2. 访问 [share.streamlit.io](https://share.streamlit.io)
 3. 点击 "New app" → 选择仓库 → 主文件选 `app.py`
-4. 在 "Secrets" 中填入 `KIMI_API_KEY` 和 `APP_PASSWORD`（可选）
+4. 在 "Secrets" 中填入 `NVIDIA_API_KEY` 和 `APP_PASSWORD`（可选）
 
 ---
 
@@ -84,7 +84,7 @@ trade-ai-helper/
 │   ├── __init__.py
 │   └── prompts.py            # 所有 AI Prompt 模板（统一管理）
 ├── utils/
-│   ├── ai_client.py          # Kimi API 调用（流式 + 非流式）
+│   ├── ai_client.py          # NVIDIA NIM API 调用（流式 + 非流式）
 │   ├── pdf_gen.py            # PDF 报价单生成（多 SKU）
 │   └── ui_helpers.py         # 共享 UI 组件
 ├── fonts/                    # 可选：放置 NotoSansSC-Regular.ttf 支持完整中文
@@ -100,9 +100,9 @@ trade-ai-helper/
 
 | 变量 | 必填 | 说明 |
 |------|------|------|
-| `KIMI_API_KEY` | ✅ | Kimi (Moonshot) API Key |
+| `NVIDIA_API_KEY` | ✅ | NVIDIA NIM API Key（https://build.nvidia.com） |
 | `APP_PASSWORD` | 可选 | 访问密码，留空则不启用鉴权 |
-| `KIMI_MODEL` | 可选 | 模型名，默认 `moonshot-v1-8k` |
+| `NVIDIA_MODEL` | 可选 | 模型名，默认 `meta/llama-3.3-70b-instruct` |
 | `RATE_LIMIT_MAX_CALLS` | 可选 | 每窗口最大调用次数，默认 `20` |
 | `RATE_LIMIT_WINDOW` | 可选 | 限速窗口（秒），默认 `3600`（1小时）|
 

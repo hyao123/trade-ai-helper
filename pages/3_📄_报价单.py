@@ -114,6 +114,19 @@ with col_total:
 
 st.markdown('<hr style="margin:1.2rem 0;border-top:1px dashed #e5e7eb;">', unsafe_allow_html=True)
 
+# --- 客户信息（Buyer / 收单方）---
+st.markdown("#### 👤 客户信息（收单方）")
+
+col_b1, col_b2 = st.columns(2)
+with col_b1:
+    buyer_company = st.text_input("客户公司", placeholder="ABC Trading Co.", value=st.session_state.get("quote_buyer_company", ""))
+    buyer_contact = st.text_input("客户联系人", placeholder="John Smith", value=st.session_state.get("quote_buyer_contact", ""))
+with col_b2:
+    buyer_email = st.text_input("客户邮箱", placeholder="john@abctrading.com", value=st.session_state.get("quote_buyer_email", ""))
+    st.markdown('<div class="tip-card">💡 填写客户信息会在 PDF 抬头显示"Buyer"栏，更专业。</div>', unsafe_allow_html=True)
+
+st.markdown('<hr style="margin:1.2rem 0;border-top:1px dashed #e5e7eb;">', unsafe_allow_html=True)
+
 # --- 交易条款 ---
 st.markdown("#### 📦 交易条款")
 
@@ -156,6 +169,9 @@ if generate_clicked:
         st.session_state["quote_contact_saved"] = contact_name
         st.session_state["quote_email_saved"]   = email
         st.session_state["quote_phone_saved"]   = phone
+        st.session_state["quote_buyer_company"] = buyer_company
+        st.session_state["quote_buyer_contact"] = buyer_contact
+        st.session_state["quote_buyer_email"]   = buyer_email
 
         with st.spinner("📄 正在生成 PDF..."):
             pdf_bytes = generate_quote_pdf(
@@ -168,6 +184,9 @@ if generate_clicked:
                 contact_name=contact_name,
                 email=email,
                 phone=phone,
+                buyer_company=buyer_company,
+                buyer_contact=buyer_contact,
+                buyer_email=buyer_email,
             )
 
         st.session_state.results["quote_pdf"]      = pdf_bytes

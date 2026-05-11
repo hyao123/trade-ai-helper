@@ -10,7 +10,11 @@ utils/ui_helpers.py
 
 from __future__ import annotations
 
+import hmac
+import html
 import json
+import re
+import time
 import types
 
 import streamlit as st
@@ -117,6 +121,34 @@ def inject_css() -> None:
     if not st.session_state.get("_css_injected"):
         st.markdown(_CSS, unsafe_allow_html=True)
         st.session_state["_css_injected"] = True
+    # 每次页面渲染时刷新侧栏信息
+    show_sidebar_info()
+
+
+# ---------------------------------------------------------------------------
+# 侧栏信息（Rate Limit 剩余次数）
+# ---------------------------------------------------------------------------
+def show_sidebar_info() -> None:
+    """在侧栏显示剩余 API 调用次数和重置倒计时。"""
+    from utils.ai_client import get_rate_limit_remaining, RATE_LIMIT_MAX_CALLS, RATE_LIMIT_WINDOW, _call_times
+
+    remaining = get_rate_limit_remaining()
+    used = RATE_LIMIT_MAX_CALLS - remaining
+
+    with st.sidebar:
+        st.markdown("---")
+        st.markdown("### 📊 使用状态")
+        st.progress(used / RATE_LIMIT_MAX_CALLS if RATE_LIMIT_MAX_CALLS > 0 else 0)
+        st.caption(f"已用 **{used}** / {RATE_LIMIT_MAX_CALLS} 次（每 {RATE_LIMIT_WINDOW // 60} 分钟重置）")
+
+        # 计算最早 slot 何时过期
+        if _call_times.get("default"):
+            now = time.time()
+            earliest = min(_call_times["default"])
+            reset_in = max(0, int(RATE_LIMIT_WINDOW - (now - earliest)))
+            minutes, seconds = divmod(reset_in, 60)
+            st.caption(f"🕐 最早释放: {minutes}分{seconds}秒后")
+        st.markdown("---")
 
 
 # ---------------------------------------------------------------------------
@@ -147,7 +179,7 @@ def check_auth() -> None:
     with st.form("login_form"):
         pwd = st.text_input("访问密码", type="password", placeholder="请输入密码")
         if st.form_submit_button("🔐 登录", use_container_width=True, type="primary"):
-            if pwd == app_password:
+            if hmac.compare_digest(pwd, app_password):
                 st.session_state.authenticated = True
                 st.rerun()
             else:
@@ -189,16 +221,23 @@ def copy_button(text: str, key: str) -> None:
 # ---------------------------------------------------------------------------
 def extract_subject(text: str) -> tuple[str, str]:
     """
-    若文本首行以 'Subject:' 开头，返回 (subject, body)。
-    否则返回 ('', text)。
-    同时跳过 Subject 行后的空行。
+    从 AI 输出中提取邮件主题行，支持多种变体格式：
+    - Subject: xxx
+    - **Subject:** xxx
+    - Subject Line: xxx
+    - 主题行：xxx
+    返回 (subject, body)；提取失败则返回 ('', text)。
     """
     lines = text.strip().splitlines()
     if not lines:
         return "", text
+
     first = lines[0].strip()
-    if first.lower().startswith("subject:"):
-        subject = first[len("subject:"):].strip()
+    # 正则匹配多种 Subject 变体（含 markdown bold、中文冒号等）
+    pattern = r'^\s*(?:\*\*)?(?:subject(?:\s*line)?|邮件主题行?)\s*[:：]\s*(?:\*\*)?\s*(.+?)(?:\*\*)?\s*$'
+    match = re.match(pattern, first, re.IGNORECASE)
+    if match:
+        subject = match.group(1).strip()
         # 跳过 subject 行之后的空行
         rest_lines = lines[1:]
         while rest_lines and not rest_lines[0].strip():
@@ -209,13 +248,14 @@ def extract_subject(text: str) -> tuple[str, str]:
 
 
 def show_subject(subject: str, key: str) -> None:
-    """渲染主题行高亮卡片 + 复制按钮。"""
+    """渲染主题行高亮卡片 + 复制按钮（XSS 安全）。"""
     if not subject:
         return
+    safe_subject = html.escape(subject)
     st.markdown(
         f'<div class="subject-box">'
         f'<div class="subject-label">📌 邮件主题行（Subject Line）</div>'
-        f'<div class="subject-text">{subject}</div>'
+        f'<div class="subject-text">{safe_subject}</div>'
         f'</div>',
         unsafe_allow_html=True,
     )

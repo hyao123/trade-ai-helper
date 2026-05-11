@@ -123,4 +123,4 @@ with t4:
 
 # ── Footer ────────────────────────────────────────────────────────────────
 st.markdown("---")
-st.markdown('<div class="footer">💼 外贸AI助手 | 让外贸更简单 · Powered by Kimi AI</div>', unsafe_allow_html=True)
+st.markdown('<div class="footer">💼 外贸AI助手 | 让外贸更简单 · Powered by NVIDIA NIM</div>', unsafe_allow_html=True)

@@ -116,11 +116,15 @@ def generate_quote_pdf(
     contact_name: str = "[Your Name]",
     email: str = "[email@example.com]",
     phone: str = "[+86-xxx-xxxxxxx]",
+    buyer_company: str = "",
+    buyer_contact: str = "",
+    buyer_email: str = "",
 ) -> bytes:
     """
     生成多产品 PDF 报价单，返回字节流。
 
     skus: list of dict，每条包含 product / model / price / quantity / unit
+    buyer_*: 可选的客户（收单方）信息
     """
     pdf = QuotePDF(company=company_name)
     font_name = _setup_font(pdf)
@@ -162,6 +166,12 @@ def generate_quote_pdf(
         amount   = price * quantity
         grand_total += amount
 
+        # 截断过长文本防止溢出（Product 最多 38 字符，Model 最多 20 字符）
+        if len(name) > 38:
+            name = name[:36] + "…"
+        if len(model) > 20:
+            model = model[:18] + "…"
+
         pdf.set_fill_color(248, 250, 252) if fill else pdf.set_fill_color(255, 255, 255)
         pdf.set_font(font_name, "", 9)
         row_data = [
@@ -192,8 +202,19 @@ def generate_quote_pdf(
     _row(pdf, font_name, "Shipping Port:", shipping or "—")
     pdf.ln(4)
 
-    # ── 公司信息 ──────────────────────────────────────
-    _section(pdf, font_name, "Contact Information")
+    # ── 客户信息（Buyer）──────────────────────────────
+    if buyer_company or buyer_contact or buyer_email:
+        _section(pdf, font_name, "Buyer Information")
+        if buyer_company:
+            _row(pdf, font_name, "Company:",  buyer_company)
+        if buyer_contact:
+            _row(pdf, font_name, "Contact:",  buyer_contact)
+        if buyer_email:
+            _row(pdf, font_name, "Email:",    buyer_email)
+        pdf.ln(4)
+
+    # ── 公司信息（Seller）────────────────────────────
+    _section(pdf, font_name, "Seller Information")
     _row(pdf, font_name, "Company:",  company_name)
     _row(pdf, font_name, "Contact:",  contact_name)
     _row(pdf, font_name, "Email:",    email)
