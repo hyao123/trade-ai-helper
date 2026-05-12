@@ -62,12 +62,12 @@ if generate_clicked:
         fname = f"{product}_产品介绍.txt"
         if stream_mode:
             result = generate_product_intro(product, features, target, lang_list, stream=True, user_id=get_user_id())
-            show_result(result, "intro", label="📝 产品介绍文案", file_name=fname, height=300)
+            show_result(result, "intro", label="📝 产品介绍文案", file_name=fname, height=300, history_feature="产品介绍", history_title=product[:25])
         else:
             with st.spinner("🤖 AI 生成中..."):
                 result = generate_product_intro(product, features, target, lang_list, stream=False, user_id=get_user_id())
             st.session_state.results["intro"] = result
-            show_result(result, "intro", label="📝 产品介绍文案", file_name=fname, height=300, balloons=True)
+            show_result(result, "intro", label="📝 产品介绍文案", file_name=fname, height=300, balloons=True, history_feature="产品介绍", history_title=product[:25])
 
 elif st.session_state.results.get("intro"):
     show_result(

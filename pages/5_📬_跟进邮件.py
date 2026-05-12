@@ -68,12 +68,12 @@ if generate_clicked:
         fname = f"跟进邮件_{customer}_{stage}.txt"
         if stream_mode:
             result = generate_followup(customer, stage, product, stream=True, user_id=get_user_id())
-            show_result(result, "followup", label="📝 跟进邮件", file_name=fname)
+            show_result(result, "followup", label="📝 跟进邮件", file_name=fname, history_feature="跟进邮件", history_title=f"{customer[:15]} · {stage}")
         else:
             with st.spinner("🤖 AI 正在生成..."):
                 result = generate_followup(customer, stage, product, stream=False, user_id=get_user_id())
             st.session_state.results["followup"] = result
-            show_result(result, "followup", label="📝 跟进邮件", file_name=fname, balloons=True)
+            show_result(result, "followup", label="📝 跟进邮件", file_name=fname, balloons=True, history_feature="跟进邮件", history_title=f"{customer[:15]} · {stage}")
 
 elif st.session_state.results.get("followup"):
     show_result(

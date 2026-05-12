@@ -60,12 +60,12 @@ if generate_clicked:
         fname = f"询盘回复_{customer_name or '客户'}.txt"
         if stream_mode:
             result = reply_inquiry(inquiry, customer_name, your_name, company_name, stream=True, user_id=get_user_id())
-            show_result(result, "inquiry", label="📝 回复草稿", file_name=fname)
+            show_result(result, "inquiry", label="📝 回复草稿", file_name=fname, history_feature="询盘回复", history_title=f"回复 {customer_name or '客户'}")
         else:
             with st.spinner("🤖 AI 正在生成..."):
                 result = reply_inquiry(inquiry, customer_name, your_name, company_name, stream=False, user_id=get_user_id())
             st.session_state.results["inquiry"] = result
-            show_result(result, "inquiry", label="📝 回复草稿", file_name=fname, balloons=True)
+            show_result(result, "inquiry", label="📝 回复草稿", file_name=fname, balloons=True, history_feature="询盘回复", history_title=f"回复 {customer_name or '客户'}")
 
 elif st.session_state.results.get("inquiry"):
     show_result(

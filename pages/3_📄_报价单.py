@@ -25,14 +25,16 @@ st.markdown("""
 
 # ── SKU 列表管理 ──────────────────────────────────────
 if "sku_list" not in st.session_state:
+    import uuid
     st.session_state.sku_list = [
-        {"product": "", "model": "", "price": 0.0, "quantity": 100, "unit": "PCS"}
+        {"id": str(uuid.uuid4())[:6], "product": "", "model": "", "price": 0.0, "quantity": 100, "unit": "PCS"}
     ]
 
 
 def add_sku():
+    import uuid
     st.session_state.sku_list.append(
-        {"product": "", "model": "", "price": 0.0, "quantity": 100, "unit": "PCS"}
+        {"id": str(uuid.uuid4())[:6], "product": "", "model": "", "price": 0.0, "quantity": 100, "unit": "PCS"}
     )
 
 
@@ -53,13 +55,18 @@ sku_list = st.session_state.sku_list
 subtotal = 0.0
 
 for i, sku in enumerate(sku_list):
+    # Ensure each SKU has a stable ID for widget keys
+    if "id" not in sku:
+        import uuid
+        sku["id"] = str(uuid.uuid4())[:6]
+    sid = sku["id"]
     cols = st.columns([3, 2, 1.5, 1.5, 1.5, 0.7])
     with cols[0]:
         sku["product"] = st.text_input(
             "产品名称 *" if i == 0 else " ",
             value=sku["product"],
             placeholder="Product Name",
-            key=f"sku_product_{i}",
+            key=f"sku_product_{sid}",
             label_visibility="visible" if i == 0 else "hidden",
         )
     with cols[1]:
@@ -67,7 +74,7 @@ for i, sku in enumerate(sku_list):
             "型号/规格" if i == 0 else " ",
             value=sku["model"],
             placeholder="Model/Spec",
-            key=f"sku_model_{i}",
+            key=f"sku_model_{sid}",
             label_visibility="visible" if i == 0 else "hidden",
         )
     with cols[2]:
@@ -75,14 +82,14 @@ for i, sku in enumerate(sku_list):
             "单价 (USD)" if i == 0 else " ",
             min_value=0.0, value=float(sku["price"]),
             step=0.01, format="%.2f",
-            key=f"sku_price_{i}",
+            key=f"sku_price_{sid}",
             label_visibility="visible" if i == 0 else "hidden",
         )
     with cols[3]:
         sku["quantity"] = st.number_input(
             "数量" if i == 0 else " ",
             min_value=1, value=int(sku["quantity"]),
-            key=f"sku_qty_{i}",
+            key=f"sku_qty_{sid}",
             label_visibility="visible" if i == 0 else "hidden",
         )
     with cols[4]:
@@ -90,13 +97,13 @@ for i, sku in enumerate(sku_list):
             "单位" if i == 0 else " ",
             UNITS,
             index=UNITS.index(sku["unit"]) if sku["unit"] in UNITS else 0,
-            key=f"sku_unit_{i}",
+            key=f"sku_unit_{sid}",
             label_visibility="visible" if i == 0 else "hidden",
         )
     with cols[5]:
         if i == 0:
             st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🗑️", key=f"del_sku_{i}", help="删除此行",
+        if st.button("🗑️", key=f"del_sku_{sid}", help="删除此行",
                      disabled=(len(sku_list) == 1)):
             remove_sku(i)
             st.rerun()

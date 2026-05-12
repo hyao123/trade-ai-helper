@@ -93,5 +93,51 @@ else:
                             if v:
                                 st.caption(f"**{k}**: {v[:50]}")
 
+# ── 数据导出/导入 ────────────────────────────────────
+st.markdown("---")
+st.markdown("### 💾 数据导出 / 导入")
+st.caption("导出所有数据为 JSON 文件，可用于备份或迁移。导入会覆盖当前数据。")
+
+import json as _json
+from utils.history import _get_history
+from utils.templates import _get_store
+
+# 收集所有可导出数据
+export_data = {
+    "history": _get_history(),
+    "templates": _get_store(),
+    "customers": st.session_state.get("customers", []),
+    "workflows": st.session_state.get("email_workflows", []),
+}
+
+col_exp, col_imp = st.columns(2)
+with col_exp:
+    export_json = _json.dumps(export_data, ensure_ascii=False, indent=2)
+    st.download_button(
+        "📥 导出全部数据 (JSON)",
+        export_json,
+        file_name="trade_ai_helper_backup.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+with col_imp:
+    uploaded = st.file_uploader("📤 导入数据", type=["json"], key="import_json")
+    if uploaded:
+        try:
+            imported = _json.loads(uploaded.read().decode("utf-8"))
+            if st.button("确认导入（会覆盖当前数据）", type="primary", use_container_width=True):
+                if "history" in imported:
+                    st.session_state["generation_history"] = imported["history"]
+                if "templates" in imported:
+                    st.session_state["templates"] = imported["templates"]
+                if "customers" in imported:
+                    st.session_state["customers"] = imported["customers"]
+                if "workflows" in imported:
+                    st.session_state["email_workflows"] = imported["workflows"]
+                st.success("✅ 数据导入成功！")
+                st.rerun()
+        except Exception as e:
+            st.error(f"❌ 导入失败：{e}")
+
 st.markdown("---")
 st.markdown('<div class="footer">💼 外贸AI助手 · 历史记录</div>', unsafe_allow_html=True)
