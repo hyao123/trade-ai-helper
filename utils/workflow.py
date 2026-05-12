@@ -1,0 +1,104 @@
+"""
+utils/workflow.py
+-----------------
+邮件跟进工作流管理。
+追踪"已发开发信"的客户，提醒跟进时间节点，形成完整外贸销售闭环。
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+import streamlit as st
+
+
+# ── 跟进节点配置 ──────────────────────────────────────
+FOLLOWUP_RULES: list[dict] = [
+    {"days": 3,  "label": "3天跟进",  "stage": "已报价",   "hint": "询问是否收到邮件，温和确认"},
+    {"days": 7,  "label": "1周跟进",  "stage": "已报价",   "hint": "分享产品新资讯或案例"},
+    {"days": 14, "label": "2周跟进",  "stage": "长期未回复", "hint": "提供新价值，重新激活"},
+    {"days": 30, "label": "1月跟进",  "stage": "长期未回复", "hint": "调整策略，考虑换话题切入"},
+]
+
+
+def _get_workflows() -> list[dict]:
+    if "email_workflows" not in st.session_state:
+        st.session_state["email_workflows"] = []
+    return st.session_state["email_workflows"]
+
+
+def add_workflow(
+    customer: str,
+    product: str,
+    company: str = "",
+    email: str = "",
+    notes: str = "",
+) -> None:
+    """记录一封已发出的开发信，启动跟进工作流。"""
+    workflows = _get_workflows()
+    now = datetime.now()
+    workflows.insert(0, {
+        "id": f"wf_{len(workflows)+1}_{int(now.timestamp())}",
+        "customer": customer,
+        "product": product,
+        "company": company,
+        "email": email,
+        "notes": notes,
+        "sent_at": now.strftime("%Y-%m-%d"),
+        "sent_ts": now.timestamp(),
+        "status": "进行中",   # 进行中 / 已回复 / 已关闭
+        "followups": [],      # 记录已完成的跟进
+    })
+
+
+def get_all_workflows() -> list[dict]:
+    return _get_workflows()
+
+
+def get_due_workflows() -> list[dict]:
+    """返回今天需要跟进的工作流。"""
+    now = datetime.now()
+    due = []
+    for wf in _get_workflows():
+        if wf["status"] != "进行中":
+            continue
+        sent_ts = wf.get("sent_ts", 0)
+        sent_dt = datetime.fromtimestamp(sent_ts)
+        days_elapsed = (now - sent_dt).days
+        done_stages = {f["stage_label"] for f in wf.get("followups", [])}
+
+        for rule in FOLLOWUP_RULES:
+            label = rule["label"]
+            if label in done_stages:
+                continue
+            if days_elapsed >= rule["days"]:
+                due.append({**wf, "_rule": rule, "_days_elapsed": days_elapsed})
+                break   # 每个 workflow 只提一个最紧迫的
+    return due
+
+
+def mark_followup_done(wf_id: str, stage_label: str) -> None:
+    """标记某个跟进节点已完成。"""
+    for wf in _get_workflows():
+        if wf["id"] == wf_id:
+            wf["followups"].append({
+                "stage_label": stage_label,
+                "done_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            })
+            return
+
+
+def update_workflow_status(wf_id: str, status: str) -> None:
+    """更新工作流状态（已回复/已关闭）。"""
+    for wf in _get_workflows():
+        if wf["id"] == wf_id:
+            wf["status"] = status
+            return
+
+
+def get_workflow_stats() -> dict:
+    wfs = _get_workflows()
+    total   = len(wfs)
+    active  = sum(1 for w in wfs if w["status"] == "进行中")
+    replied = sum(1 for w in wfs if w["status"] == "已回复")
+    due_cnt = len(get_due_workflows())
+    return {"total": total, "active": active, "replied": replied, "due": due_cnt}

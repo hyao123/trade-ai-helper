@@ -92,6 +92,25 @@ def _section(pdf: FPDF, font_name: str, title: str) -> None:
     pdf.ln(1)
 
 
+def _truncate_by_width(pdf: FPDF, font_name: str, text: str, max_mm: float) -> str:
+    """
+    按渲染宽度截断字符串，避免 CJK/混合字符溢出。
+    使用 fpdf2 的 get_string_width() 而非字符数，确保视觉宽度正确。
+    """
+    if not text:
+        return text
+    pdf.set_font(font_name, "", 9)
+    if pdf.get_string_width(text) <= max_mm:
+        return text
+    # 逐字符缩减直到满足宽度
+    ellipsis = "…"
+    for i in range(len(text) - 1, 0, -1):
+        candidate = text[:i] + ellipsis
+        if pdf.get_string_width(candidate) <= max_mm:
+            return candidate
+    return ellipsis
+
+
 def _row(pdf: FPDF, font_name: str, label: str, value: str,
          label_w: int = 45, row_h: int = 7) -> None:
     pdf.set_font(font_name, "B", 9)
@@ -166,11 +185,9 @@ def generate_quote_pdf(
         amount   = price * quantity
         grand_total += amount
 
-        # 截断过长文本防止溢出（Product 最多 38 字符，Model 最多 20 字符）
-        if len(name) > 38:
-            name = name[:36] + "…"
-        if len(model) > 20:
-            model = model[:18] + "…"
+        # 截断过长文本防止溢出（按渲染宽度截断，兼容 CJK/混合字符）
+        name  = _truncate_by_width(pdf, font_name, name,  max_mm=68)
+        model = _truncate_by_width(pdf, font_name, model, max_mm=33)
 
         pdf.set_fill_color(248, 250, 252) if fill else pdf.set_fill_color(255, 255, 255)
         pdf.set_font(font_name, "", 9)

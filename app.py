@@ -28,7 +28,7 @@ st.markdown("""
 # ── Stats ─────────────────────────────────────────────────────────────────
 c1, c2, c3, c4, c5 = st.columns(5)
 for col, val, label in [
-    (c1, "8",      "核心功能"),
+    (c1, "10",     "核心功能"),
     (c2, "5+",     "语种支持"),
     (c3, "⚡ 流式", "实时输出"),
     (c4, "Listing","Amazon/Shopify"),
@@ -104,10 +104,24 @@ FEATURES = [
         "badge": "🔥 获客利器",
         "page": "pages/8_💬_社媒文案.py",
     },
+    {
+        "icon": "📋",
+        "title": "历史记录",
+        "desc": "查看所有 AI 生成结果，随时回看复用，最多保存 50 条",
+        "badge": "💾 自动保存",
+        "page": "pages/9_📋_历史记录.py",
+    },
+    {
+        "icon": "📅",
+        "title": "跟进日历",
+        "desc": "记录已发邮件，系统自动提醒 3天/1周/2周/1月 跟进节点",
+        "badge": "🤖 自动化",
+        "page": "pages/10_📅_跟进日历.py",
+    },
 ]
 
-cols = st.columns(4)
-for col, feat in zip(cols, FEATURES):
+cols = st.columns(5)
+for col, feat in zip(cols[:5], FEATURES[:5]):
     with col:
         st.markdown(
             f"""
@@ -128,6 +142,28 @@ for col, feat in zip(cols, FEATURES):
         if st.button(f"进入 {feat['title']}", key=f"nav_{feat['title']}", use_container_width=True):
             st.switch_page(feat["page"])
 
+cols2 = st.columns(5)
+for col, feat in zip(cols2, FEATURES[5:]):
+    with col:
+        st.markdown(
+            f"""
+            <div class="main-form" style="text-align:center;cursor:pointer;min-height:200px;">
+                <div style="font-size:2.5rem;margin-bottom:0.5rem;">{feat['icon']}</div>
+                <div class="form-title" style="margin-bottom:0.5rem;">{feat['title']}</div>
+                <p style="font-size:0.82rem;color:#6b7280;line-height:1.5;margin-bottom:0.75rem;">
+                    {feat['desc']}
+                </p>
+                <span style="background:#eff6ff;color:#3b82f6;padding:0.2rem 0.6rem;
+                             border-radius:12px;font-size:0.75rem;font-weight:600;">
+                    {feat['badge']}
+                </span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button(f"进入 {feat['title']}", key=f"nav2_{feat['title']}", use_container_width=True):
+            st.switch_page(feat["page"])
+
 # ── 使用提示 ─────────────────────────────────────────────────────────────
 st.markdown("---")
 st.markdown("### 💡 使用提示")
@@ -139,7 +175,7 @@ with t2:
 with t3:
     st.info("**📋 一键复制**\n\n所有生成结果均可一键复制到剪贴板，也可下载为 .txt 文件存档。")
 with t4:
-    st.info("**💾 结果保留**\n\n切换页面后生成结果不会丢失，回到对应页面仍可查看上次结果。")
+    st.info("**📅 跟进日历**\n\n发完开发信记录到跟进日历，3天/1周/2周/1月自动提醒，不再漏掉任何商机。")
 
 # ── Footer ────────────────────────────────────────────────────────────────
 st.markdown("---")
