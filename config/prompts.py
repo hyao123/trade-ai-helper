@@ -4,6 +4,7 @@ config/prompts.py
 所有 AI Prompt 模板统一管理。
 每个函数返回 (prompt: str, system_prompt: str | None) 元组。
 """
+from utils.sanitize import sanitize_input, sanitize_prompt_param
 
 # ---------------------------------------------------------------------------
 # 开发信
@@ -32,6 +33,9 @@ def build_email_prompt(
     tone: str = "简洁专业",
     language: str = "英语",
 ) -> tuple[str, str | None]:
+    product = sanitize_prompt_param(product, "product")
+    customer = sanitize_prompt_param(customer, "customer")
+    features = sanitize_prompt_param(features, "features")
     style = EMAIL_STYLES.get(tone, EMAIL_STYLES["简洁专业"])
     lang_name = EMAIL_LANGUAGES.get(language, "English")
     system = f"你是一位有10年经验的外贸业务员，擅长撰写高转化率的{lang_name}开发信。"
@@ -72,6 +76,10 @@ def build_inquiry_prompt(
     your_name: str = "",
     company_name: str = "",
 ) -> tuple[str, str | None]:
+    inquiry = sanitize_input(inquiry, max_length=2000)
+    customer_name = sanitize_prompt_param(customer_name, "customer_name")
+    your_name = sanitize_prompt_param(your_name, "your_name")
+    company_name = sanitize_prompt_param(company_name, "company_name")
     customer_info = f"客户姓名：{customer_name}" if customer_name else "（客户姓名未提供）"
     signature_name = your_name if your_name else "[Your Name]"
     signature_company = company_name if company_name else "[Your Company]"
@@ -112,6 +120,9 @@ def build_product_intro_prompt(
     target: str,
     languages: list[str],
 ) -> tuple[str, str | None]:
+    product = sanitize_prompt_param(product, "product")
+    features = sanitize_prompt_param(features, "features")
+    target = sanitize_prompt_param(target, "target")
     langs = [LANG_MAP.get(l, l) for l in languages]
     lang_str = ", ".join(langs)
     system = "你是一位专业的外贸文案撰写师，擅长为B2B产品撰写多语言推广文案。"
@@ -148,6 +159,8 @@ def build_followup_prompt(
     stage: str,
     product: str = "",
 ) -> tuple[str, str | None]:
+    customer = sanitize_prompt_param(customer, "customer")
+    product = sanitize_prompt_param(product, "product")
     context = FOLLOWUP_STAGES.get(stage, "常规跟进")
     product_info = f"\n产品: {product}" if product else ""
     system = "你是一位有丰富经验的外贸业务员，擅长撰写专业但不令人厌烦的跟进邮件。"
@@ -186,6 +199,10 @@ def build_listing_prompt(
     category: str = "",
 ) -> tuple[str, str | None]:
     """构建产品上架 Listing 文案的 Prompt。"""
+    product = sanitize_prompt_param(product, "product")
+    keywords = sanitize_prompt_param(keywords, "keywords")
+    features = sanitize_prompt_param(features, "features")
+    category = sanitize_prompt_param(category, "category")
     platform_desc = LISTING_PLATFORMS.get(platform, "Amazon product listing")
     category_info = f"\n产品类目: {category}" if category else ""
     system = (
@@ -246,6 +263,10 @@ def build_social_post_prompt(
     promo: str = "",
 ) -> tuple[str, str | None]:
     """构建社媒文案 Prompt。"""
+    product = sanitize_prompt_param(product, "product")
+    features = sanitize_prompt_param(features, "features")
+    audience = sanitize_prompt_param(audience, "audience")
+    promo = sanitize_prompt_param(promo, "promo")
     platform_desc = SOCIAL_PLATFORMS.get(platform, "social media post")
     audience_info = f"\n目标受众: {audience}" if audience else ""
     promo_info = f"\n促销/活动: {promo}" if promo else ""
