@@ -13,7 +13,7 @@ st.set_page_config(page_title="报价单 | 外贸AI助手", page_icon="📄", la
 inject_css()
 check_auth()
 
-# Logo persistence path
+# Single-tenant: one logo per deployment (shared across all sessions)
 LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "company_logo.png")
 
 if "results" not in st.session_state:

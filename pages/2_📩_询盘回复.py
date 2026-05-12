@@ -76,7 +76,7 @@ if generate_clicked:
                 result = reply_inquiry(inquiry, customer_name, your_name, company_name, stream=False, user_id=get_user_id())
             st.session_state.results["inquiry"] = result
             show_result(result, "inquiry", label="📝 回复草稿", file_name=fname, balloons=True, history_feature="询盘回复", history_title=f"回复 {customer_name or '客户'}")
-        show_regenerate_buttons("inquiry")
+        show_regenerate_buttons("inquiry", show_style_button=False)
 
 elif st.session_state.results.get("inquiry"):
     show_result(
@@ -86,7 +86,7 @@ elif st.session_state.results.get("inquiry"):
         file_name="询盘回复.txt",
         balloons=False,
     )
-    show_regenerate_buttons("inquiry")
+    show_regenerate_buttons("inquiry", show_style_button=False)
 
 st.markdown("---")
 st.markdown('<div class="footer">💼 外贸AI助手 · 询盘回复</div>', unsafe_allow_html=True)

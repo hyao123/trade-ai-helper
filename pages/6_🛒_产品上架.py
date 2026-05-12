@@ -102,7 +102,7 @@ if generate_clicked:
                 )
             st.session_state.results["listing"] = result
             show_result(result, "listing", label="📝 Listing 文案", file_name=fname, height=350, balloons=True, history_feature="产品上架", history_title=product[:30])
-        show_regenerate_buttons("listing")
+        show_regenerate_buttons("listing", show_style_button=False)
 
 elif st.session_state.results.get("listing"):
     show_result(
@@ -113,7 +113,7 @@ elif st.session_state.results.get("listing"):
         height=350,
         balloons=False,
     )
-    show_regenerate_buttons("listing")
+    show_regenerate_buttons("listing", show_style_button=False)
 
 st.markdown("---")
 st.markdown('<div class="footer">💼 外贸AI助手 · 产品上架文案</div>', unsafe_allow_html=True)

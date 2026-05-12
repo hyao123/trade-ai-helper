@@ -97,7 +97,7 @@ if generate_clicked:
                 )
             st.session_state.results["social"] = result
             show_result(result, "social", label="📝 社媒文案", file_name=fname, height=350, balloons=True, history_feature="社媒文案", history_title=product[:25])
-        show_regenerate_buttons("social")
+        show_regenerate_buttons("social", show_style_button=False)
 
 elif st.session_state.results.get("social"):
     show_result(
@@ -108,7 +108,7 @@ elif st.session_state.results.get("social"):
         height=350,
         balloons=False,
     )
-    show_regenerate_buttons("social")
+    show_regenerate_buttons("social", show_style_button=False)
 
 st.markdown("---")
 st.markdown('<div class="footer">💼 外贸AI助手 · 社媒文案生成</div>', unsafe_allow_html=True)

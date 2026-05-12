@@ -60,10 +60,10 @@ class QuotePDF(FPDF):
         # 渐变色装饰条（用矩形模拟）
         self.set_fill_color(30, 58, 95)
         self.rect(0, 0, 210, 18, "F")
-        # Logo (if available)
+        # Logo (if available) - constrain to 45x14mm box to prevent overflow
         if self._logo_path and os.path.exists(self._logo_path):
             try:
-                self.image(self._logo_path, x=5, y=2, h=14)
+                self.image(self._logo_path, x=5, y=2, w=45, h=14, keep_aspect_ratio=True)
             except Exception:
                 pass  # Gracefully handle corrupted/unreadable image files
         self.set_text_color(255, 255, 255)

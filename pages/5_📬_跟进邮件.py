@@ -82,7 +82,7 @@ if generate_clicked:
                 result = generate_followup(customer, stage, product, stream=False, user_id=get_user_id())
             st.session_state.results["followup"] = result
             show_result(result, "followup", label="📝 跟进邮件", file_name=fname, balloons=True, history_feature="跟进邮件", history_title=f"{customer[:15]} · {stage}")
-        show_regenerate_buttons("followup")
+        show_regenerate_buttons("followup", show_style_button=False)
 
 elif st.session_state.results.get("followup"):
     show_result(
@@ -92,7 +92,7 @@ elif st.session_state.results.get("followup"):
         file_name="跟进邮件.txt",
         balloons=False,
     )
-    show_regenerate_buttons("followup")
+    show_regenerate_buttons("followup", show_style_button=False)
 
 st.markdown("---")
 st.markdown('<div class="footer">💼 外贸AI助手 · 跟进邮件生成</div>', unsafe_allow_html=True)

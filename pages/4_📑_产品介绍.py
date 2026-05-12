@@ -76,7 +76,7 @@ if generate_clicked:
                 result = generate_product_intro(product, features, target, lang_list, stream=False, user_id=get_user_id())
             st.session_state.results["intro"] = result
             show_result(result, "intro", label="📝 产品介绍文案", file_name=fname, height=300, balloons=True, history_feature="产品介绍", history_title=product[:25])
-        show_regenerate_buttons("intro")
+        show_regenerate_buttons("intro", show_style_button=False)
 
 elif st.session_state.results.get("intro"):
     show_result(
@@ -87,7 +87,7 @@ elif st.session_state.results.get("intro"):
         height=300,
         balloons=False,
     )
-    show_regenerate_buttons("intro")
+    show_regenerate_buttons("intro", show_style_button=False)
 
 st.markdown("---")
 st.markdown('<div class="footer">💼 外贸AI助手 · 产品介绍生成</div>', unsafe_allow_html=True)
