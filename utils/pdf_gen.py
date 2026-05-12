@@ -104,7 +104,7 @@ def _truncate_by_width(pdf: FPDF, font_name: str, text: str, max_mm: float) -> s
     if pdf.get_string_width(text) <= max_mm:
         return text
     # 逐字符缩减直到满足宽度
-    ellipsis = "…"
+    ellipsis = "..."
     for i in range(len(text) - 1, 0, -1):
         candidate = text[:i] + ellipsis
         if pdf.get_string_width(candidate) <= max_mm:
