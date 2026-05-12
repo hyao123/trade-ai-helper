@@ -2,7 +2,8 @@
 app.py — 首页（功能入口 + 导航）
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth
+
+from utils.ui_helpers import check_auth, inject_css
 
 st.set_page_config(
     page_title="外贸AI助手 | TradeAI Pro",

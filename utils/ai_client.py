@@ -15,18 +15,23 @@ NVIDIA NIM API 文档：https://docs.api.nvidia.com/nim/docs/api-quickstart
 
 from __future__ import annotations
 
-import os
 import time
 from collections import defaultdict
 from typing import Generator
 
-from openai import OpenAI, AuthenticationError, RateLimitError, APIStatusError, APITimeoutError
+from openai import (
+    APIStatusError,
+    APITimeoutError,
+    AuthenticationError,
+    OpenAI,
+    RateLimitError,
+)
 
 from config.prompts import (
     build_email_prompt,
+    build_followup_prompt,
     build_inquiry_prompt,
     build_product_intro_prompt,
-    build_followup_prompt,
 )
 from utils.secrets import get_secret
 
@@ -85,6 +90,17 @@ def get_rate_limit_reset_seconds(user_id: str = "default") -> int:
         return 0
     earliest = min(active)
     return max(0, int(RATE_LIMIT_WINDOW - (now - earliest)))
+
+
+def _rate_limit_check(user_id: str = "default") -> tuple[bool, int]:
+    """Prune expired slots, consume one slot if allowed, and return allowance state."""
+    now = time.time()
+    _call_times[user_id] = [t for t in _call_times[user_id] if now - t < RATE_LIMIT_WINDOW]
+    if len(_call_times[user_id]) >= RATE_LIMIT_MAX_CALLS:
+        return False, 0
+
+    _rate_limit_consume(user_id)
+    return True, RATE_LIMIT_MAX_CALLS - len(_call_times[user_id])
 
 
 def _check_preconditions(user_id: str = "default") -> str | None:

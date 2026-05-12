@@ -3,11 +3,16 @@ pages/10_📅_跟进日历.py
 邮件自动化工作流：记录已发邮件，智能提醒跟进时间节点。
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth
+
+from utils.ui_helpers import check_auth, inject_css
 from utils.workflow import (
-    add_workflow, get_all_workflows, get_due_workflows,
-    mark_followup_done, update_workflow_status,
-    get_workflow_stats, FOLLOWUP_RULES,
+    FOLLOWUP_RULES,
+    add_workflow,
+    get_all_workflows,
+    get_due_workflows,
+    get_workflow_stats,
+    mark_followup_done,
+    update_workflow_status,
 )
 
 st.set_page_config(page_title="跟进日历 | 外贸AI助手", page_icon="📅", layout="wide")

@@ -3,8 +3,9 @@ pages/8_💬_社媒文案.py
 生成 LinkedIn / Instagram / Facebook 社媒营销文案，支持流式输出。
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id
+
 from utils.ai_client import generate_social_post
+from utils.ui_helpers import check_auth, get_user_id, inject_css, show_result
 
 st.set_page_config(page_title="社媒文案 | 外贸AI助手", page_icon="💬", layout="wide")
 inject_css()

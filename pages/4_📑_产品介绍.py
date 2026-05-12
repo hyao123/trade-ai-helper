@@ -3,8 +3,9 @@ pages/4_📑_产品介绍.py
 生成多语种产品介绍文案，支持流式输出。
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id
+
 from utils.ai_client import generate_product_intro
+from utils.ui_helpers import check_auth, get_user_id, inject_css, show_result
 
 st.set_page_config(page_title="产品介绍 | 外贸AI助手", page_icon="📑", layout="wide")
 inject_css()

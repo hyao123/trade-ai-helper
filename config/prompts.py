@@ -112,7 +112,7 @@ def build_product_intro_prompt(
     target: str,
     languages: list[str],
 ) -> tuple[str, str | None]:
-    langs = [LANG_MAP.get(l, l) for l in languages]
+    langs = [LANG_MAP.get(language, language) for language in languages]
     lang_str = ", ".join(langs)
     system = "你是一位专业的外贸文案撰写师，擅长为B2B产品撰写多语言推广文案。"
     prompt = f"""请为以下产品撰写 {lang_str} 的产品介绍文案：

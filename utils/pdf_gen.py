@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import datetime
 import os
+
 from fpdf import FPDF
 
 # ---------------------------------------------------------------------------
@@ -103,7 +104,7 @@ def _truncate_by_width(pdf: FPDF, font_name: str, text: str, max_mm: float) -> s
     if pdf.get_string_width(text) <= max_mm:
         return text
     # 逐字符缩减直到满足宽度
-    ellipsis = "…"
+    ellipsis = "..."
     for i in range(len(text) - 1, 0, -1):
         candidate = text[:i] + ellipsis
         if pdf.get_string_width(candidate) <= max_mm:
@@ -118,7 +119,7 @@ def _row(pdf: FPDF, font_name: str, label: str, value: str,
     pdf.cell(label_w, row_h, label, 0, 0, "L")
     pdf.set_font(font_name, "", 9)
     pdf.set_text_color(17, 24, 39)
-    pdf.cell(0, row_h, str(value) if value else "—", 0, 1, "L")
+    pdf.cell(0, row_h, str(value) if value else "-", 0, 1, "L")
     pdf.set_text_color(0, 0, 0)
 
 
@@ -178,7 +179,7 @@ def generate_quote_pdf(
     fill = False
     for sku in skus:
         name     = sku.get("product", "")
-        model    = sku.get("model", "") or "—"
+        model    = sku.get("model", "") or "-"
         price    = float(sku.get("price", 0))
         quantity = int(sku.get("quantity", 0))
         unit     = sku.get("unit", "PCS")
@@ -216,7 +217,7 @@ def generate_quote_pdf(
     _row(pdf, font_name, "Payment Terms:", payment)
     _row(pdf, font_name, "Delivery Time:", delivery)
     _row(pdf, font_name, "Validity:",      validity)
-    _row(pdf, font_name, "Shipping Port:", shipping or "—")
+    _row(pdf, font_name, "Shipping Port:", shipping or "-")
     pdf.ln(4)
 
     # ── 客户信息（Buyer）──────────────────────────────

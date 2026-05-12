@@ -8,8 +8,9 @@ utils/templates.py
 
 from __future__ import annotations
 
-import streamlit as st
 from datetime import datetime
+
+import streamlit as st
 
 
 def _get_store() -> dict[str, list[dict]]:
