@@ -15,13 +15,8 @@ _FILENAME = "customers.json"
 
 def _get_customers() -> list[dict]:
     """Get customer list from session_state, loading from disk on first access."""
-    if "customers" not in st.session_state:
+    if "customers" not in st.session_state or not st.session_state.get("_customers_loaded_from_disk"):
         st.session_state["customers"] = load_json(_FILENAME, default=[])
-        st.session_state["_customers_loaded_from_disk"] = True
-    elif not st.session_state.get("_customers_loaded_from_disk"):
-        disk_data = load_json(_FILENAME, default=[])
-        if disk_data and not st.session_state["customers"]:
-            st.session_state["customers"] = disk_data
         st.session_state["_customers_loaded_from_disk"] = True
     return st.session_state["customers"]
 
@@ -57,6 +52,13 @@ def update_customer(index: int, data: dict) -> None:
     if 0 <= index < len(customers):
         customers[index] = data
         _persist_customers()
+
+
+def import_customers(data: list) -> None:
+    """Bulk-import customer data, replacing current state and persisting to disk."""
+    st.session_state["customers"] = data
+    st.session_state["_customers_loaded_from_disk"] = True
+    _persist_customers()
 
 
 def find_customer(company: str, contact: str) -> dict | None:

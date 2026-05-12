@@ -26,13 +26,8 @@ FOLLOWUP_RULES: list[dict] = [
 
 
 def _get_workflows() -> list[dict]:
-    if "email_workflows" not in st.session_state:
+    if "email_workflows" not in st.session_state or not st.session_state.get("_workflows_loaded_from_disk"):
         st.session_state["email_workflows"] = load_json(_FILENAME, default=[])
-        st.session_state["_workflows_loaded_from_disk"] = True
-    elif not st.session_state.get("_workflows_loaded_from_disk"):
-        disk_data = load_json(_FILENAME, default=[])
-        if disk_data and not st.session_state["email_workflows"]:
-            st.session_state["email_workflows"] = disk_data
         st.session_state["_workflows_loaded_from_disk"] = True
     return st.session_state["email_workflows"]
 
@@ -40,6 +35,13 @@ def _get_workflows() -> list[dict]:
 def _persist_workflows() -> None:
     """Save current workflows to disk."""
     save_json(_FILENAME, st.session_state.get("email_workflows", []))
+
+
+def import_workflows(data: list) -> None:
+    """Bulk-import workflow data, replacing current state and persisting to disk."""
+    st.session_state["email_workflows"] = data
+    st.session_state["_workflows_loaded_from_disk"] = True
+    _persist_workflows()
 
 
 def add_workflow(

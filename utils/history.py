@@ -18,15 +18,17 @@ _FILENAME = "history.json"
 
 def _get_history() -> list[dict]:
     """获取历史记录列表。"""
-    if "generation_history" not in st.session_state:
+    if "generation_history" not in st.session_state or not st.session_state.get("_history_loaded_from_disk"):
         st.session_state["generation_history"] = load_json(_FILENAME, default=[])
         st.session_state["_history_loaded_from_disk"] = True
-    elif not st.session_state.get("_history_loaded_from_disk"):
-        disk_data = load_json(_FILENAME, default=[])
-        if disk_data and not st.session_state["generation_history"]:
-            st.session_state["generation_history"] = disk_data
-        st.session_state["_history_loaded_from_disk"] = True
     return st.session_state["generation_history"]
+
+
+def import_history(data: list) -> None:
+    """Bulk-import history data, replacing current state and persisting to disk."""
+    st.session_state["generation_history"] = data
+    st.session_state["_history_loaded_from_disk"] = True
+    save_json(_FILENAME, data)
 
 
 def add_to_history(

@@ -18,13 +18,8 @@ _FILENAME = "templates.json"
 
 def _get_store() -> dict[str, list[dict]]:
     """获取模板存储（按功能分类）。"""
-    if "templates" not in st.session_state:
+    if "templates" not in st.session_state or not st.session_state.get("_templates_loaded_from_disk"):
         st.session_state["templates"] = load_json(_FILENAME, default={})
-        st.session_state["_templates_loaded_from_disk"] = True
-    elif not st.session_state.get("_templates_loaded_from_disk"):
-        disk_data = load_json(_FILENAME, default={})
-        if disk_data and not st.session_state["templates"]:
-            st.session_state["templates"] = disk_data
         st.session_state["_templates_loaded_from_disk"] = True
     return st.session_state["templates"]
 
@@ -32,6 +27,13 @@ def _get_store() -> dict[str, list[dict]]:
 def _persist_templates() -> None:
     """Save current templates to disk."""
     save_json(_FILENAME, st.session_state.get("templates", {}))
+
+
+def import_templates(data: dict) -> None:
+    """Bulk-import template data, replacing current state and persisting to disk."""
+    st.session_state["templates"] = data
+    st.session_state["_templates_loaded_from_disk"] = True
+    save_json(_FILENAME, data)
 
 
 def save_template(category: str, name: str, data: dict) -> None:
