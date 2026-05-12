@@ -2,21 +2,36 @@
 utils/templates.py
 ------------------
 模板保存/加载/删除系统。
-数据持久化到 st.session_state（单 session 有效）。
-未来可扩展到 JSON 文件或数据库。
+数据持久化到 st.session_state + JSON 文件。
 """
 
 from __future__ import annotations
 
-import streamlit as st
 from datetime import datetime
+
+import streamlit as st
+
+from utils.storage import load_json, save_json
+
+_FILENAME = "templates.json"
 
 
 def _get_store() -> dict[str, list[dict]]:
     """获取模板存储（按功能分类）。"""
     if "templates" not in st.session_state:
-        st.session_state["templates"] = {}
+        st.session_state["templates"] = load_json(_FILENAME, default={})
+        st.session_state["_templates_loaded_from_disk"] = True
+    elif not st.session_state.get("_templates_loaded_from_disk"):
+        disk_data = load_json(_FILENAME, default={})
+        if disk_data and not st.session_state["templates"]:
+            st.session_state["templates"] = disk_data
+        st.session_state["_templates_loaded_from_disk"] = True
     return st.session_state["templates"]
+
+
+def _persist_templates() -> None:
+    """Save current templates to disk."""
+    save_json(_FILENAME, st.session_state.get("templates", {}))
 
 
 def save_template(category: str, name: str, data: dict) -> None:
@@ -37,6 +52,7 @@ def save_template(category: str, name: str, data: dict) -> None:
         "data": data,
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
     })
+    _persist_templates()
 
 
 def load_templates(category: str) -> list[dict]:
@@ -50,6 +66,7 @@ def delete_template(category: str, name: str) -> None:
     store = _get_store()
     if category in store:
         store[category] = [t for t in store[category] if t["name"] != name]
+    _persist_templates()
 
 
 def get_template_names(category: str) -> list[str]:

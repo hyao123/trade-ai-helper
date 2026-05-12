@@ -8,7 +8,12 @@ utils/workflow.py
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+
 import streamlit as st
+
+from utils.storage import load_json, save_json
+
+_FILENAME = "workflows.json"
 
 
 # ── 跟进节点配置 ──────────────────────────────────────
@@ -22,8 +27,19 @@ FOLLOWUP_RULES: list[dict] = [
 
 def _get_workflows() -> list[dict]:
     if "email_workflows" not in st.session_state:
-        st.session_state["email_workflows"] = []
+        st.session_state["email_workflows"] = load_json(_FILENAME, default=[])
+        st.session_state["_workflows_loaded_from_disk"] = True
+    elif not st.session_state.get("_workflows_loaded_from_disk"):
+        disk_data = load_json(_FILENAME, default=[])
+        if disk_data and not st.session_state["email_workflows"]:
+            st.session_state["email_workflows"] = disk_data
+        st.session_state["_workflows_loaded_from_disk"] = True
     return st.session_state["email_workflows"]
+
+
+def _persist_workflows() -> None:
+    """Save current workflows to disk."""
+    save_json(_FILENAME, st.session_state.get("email_workflows", []))
 
 
 def add_workflow(
@@ -48,6 +64,7 @@ def add_workflow(
         "status": "进行中",   # 进行中 / 已回复 / 已关闭
         "followups": [],      # 记录已完成的跟进
     })
+    _persist_workflows()
 
 
 def get_all_workflows() -> list[dict]:
@@ -84,6 +101,7 @@ def mark_followup_done(wf_id: str, stage_label: str) -> None:
                 "stage_label": stage_label,
                 "done_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
             })
+            _persist_workflows()
             return
 
 
@@ -92,6 +110,7 @@ def update_workflow_status(wf_id: str, status: str) -> None:
     for wf in _get_workflows():
         if wf["id"] == wf_id:
             wf["status"] = status
+            _persist_workflows()
             return
 
 

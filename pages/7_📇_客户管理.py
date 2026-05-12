@@ -4,6 +4,7 @@ pages/7_📇_客户管理.py
 """
 import streamlit as st
 from utils.ui_helpers import inject_css, check_auth
+from utils.customers import get_customers, add_customer, delete_customer
 from datetime import datetime
 
 st.set_page_config(page_title="客户管理 | 外贸AI助手", page_icon="📇", layout="wide")
@@ -11,10 +12,7 @@ inject_css()
 check_auth()
 
 # ── 初始化客户数据 ────────────────────────────────────
-if "customers" not in st.session_state:
-    st.session_state["customers"] = []
-
-customers = st.session_state["customers"]
+customers = get_customers()
 
 # ── 页头 ──────────────────────────────────────────────
 st.markdown("""
@@ -51,7 +49,7 @@ if st.button("💾 添加客户", type="primary", use_container_width=True):
     if not new_company.strip():
         st.warning("⚠️ 请填写公司名称")
     else:
-        customers.append({
+        add_customer({
             "company": new_company.strip(),
             "contact": new_contact.strip(),
             "email": new_email.strip(),
@@ -126,7 +124,7 @@ else:
                 if st.button("🗑️ 删除", key=f"crm_del_{i}", use_container_width=True):
                     # 找到原始索引并删除
                     idx = customers.index(cust)
-                    customers.pop(idx)
+                    delete_customer(idx)
                     st.rerun()
 
 st.markdown("---")

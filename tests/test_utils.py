@@ -2,9 +2,14 @@
 tests/test_utils.py
 Unit tests for core utility functions (no API calls needed).
 """
+from __future__ import annotations
+
 import sys
 import os
+import tempfile
 import time
+from pathlib import Path
+from unittest.mock import patch
 
 # Add project root to path so imports work
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -152,3 +157,71 @@ class TestPdfGeneration:
         skus = [{"product": "Free Sample", "model": "FS-01", "price": 0.0, "quantity": 5, "unit": "PCS"}]
         result = generate_quote_pdf(skus=skus)
         assert result[:4] == b"%PDF"
+
+
+# ---------------------------------------------------------------------------
+# Test storage module
+# ---------------------------------------------------------------------------
+class TestStorage:
+    """Tests for utils/storage.py JSON persistence layer."""
+
+    def _make_temp_dir(self):
+        return Path(tempfile.mkdtemp())
+
+    def test_load_json_returns_default_when_file_not_found(self):
+        from utils.storage import load_json
+        tmp_dir = self._make_temp_dir()
+        with patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            result = load_json("nonexistent.json")
+            assert result == []
+
+    def test_load_json_returns_custom_default(self):
+        from utils.storage import load_json
+        tmp_dir = self._make_temp_dir()
+        with patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            result = load_json("nonexistent.json", default={})
+            assert result == {}
+
+    def test_save_json_writes_valid_json(self):
+        from utils.storage import load_json, save_json
+        tmp_dir = self._make_temp_dir()
+        test_data = [{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}]
+        with patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            save_json("test.json", test_data)
+            loaded = load_json("test.json")
+            assert loaded == test_data
+
+    def test_atomic_write_produces_final_file(self):
+        from utils.storage import save_json
+        tmp_dir = self._make_temp_dir()
+        with patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            save_json("atomic_test.json", {"key": "value"})
+            # Final file should exist, .tmp should not
+            assert (tmp_dir / "atomic_test.json").exists()
+            assert not (tmp_dir / "atomic_test.tmp").exists()
+
+    def test_save_json_overwrites_existing(self):
+        from utils.storage import load_json, save_json
+        tmp_dir = self._make_temp_dir()
+        with patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            save_json("overwrite.json", [1, 2, 3])
+            save_json("overwrite.json", [4, 5, 6])
+            loaded = load_json("overwrite.json")
+            assert loaded == [4, 5, 6]
+
+    def test_load_json_handles_invalid_json(self):
+        from utils.storage import load_json
+        tmp_dir = self._make_temp_dir()
+        # Write invalid JSON
+        bad_file = tmp_dir / "bad.json"
+        bad_file.write_text("not valid json {{{", encoding="utf-8")
+        with patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            result = load_json("bad.json", default=[])
+            assert result == []
+
+    def test_get_data_dir_creates_directory(self):
+        from utils.storage import get_data_dir
+        # Simply test the real function creates directory
+        data_dir = get_data_dir()
+        assert data_dir.exists()
+        assert data_dir.is_dir()
