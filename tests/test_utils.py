@@ -2,8 +2,8 @@
 tests/test_utils.py
 Unit tests for core utility functions (no API calls needed).
 """
-import sys
 import os
+import sys
 import time
 
 # Add project root to path so imports work
@@ -67,7 +67,7 @@ class TestRateLimiting:
     """Tests for ai_client rate limiting functions."""
 
     def test_rate_limit_check_allows_within_limit(self):
-        from utils.ai_client import _rate_limit_check, _call_times, RATE_LIMIT_MAX_CALLS
+        from utils.ai_client import RATE_LIMIT_MAX_CALLS, _call_times, _rate_limit_check
         # Reset state
         test_user = "test_user_allow"
         _call_times[test_user] = []
@@ -77,7 +77,11 @@ class TestRateLimiting:
         assert remaining == RATE_LIMIT_MAX_CALLS - 1
 
     def test_rate_limit_check_blocks_at_limit(self):
-        from utils.ai_client import _rate_limit_check, _call_times, RATE_LIMIT_MAX_CALLS, RATE_LIMIT_WINDOW
+        from utils.ai_client import (
+            RATE_LIMIT_MAX_CALLS,
+            _call_times,
+            _rate_limit_check,
+        )
         test_user = "test_user_block"
         # Fill up all slots
         now = time.time()
@@ -88,7 +92,12 @@ class TestRateLimiting:
         assert remaining == 0
 
     def test_rate_limit_expired_slots_freed(self):
-        from utils.ai_client import _rate_limit_check, _call_times, RATE_LIMIT_MAX_CALLS, RATE_LIMIT_WINDOW
+        from utils.ai_client import (
+            RATE_LIMIT_MAX_CALLS,
+            RATE_LIMIT_WINDOW,
+            _call_times,
+            _rate_limit_check,
+        )
         test_user = "test_user_expired"
         # All slots expired
         _call_times[test_user] = [time.time() - RATE_LIMIT_WINDOW - 10] * RATE_LIMIT_MAX_CALLS
@@ -97,7 +106,11 @@ class TestRateLimiting:
         assert allowed is True
 
     def test_get_rate_limit_remaining(self):
-        from utils.ai_client import get_rate_limit_remaining, _call_times, RATE_LIMIT_MAX_CALLS
+        from utils.ai_client import (
+            RATE_LIMIT_MAX_CALLS,
+            _call_times,
+            get_rate_limit_remaining,
+        )
         test_user = "test_user_remaining"
         _call_times[test_user] = []
         assert get_rate_limit_remaining(test_user) == RATE_LIMIT_MAX_CALLS

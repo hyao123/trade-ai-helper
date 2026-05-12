@@ -15,18 +15,23 @@ NVIDIA NIM API 文档：https://docs.api.nvidia.com/nim/docs/api-quickstart
 
 from __future__ import annotations
 
-import os
 import time
 from collections import defaultdict
 from typing import Generator
 
-from openai import OpenAI, AuthenticationError, RateLimitError, APIStatusError, APITimeoutError
+from openai import (
+    APIStatusError,
+    APITimeoutError,
+    AuthenticationError,
+    OpenAI,
+    RateLimitError,
+)
 
 from config.prompts import (
     build_email_prompt,
+    build_followup_prompt,
     build_inquiry_prompt,
     build_product_intro_prompt,
-    build_followup_prompt,
 )
 from utils.secrets import get_secret
 

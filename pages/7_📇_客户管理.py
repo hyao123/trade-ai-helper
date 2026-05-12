@@ -2,9 +2,11 @@
 pages/7_📇_客户管理.py
 轻量级客户 CRM：管理客户信息，追踪沟通历史。
 """
-import streamlit as st
-from utils.ui_helpers import inject_css, check_auth
 from datetime import datetime
+
+import streamlit as st
+
+from utils.ui_helpers import check_auth, inject_css
 
 st.set_page_config(page_title="客户管理 | 外贸AI助手", page_icon="📇", layout="wide")
 inject_css()

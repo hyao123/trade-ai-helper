@@ -14,10 +14,10 @@ import hmac
 import html
 import json
 import re
-import time
 import types
 
 import streamlit as st
+
 from utils.secrets import get_secret
 
 # ---------------------------------------------------------------------------
@@ -138,7 +138,12 @@ def _get_session_user_id() -> str:
 
 def show_sidebar_info() -> None:
     """在侧栏显示剩余 API 调用次数和重置倒计时（仅使用公共 API）。"""
-    from utils.ai_client import get_rate_limit_remaining, get_rate_limit_reset_seconds, RATE_LIMIT_MAX_CALLS, RATE_LIMIT_WINDOW
+    from utils.ai_client import (
+        RATE_LIMIT_MAX_CALLS,
+        RATE_LIMIT_WINDOW,
+        get_rate_limit_remaining,
+        get_rate_limit_reset_seconds,
+    )
 
     uid = _get_session_user_id()
     remaining = get_rate_limit_remaining(uid)

@@ -3,9 +3,15 @@ pages/1_📧_开发信.py
 生成外贸开发信（含邮件主题行），支持流式输出 + 模板保存/加载。
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id
+
 from utils.ai_client import generate_email
-from utils.templates import save_template, get_template_names, get_template_data, delete_template
+from utils.templates import (
+    delete_template,
+    get_template_data,
+    get_template_names,
+    save_template,
+)
+from utils.ui_helpers import check_auth, get_user_id, inject_css, show_result
 
 st.set_page_config(page_title="开发信生成 | 外贸AI助手", page_icon="📧", layout="wide")
 inject_css()
