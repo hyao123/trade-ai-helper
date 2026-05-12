@@ -25,17 +25,28 @@ jobs:
         run: ruff check . --select E,F,I --ignore E501
 
       - name: Syntax check (all .py files)
-        run: python -c "
-          import ast, pathlib, sys
+        run: |
+          python - <<'PY'
+          import ast
+          import pathlib
+          import sys
+
           errors = []
-          for f in sorted(pathlib.Path('.').rglob('*.py')):
-              if '.git' in str(f): continue
-              try: ast.parse(f.read_text())
-              except SyntaxError as e: errors.append(f'{f}: {e}')
+          files = sorted(pathlib.Path(".").rglob("*.py"))
+          for file_path in files:
+              if ".git" in file_path.parts:
+                  continue
+              try:
+                  ast.parse(file_path.read_text())
+              except SyntaxError as error:
+                  errors.append(f"{file_path}: {error}")
+
           if errors:
-              print('\n'.join(errors)); sys.exit(1)
-          print(f'All {len(list(pathlib.Path(\".\").rglob(\"*.py\")))} files passed')
-          "
+              print("\n".join(errors))
+              sys.exit(1)
+
+          print(f"All {len(files)} files passed")
+          PY
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
