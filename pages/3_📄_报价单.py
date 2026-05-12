@@ -4,6 +4,7 @@ pages/3_📄_报价单.py
 """
 from __future__ import annotations
 
+import os
 import streamlit as st
 from utils.ui_helpers import inject_css, check_auth
 from utils.pdf_gen import generate_quote_pdf
@@ -11,6 +12,9 @@ from utils.pdf_gen import generate_quote_pdf
 st.set_page_config(page_title="报价单 | 外贸AI助手", page_icon="📄", layout="wide")
 inject_css()
 check_auth()
+
+# Logo persistence path
+LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "company_logo.png")
 
 if "results" not in st.session_state:
     st.session_state.results = {}
@@ -166,6 +170,28 @@ with col_c2:
     email = st.text_input("联系邮箱", value=st.session_state.get("quote_email_saved", "sales@yourcompany.com"))
     phone = st.text_input("联系电话", value=st.session_state.get("quote_phone_saved", "+86-XXX-XXXXXXX"))
 
+# --- 公司Logo（可选）---
+st.markdown("#### 🖼️ 公司Logo（可选）")
+if os.path.exists(LOGO_PATH):
+    st.image(LOGO_PATH, width=150, caption="当前Logo")
+    if st.button("🗑️ 删除Logo", key="remove_logo"):
+        os.remove(LOGO_PATH)
+        st.success("Logo已删除")
+        st.rerun()
+
+uploaded_logo = st.file_uploader(
+    "上传公司Logo",
+    type=["png", "jpg", "jpeg"],
+    help="支持 PNG/JPG 格式，建议尺寸不超过 500x200px",
+    key="logo_uploader",
+)
+if uploaded_logo:
+    os.makedirs(os.path.dirname(LOGO_PATH), exist_ok=True)
+    with open(LOGO_PATH, "wb") as f:
+        f.write(uploaded_logo.getvalue())
+    st.success("✅ Logo已保存")
+    st.rerun()
+
 generate_clicked = st.button("🚀 生成报价单 (PDF)", type="primary", use_container_width=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
@@ -193,6 +219,7 @@ if generate_clicked:
         quote_no = f"Q-2026-{st.session_state['quote_number']:03d}"
 
         with st.spinner("📄 正在生成 PDF..."):
+            logo_path_arg = LOGO_PATH if os.path.exists(LOGO_PATH) else None
             pdf_bytes = generate_quote_pdf(
                 skus=valid_skus,
                 payment=payment,
@@ -206,6 +233,7 @@ if generate_clicked:
                 buyer_company=buyer_company,
                 buyer_contact=buyer_contact,
                 buyer_email=buyer_email,
+                logo_path=logo_path_arg,
             )
 
         st.session_state.results["quote_pdf"]      = pdf_bytes

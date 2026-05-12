@@ -413,6 +413,57 @@ class TestCRMIntegration:
 
 
 # ---------------------------------------------------------------------------
+# Test PDF generation with logo
+# ---------------------------------------------------------------------------
+class TestPdfLogoGeneration:
+    """Tests for PDF generation with logo."""
+
+    def _create_minimal_png(self, path: str) -> None:
+        """Create a minimal valid 1x1 white PNG file for testing."""
+        import struct
+        import zlib
+        signature = b'\x89PNG\r\n\x1a\n'
+        # IHDR
+        ihdr_data = struct.pack('>IIBBBBB', 1, 1, 8, 2, 0, 0, 0)
+        ihdr_crc = zlib.crc32(b'IHDR' + ihdr_data)
+        ihdr = struct.pack('>I', 13) + b'IHDR' + ihdr_data + struct.pack('>I', ihdr_crc & 0xffffffff)
+        # IDAT
+        raw_data = zlib.compress(b'\x00\xff\xff\xff')  # filter byte + RGB
+        idat_crc = zlib.crc32(b'IDAT' + raw_data)
+        idat = struct.pack('>I', len(raw_data)) + b'IDAT' + raw_data + struct.pack('>I', idat_crc & 0xffffffff)
+        # IEND
+        iend_crc = zlib.crc32(b'IEND')
+        iend = struct.pack('>I', 0) + b'IEND' + struct.pack('>I', iend_crc & 0xffffffff)
+        with open(path, 'wb') as f:
+            f.write(signature + ihdr + idat + iend)
+
+    def test_pdf_without_logo(self):
+        from utils.pdf_gen import generate_quote_pdf
+        skus = [{"product": "Test", "model": "T1", "price": 10.0, "quantity": 1, "unit": "PCS"}]
+        result = generate_quote_pdf(skus=skus, logo_path=None)
+        assert result[:4] == b"%PDF"
+
+    def test_pdf_with_logo(self):
+        from utils.pdf_gen import generate_quote_pdf
+        tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+        try:
+            self._create_minimal_png(tmp.name)
+            skus = [{"product": "Test", "model": "T1", "price": 10.0, "quantity": 1, "unit": "PCS"}]
+            result = generate_quote_pdf(skus=skus, logo_path=tmp.name)
+            assert result[:4] == b"%PDF"
+            assert len(result) > 1000
+        finally:
+            os.unlink(tmp.name)
+
+    def test_pdf_with_nonexistent_logo_path(self):
+        from utils.pdf_gen import generate_quote_pdf
+        skus = [{"product": "Test", "model": "T1", "price": 10.0, "quantity": 1, "unit": "PCS"}]
+        # Should not crash if logo path doesn't exist
+        result = generate_quote_pdf(skus=skus, logo_path="/nonexistent/logo.png")
+        assert result[:4] == b"%PDF"
+
+
+# ---------------------------------------------------------------------------
 # Test sanitize module
 # ---------------------------------------------------------------------------
 class TestSanitize:

@@ -50,15 +50,22 @@ def _setup_font(pdf: FPDF) -> str:
 # PDF 类
 # ---------------------------------------------------------------------------
 class QuotePDF(FPDF):
-    def __init__(self, font_name: str = "Arial", company: str = ""):
+    def __init__(self, font_name: str = "Arial", company: str = "", logo_path: str | None = None):
         super().__init__()
         self._font_name = font_name
         self._company   = company
+        self._logo_path = logo_path
 
     def header(self):
         # 渐变色装饰条（用矩形模拟）
         self.set_fill_color(30, 58, 95)
         self.rect(0, 0, 210, 18, "F")
+        # Logo (if available)
+        if self._logo_path and os.path.exists(self._logo_path):
+            try:
+                self.image(self._logo_path, x=5, y=2, h=14)
+            except Exception:
+                pass  # Gracefully handle corrupted/unreadable image files
         self.set_text_color(255, 255, 255)
         self.set_font(self._font_name, "B", 14)
         self.set_y(3)
@@ -138,14 +145,20 @@ def generate_quote_pdf(
     buyer_company: str = "",
     buyer_contact: str = "",
     buyer_email: str = "",
+    logo_path: str | None = None,
 ) -> bytes:
     """
     生成多产品 PDF 报价单，返回字节流。
 
     skus: list of dict，每条包含 product / model / price / quantity / unit
     buyer_*: 可选的客户（收单方）信息
+    logo_path: 可选的公司 Logo 图片路径
     """
-    pdf = QuotePDF(company=company_name)
+    # Guard against invalid logo_path
+    if logo_path and not os.path.exists(logo_path):
+        logo_path = None
+
+    pdf = QuotePDF(company=company_name, logo_path=logo_path)
     font_name = _setup_font(pdf)
     pdf._font_name = font_name
 
