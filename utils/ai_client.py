@@ -92,6 +92,17 @@ def get_rate_limit_reset_seconds(user_id: str = "default") -> int:
     return max(0, int(RATE_LIMIT_WINDOW - (now - earliest)))
 
 
+def _rate_limit_check(user_id: str = "default") -> tuple[bool, int]:
+    """Prune expired slots, consume one slot if allowed, and return allowance state."""
+    now = time.time()
+    _call_times[user_id] = [t for t in _call_times[user_id] if now - t < RATE_LIMIT_WINDOW]
+    if len(_call_times[user_id]) >= RATE_LIMIT_MAX_CALLS:
+        return False, 0
+
+    _rate_limit_consume(user_id)
+    return True, RATE_LIMIT_MAX_CALLS - len(_call_times[user_id])
+
+
 def _check_preconditions(user_id: str = "default") -> str | None:
     """返回错误信息字符串；None 表示可以继续调用。不消耗 rate limit slot。"""
     if not get_secret("NVIDIA_API_KEY"):
