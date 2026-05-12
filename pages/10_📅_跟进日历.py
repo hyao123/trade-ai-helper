@@ -9,6 +9,7 @@ from utils.workflow import (
     mark_followup_done, update_workflow_status,
     get_workflow_stats, FOLLOWUP_RULES,
 )
+from utils.customers import find_customer, update_customer_stage
 
 st.set_page_config(page_title="跟进日历 | 外贸AI助手", page_icon="📅", layout="wide")
 inject_css()
@@ -66,6 +67,8 @@ if due_items:
             with col_c:
                 if st.button("🎉 客户已回复", key=f"replied_{item['id']}", use_container_width=True):
                     update_workflow_status(item["id"], "已回复")
+                    if update_customer_stage(item["company"], item["customer"], "已询盘"):
+                        st.info("📇 已同步更新客户阶段")
                     st.success("已标记为：已回复")
                     st.rerun()
     st.markdown("---")
@@ -132,6 +135,8 @@ if all_wfs:
                 st.caption(f"备注: {wf['notes']}")
             if wf.get("email"):
                 st.caption(f"邮箱: {wf['email']}")
+            if find_customer(wf["company"], wf["customer"]):
+                st.caption("🔗 已关联 CRM 客户")
 
             # 操作
             col_x, col_y = st.columns(2)
@@ -139,6 +144,8 @@ if all_wfs:
                 if wf["status"] == "进行中":
                     if st.button("🎉 标记已回复", key=f"replied2_{wf['id']}", use_container_width=True):
                         update_workflow_status(wf["id"], "已回复")
+                        if update_customer_stage(wf["company"], wf["customer"], "已询盘"):
+                            st.info("📇 已同步更新客户阶段")
                         st.rerun()
             with col_y:
                 if wf["status"] != "已关闭":

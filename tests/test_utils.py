@@ -225,3 +225,188 @@ class TestStorage:
         data_dir = get_data_dir()
         assert data_dir.exists()
         assert data_dir.is_dir()
+
+
+# ---------------------------------------------------------------------------
+# Test CRM <-> Workflow integration
+# ---------------------------------------------------------------------------
+class TestCRMIntegration:
+    """Tests for CRM <-> Follow-up Calendar integration functions."""
+
+    def _setup_mock_st(self):
+        """Create a mock streamlit module with session_state as a dict."""
+        import types
+        mock_st = types.ModuleType("streamlit")
+        mock_st.session_state = {}
+        return mock_st
+
+    def _get_customers_module(self, mock_st, tmp_dir):
+        """Import customers module with mocked streamlit and storage."""
+        import importlib
+        import utils.customers as customers_mod
+        importlib.reload(customers_mod)
+        with patch("utils.customers.st", mock_st), \
+             patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            yield customers_mod
+
+    def _get_workflow_module(self, mock_st, tmp_dir):
+        """Import workflow module with mocked streamlit and storage."""
+        import importlib
+        import utils.workflow as workflow_mod
+        importlib.reload(workflow_mod)
+        with patch("utils.workflow.st", mock_st), \
+             patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            yield workflow_mod
+
+    def test_find_customer_found(self):
+        mock_st = self._setup_mock_st()
+        tmp_dir = Path(tempfile.mkdtemp())
+        with patch("utils.customers.st", mock_st), \
+             patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            from utils.customers import add_customer, find_customer
+            # Force reload of session state
+            mock_st.session_state.clear()
+            add_customer({
+                "company": "ABC Trading",
+                "contact": "John Smith",
+                "email": "john@abc.com",
+                "country": "USA",
+                "product": "LED Lamp",
+                "stage": "已发信",
+                "notes": "",
+                "created_at": "2024-01-01",
+                "last_contact": "2024-01-01",
+            })
+            result = find_customer("ABC Trading", "John Smith")
+            assert result is not None
+            assert result["company"] == "ABC Trading"
+            assert result["contact"] == "John Smith"
+
+    def test_find_customer_case_insensitive(self):
+        mock_st = self._setup_mock_st()
+        tmp_dir = Path(tempfile.mkdtemp())
+        with patch("utils.customers.st", mock_st), \
+             patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            from utils.customers import add_customer, find_customer
+            mock_st.session_state.clear()
+            add_customer({
+                "company": "ABC Trading",
+                "contact": "John Smith",
+                "email": "john@abc.com",
+                "country": "USA",
+                "product": "LED Lamp",
+                "stage": "已发信",
+                "notes": "",
+                "created_at": "2024-01-01",
+                "last_contact": "2024-01-01",
+            })
+            result = find_customer("abc trading", "john smith")
+            assert result is not None
+
+    def test_find_customer_not_found(self):
+        mock_st = self._setup_mock_st()
+        tmp_dir = Path(tempfile.mkdtemp())
+        with patch("utils.customers.st", mock_st), \
+             patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            from utils.customers import find_customer
+            mock_st.session_state.clear()
+            result = find_customer("Nonexistent Corp", "Nobody")
+            assert result is None
+
+    def test_update_customer_stage(self):
+        mock_st = self._setup_mock_st()
+        tmp_dir = Path(tempfile.mkdtemp())
+        with patch("utils.customers.st", mock_st), \
+             patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            from utils.customers import add_customer, find_customer, update_customer_stage
+            mock_st.session_state.clear()
+            add_customer({
+                "company": "XYZ Ltd",
+                "contact": "Alice",
+                "email": "alice@xyz.com",
+                "country": "UK",
+                "product": "Solar Panel",
+                "stage": "已发信",
+                "notes": "",
+                "created_at": "2024-01-01",
+                "last_contact": "2024-01-01",
+            })
+            result = update_customer_stage("XYZ Ltd", "Alice", "已询盘")
+            assert result is True
+            cust = find_customer("XYZ Ltd", "Alice")
+            assert cust["stage"] == "已询盘"
+            assert cust["last_contact"] != "2024-01-01"  # Should be updated
+
+    def test_update_customer_stage_not_found(self):
+        mock_st = self._setup_mock_st()
+        tmp_dir = Path(tempfile.mkdtemp())
+        with patch("utils.customers.st", mock_st), \
+             patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            from utils.customers import update_customer_stage
+            mock_st.session_state.clear()
+            result = update_customer_stage("Nobody Corp", "Ghost", "已询盘")
+            assert result is False
+
+    def test_create_workflow_from_customer(self):
+        mock_st = self._setup_mock_st()
+        tmp_dir = Path(tempfile.mkdtemp())
+        with patch("utils.workflow.st", mock_st), \
+             patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            from utils.workflow import create_workflow_from_customer, get_all_workflows
+            mock_st.session_state.clear()
+            customer_data = {
+                "company": "ABC Trading",
+                "contact": "John Smith",
+                "email": "john@abc.com",
+                "product": "LED Lamp",
+            }
+            result = create_workflow_from_customer(customer_data)
+            assert result is True
+            workflows = get_all_workflows()
+            assert len(workflows) == 1
+            assert workflows[0]["customer"] == "John Smith"
+            assert workflows[0]["company"] == "ABC Trading"
+            assert workflows[0]["product"] == "LED Lamp"
+
+    def test_create_workflow_no_duplicate(self):
+        mock_st = self._setup_mock_st()
+        tmp_dir = Path(tempfile.mkdtemp())
+        with patch("utils.workflow.st", mock_st), \
+             patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            from utils.workflow import create_workflow_from_customer, get_all_workflows
+            mock_st.session_state.clear()
+            customer_data = {
+                "company": "ABC Trading",
+                "contact": "John Smith",
+                "email": "john@abc.com",
+                "product": "LED Lamp",
+            }
+            result1 = create_workflow_from_customer(customer_data)
+            assert result1 is True
+            result2 = create_workflow_from_customer(customer_data)
+            assert result2 is False
+            workflows = get_all_workflows()
+            assert len(workflows) == 1
+
+    def test_find_workflow_by_customer(self):
+        mock_st = self._setup_mock_st()
+        tmp_dir = Path(tempfile.mkdtemp())
+        with patch("utils.workflow.st", mock_st), \
+             patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            from utils.workflow import add_workflow, find_workflow_by_customer
+            mock_st.session_state.clear()
+            add_workflow("John Smith", "LED Lamp", "ABC Trading", "john@abc.com")
+            result = find_workflow_by_customer("John Smith", "ABC Trading")
+            assert result is not None
+            assert result["customer"] == "John Smith"
+            assert result["company"] == "ABC Trading"
+
+    def test_find_workflow_by_customer_not_found(self):
+        mock_st = self._setup_mock_st()
+        tmp_dir = Path(tempfile.mkdtemp())
+        with patch("utils.workflow.st", mock_st), \
+             patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            from utils.workflow import find_workflow_by_customer
+            mock_st.session_state.clear()
+            result = find_workflow_by_customer("Nobody", "Ghost Corp")
+            assert result is None

@@ -121,3 +121,40 @@ def get_workflow_stats() -> dict:
     replied = sum(1 for w in wfs if w["status"] == "已回复")
     due_cnt = len(get_due_workflows())
     return {"total": total, "active": active, "replied": replied, "due": due_cnt}
+
+
+def find_workflow_by_customer(customer_name: str, company: str) -> dict | None:
+    """Find the first active workflow matching customer name and company."""
+    customer_lower = customer_name.lower()
+    company_lower = company.lower()
+    for wf in _get_workflows():
+        if wf["status"] != "进行中":
+            continue
+        if (wf.get("customer", "").lower() == customer_lower
+                and wf.get("company", "").lower() == company_lower):
+            return wf
+    return None
+
+
+def create_workflow_from_customer(customer_data: dict) -> bool:
+    """Create a workflow from a customer dict. Returns False if duplicate exists."""
+    contact = customer_data.get("contact", "")
+    product = customer_data.get("product", "")
+    company = customer_data.get("company", "")
+    email = customer_data.get("email", "")
+
+    # Check for duplicate: same customer + company + product with active status
+    workflows = _get_workflows()
+    contact_lower = contact.lower()
+    company_lower = company.lower()
+    product_lower = product.lower()
+    for wf in workflows:
+        if wf["status"] != "进行中":
+            continue
+        if (wf.get("customer", "").lower() == contact_lower
+                and wf.get("company", "").lower() == company_lower
+                and wf.get("product", "").lower() == product_lower):
+            return False
+
+    add_workflow(contact, product, company, email)
+    return True

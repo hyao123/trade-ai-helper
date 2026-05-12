@@ -57,3 +57,32 @@ def update_customer(index: int, data: dict) -> None:
     if 0 <= index < len(customers):
         customers[index] = data
         _persist_customers()
+
+
+def find_customer(company: str, contact: str) -> dict | None:
+    """Find a customer by company AND contact name (case-insensitive)."""
+    customers = _get_customers()
+    company_lower = company.lower()
+    contact_lower = contact.lower()
+    for cust in customers:
+        if (cust.get("company", "").lower() == company_lower
+                and cust.get("contact", "").lower() == contact_lower):
+            return cust
+    return None
+
+
+def update_customer_stage(company: str, contact: str, new_stage: str) -> bool:
+    """Find the customer, update their stage and last_contact. Return True if updated."""
+    from datetime import datetime
+
+    customers = _get_customers()
+    company_lower = company.lower()
+    contact_lower = contact.lower()
+    for cust in customers:
+        if (cust.get("company", "").lower() == company_lower
+                and cust.get("contact", "").lower() == contact_lower):
+            cust["stage"] = new_stage
+            cust["last_contact"] = datetime.now().strftime("%Y-%m-%d")
+            _persist_customers()
+            return True
+    return False

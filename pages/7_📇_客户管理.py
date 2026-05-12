@@ -5,6 +5,7 @@ pages/7_📇_客户管理.py
 import streamlit as st
 from utils.ui_helpers import inject_css, check_auth
 from utils.customers import get_customers, add_customer, delete_customer
+from utils.workflow import create_workflow_from_customer
 from datetime import datetime
 
 st.set_page_config(page_title="客户管理 | 外贸AI助手", page_icon="📇", layout="wide")
@@ -49,7 +50,7 @@ if st.button("💾 添加客户", type="primary", use_container_width=True):
     if not new_company.strip():
         st.warning("⚠️ 请填写公司名称")
     else:
-        add_customer({
+        customer_data = {
             "company": new_company.strip(),
             "contact": new_contact.strip(),
             "email": new_email.strip(),
@@ -59,8 +60,12 @@ if st.button("💾 添加客户", type="primary", use_container_width=True):
             "notes": new_notes.strip(),
             "created_at": datetime.now().strftime("%Y-%m-%d"),
             "last_contact": datetime.now().strftime("%Y-%m-%d"),
-        })
+        }
+        add_customer(customer_data)
         st.success(f"✅ 已添加客户：{new_company}")
+        if new_stage in ["已发信", "已询盘", "已报价", "已发样", "谈判中"]:
+            if create_workflow_from_customer(customer_data):
+                st.info("📅 已自动创建跟进提醒")
         st.rerun()
 
 st.markdown("</div>", unsafe_allow_html=True)
