@@ -399,3 +399,27 @@ def show_result(
         add_to_history(history_feature, history_title or result_key, result)
 
     _render_result_area(result, result_key, label, file_name, height, show_subject_line)
+
+
+# ---------------------------------------------------------------------------
+# 再生成按钮：再来一版 / 换个风格
+# ---------------------------------------------------------------------------
+def show_regenerate_buttons(result_key: str) -> None:
+    """
+    Show 'Try again' and 'Change style' buttons after AI generation results.
+
+    Sets session_state flags that the page can check to trigger regeneration:
+    - st.session_state[f"{result_key}_regenerate"] = "same" (try again)
+    - st.session_state[f"{result_key}_regenerate"] = "style" (change style)
+    """
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔄 再来一版", key=f"regen_same_{result_key}", use_container_width=True):
+            st.session_state[f"{result_key}_regenerate"] = "same"
+            st.session_state.results.pop(result_key, None)
+            st.rerun()
+    with col2:
+        if st.button("🎨 换个风格", key=f"regen_style_{result_key}", use_container_width=True):
+            st.session_state[f"{result_key}_regenerate"] = "style"
+            st.session_state.results.pop(result_key, None)
+            st.rerun()

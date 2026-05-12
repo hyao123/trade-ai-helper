@@ -3,7 +3,7 @@ pages/4_📑_产品介绍.py
 生成多语种产品介绍文案，支持流式输出。
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id
+from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id, show_regenerate_buttons
 from utils.ai_client import generate_product_intro
 
 st.set_page_config(page_title="产品介绍 | 外贸AI助手", page_icon="📑", layout="wide")
@@ -49,6 +49,14 @@ with col2:
 generate_clicked = st.button("🚀 生成产品介绍", type="primary", use_container_width=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
+# ── 再生成处理 ────────────────────────────────────────
+_regen_mode = st.session_state.pop("intro_regenerate", None)
+if _regen_mode:
+    generate_clicked = True
+    # Restore saved form values for regeneration
+    product = st.session_state.get("intro_product_val", product)
+    features = st.session_state.get("intro_features_val", features)
+
 # ── 生成逻辑 ──────────────────────────────────────────
 if generate_clicked:
     if not product or not features.strip():
@@ -68,6 +76,7 @@ if generate_clicked:
                 result = generate_product_intro(product, features, target, lang_list, stream=False, user_id=get_user_id())
             st.session_state.results["intro"] = result
             show_result(result, "intro", label="📝 产品介绍文案", file_name=fname, height=300, balloons=True, history_feature="产品介绍", history_title=product[:25])
+        show_regenerate_buttons("intro")
 
 elif st.session_state.results.get("intro"):
     show_result(
@@ -78,6 +87,7 @@ elif st.session_state.results.get("intro"):
         height=300,
         balloons=False,
     )
+    show_regenerate_buttons("intro")
 
 st.markdown("---")
 st.markdown('<div class="footer">💼 外贸AI助手 · 产品介绍生成</div>', unsafe_allow_html=True)

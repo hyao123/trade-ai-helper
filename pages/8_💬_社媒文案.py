@@ -3,7 +3,7 @@ pages/8_💬_社媒文案.py
 生成 LinkedIn / Instagram / Facebook 社媒营销文案，支持流式输出。
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id
+from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id, show_regenerate_buttons
 from utils.ai_client import generate_social_post
 
 st.set_page_config(page_title="社媒文案 | 外贸AI助手", page_icon="💬", layout="wide")
@@ -59,6 +59,16 @@ with col2:
 generate_clicked = st.button("🚀 生成社媒文案", type="primary", use_container_width=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
+# ── 再生成处理 ────────────────────────────────────────
+_regen_mode = st.session_state.pop("social_regenerate", None)
+if _regen_mode:
+    generate_clicked = True
+    # Restore saved form values for regeneration
+    product = st.session_state.get("social_product_val", product)
+    features = st.session_state.get("social_features_val", features)
+    audience = st.session_state.get("social_audience_val", audience)
+    promo = st.session_state.get("social_promo_val", promo)
+
 # ── 生成逻辑 ──────────────────────────────────────────
 if generate_clicked:
     if not product:
@@ -87,6 +97,7 @@ if generate_clicked:
                 )
             st.session_state.results["social"] = result
             show_result(result, "social", label="📝 社媒文案", file_name=fname, height=350, balloons=True, history_feature="社媒文案", history_title=product[:25])
+        show_regenerate_buttons("social")
 
 elif st.session_state.results.get("social"):
     show_result(
@@ -97,6 +108,7 @@ elif st.session_state.results.get("social"):
         height=350,
         balloons=False,
     )
+    show_regenerate_buttons("social")
 
 st.markdown("---")
 st.markdown('<div class="footer">💼 外贸AI助手 · 社媒文案生成</div>', unsafe_allow_html=True)

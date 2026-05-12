@@ -3,7 +3,7 @@ pages/6_🛒_产品上架.py
 生成 Amazon / Shopify 产品 Listing 文案，支持流式输出。
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id
+from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id, show_regenerate_buttons
 from utils.ai_client import generate_listing
 
 st.set_page_config(page_title="产品上架 | 外贸AI助手", page_icon="🛒", layout="wide")
@@ -61,6 +61,16 @@ features = st.text_area(
 generate_clicked = st.button("🚀 生成 Listing 文案", type="primary", use_container_width=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
+# ── 再生成处理 ────────────────────────────────────────
+_regen_mode = st.session_state.pop("listing_regenerate", None)
+if _regen_mode:
+    generate_clicked = True
+    # Restore saved form values for regeneration
+    product = st.session_state.get("listing_product_val", product)
+    keywords = st.session_state.get("listing_keywords_val", keywords)
+    features = st.session_state.get("listing_features_val", features)
+    category = st.session_state.get("listing_category_val", category)
+
 # ── 生成逻辑 ──────────────────────────────────────────
 if generate_clicked:
     if not product:
@@ -92,6 +102,7 @@ if generate_clicked:
                 )
             st.session_state.results["listing"] = result
             show_result(result, "listing", label="📝 Listing 文案", file_name=fname, height=350, balloons=True, history_feature="产品上架", history_title=product[:30])
+        show_regenerate_buttons("listing")
 
 elif st.session_state.results.get("listing"):
     show_result(
@@ -102,6 +113,7 @@ elif st.session_state.results.get("listing"):
         height=350,
         balloons=False,
     )
+    show_regenerate_buttons("listing")
 
 st.markdown("---")
 st.markdown('<div class="footer">💼 外贸AI助手 · 产品上架文案</div>', unsafe_allow_html=True)

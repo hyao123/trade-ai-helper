@@ -3,7 +3,7 @@ pages/2_📩_询盘回复.py
 粘贴客户询盘，AI 生成专业英文回复草稿，支持流式输出。
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id
+from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id, show_regenerate_buttons
 from utils.ai_client import reply_inquiry
 
 st.set_page_config(page_title="询盘回复 | 外贸AI助手", page_icon="📩", layout="wide")
@@ -45,6 +45,16 @@ with col2:
 generate_clicked = st.button("🚀 生成回复", type="primary", use_container_width=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
+# ── 再生成处理 ────────────────────────────────────────
+_regen_mode = st.session_state.pop("inquiry_regenerate", None)
+if _regen_mode:
+    generate_clicked = True
+    # Restore saved form values for regeneration
+    inquiry = st.session_state.get("inquiry_text_val", inquiry)
+    customer_name = st.session_state.get("inquiry_customer_val", customer_name)
+    your_name = st.session_state.get("inquiry_your_name_val", your_name)
+    company_name = st.session_state.get("inquiry_company_val", company_name)
+
 # ── 生成逻辑 ──────────────────────────────────────────
 if generate_clicked:
     if not inquiry.strip():
@@ -66,6 +76,7 @@ if generate_clicked:
                 result = reply_inquiry(inquiry, customer_name, your_name, company_name, stream=False, user_id=get_user_id())
             st.session_state.results["inquiry"] = result
             show_result(result, "inquiry", label="📝 回复草稿", file_name=fname, balloons=True, history_feature="询盘回复", history_title=f"回复 {customer_name or '客户'}")
+        show_regenerate_buttons("inquiry")
 
 elif st.session_state.results.get("inquiry"):
     show_result(
@@ -75,6 +86,7 @@ elif st.session_state.results.get("inquiry"):
         file_name="询盘回复.txt",
         balloons=False,
     )
+    show_regenerate_buttons("inquiry")
 
 st.markdown("---")
 st.markdown('<div class="footer">💼 外贸AI助手 · 询盘回复</div>', unsafe_allow_html=True)

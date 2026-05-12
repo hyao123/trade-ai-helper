@@ -3,7 +3,7 @@ pages/5_📬_跟进邮件.py
 根据跟进阶段生成专业英文跟进邮件，支持流式输出。
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id
+from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id, show_regenerate_buttons
 from utils.ai_client import generate_followup
 from config.prompts import FOLLOWUP_STAGES
 
@@ -56,6 +56,14 @@ st.info(f"**当前阶段说明：** {FOLLOWUP_STAGES.get(stage, '')}")
 generate_clicked = st.button("🚀 生成跟进邮件", type="primary", use_container_width=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
+# ── 再生成处理 ────────────────────────────────────────
+_regen_mode = st.session_state.pop("followup_regenerate", None)
+if _regen_mode:
+    generate_clicked = True
+    # Restore saved form values for regeneration
+    customer = st.session_state.get("followup_customer_val", customer)
+    product = st.session_state.get("followup_product_val", product)
+
 # ── 生成逻辑 ──────────────────────────────────────────
 if generate_clicked:
     if not customer.strip():
@@ -74,6 +82,7 @@ if generate_clicked:
                 result = generate_followup(customer, stage, product, stream=False, user_id=get_user_id())
             st.session_state.results["followup"] = result
             show_result(result, "followup", label="📝 跟进邮件", file_name=fname, balloons=True, history_feature="跟进邮件", history_title=f"{customer[:15]} · {stage}")
+        show_regenerate_buttons("followup")
 
 elif st.session_state.results.get("followup"):
     show_result(
@@ -83,6 +92,7 @@ elif st.session_state.results.get("followup"):
         file_name="跟进邮件.txt",
         balloons=False,
     )
+    show_regenerate_buttons("followup")
 
 st.markdown("---")
 st.markdown('<div class="footer">💼 外贸AI助手 · 跟进邮件生成</div>', unsafe_allow_html=True)

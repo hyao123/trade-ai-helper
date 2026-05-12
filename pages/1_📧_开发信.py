@@ -3,7 +3,7 @@ pages/1_📧_开发信.py
 生成外贸开发信（含邮件主题行），支持流式输出 + 模板保存/加载。
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id
+from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id, show_regenerate_buttons
 from utils.ai_client import generate_email
 from utils.templates import save_template, get_template_names, get_template_data, delete_template
 
@@ -102,6 +102,21 @@ if save_clicked:
         })
         st.success(f"✅ 模板已保存：{tpl_name}")
 
+# ── 再生成处理 ────────────────────────────────────────
+_regen_mode = st.session_state.pop("email_regenerate", None)
+if _regen_mode:
+    generate_clicked = True
+    # For "style" mode, cycle the tone
+    if _regen_mode == "style":
+        _tones = ["简洁专业", "正式商务", "亲切友好"]
+        _current = st.session_state.get("email_last_tone", tone)
+        _idx = (_tones.index(_current) + 1) % len(_tones) if _current in _tones else 0
+        tone = _tones[_idx]
+    # Restore saved form values for regeneration
+    product = st.session_state.get("email_product_val", product)
+    customer = st.session_state.get("email_customer_val", customer)
+    features_text = st.session_state.get("email_features_val", features_text)
+
 # ── 生成逻辑 ──────────────────────────────────────────
 if generate_clicked:
     if not product or not customer:
@@ -112,6 +127,7 @@ if generate_clicked:
         st.session_state["email_product_val"]  = product
         st.session_state["email_customer_val"] = customer
         st.session_state["email_features_val"] = features_text
+        st.session_state["email_last_tone"] = tone
         st.session_state.results.pop("email", None)
 
         if stream_mode:
@@ -122,6 +138,7 @@ if generate_clicked:
                 result = generate_email(product, customer, features_text, tone, language, stream=False, user_id=get_user_id())
             st.session_state.results["email"] = result
             show_result(result, "email", label="📝 开发信正文", file_name=f"开发信_{product}.txt", balloons=True, show_subject_line=True, history_feature="开发信", history_title=f"{product} → {customer[:20]}")
+        show_regenerate_buttons("email")
 
 elif st.session_state.results.get("email"):
     show_result(
@@ -130,6 +147,7 @@ elif st.session_state.results.get("email"):
         file_name=f"开发信_{st.session_state.get('email_product_val', '结果')}.txt",
         balloons=False, show_subject_line=True,
     )
+    show_regenerate_buttons("email")
 
 st.markdown("---")
 st.markdown('<div class="footer">💼 外贸AI助手 · 开发信生成</div>', unsafe_allow_html=True)
