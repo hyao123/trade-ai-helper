@@ -12,6 +12,9 @@ from datetime import datetime
 import streamlit as st
 
 from utils.storage import load_json, save_json
+from utils.logger import get_logger
+
+logger = get_logger("templates")
 
 _FILENAME = "templates.json"
 
@@ -34,6 +37,7 @@ def import_templates(data: dict) -> None:
     st.session_state["templates"] = data
     st.session_state["_templates_loaded_from_disk"] = True
     save_json(_FILENAME, data)
+    logger.info("Templates imported: %d categories", len(data))
 
 
 def save_template(category: str, name: str, data: dict) -> None:
@@ -54,6 +58,7 @@ def save_template(category: str, name: str, data: dict) -> None:
         "data": data,
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
     })
+    logger.debug("Template saved: %s/%s", category, name)
     _persist_templates()
 
 
@@ -68,6 +73,7 @@ def delete_template(category: str, name: str) -> None:
     store = _get_store()
     if category in store:
         store[category] = [t for t in store[category] if t["name"] != name]
+    logger.debug("Template deleted: %s/%s", category, name)
     _persist_templates()
 
 

@@ -12,6 +12,9 @@ from datetime import datetime, timedelta
 import streamlit as st
 
 from utils.storage import load_json, save_json
+from utils.logger import get_logger
+
+logger = get_logger("workflow")
 
 _FILENAME = "workflows.json"
 
@@ -42,6 +45,7 @@ def import_workflows(data: list) -> None:
     st.session_state["email_workflows"] = data
     st.session_state["_workflows_loaded_from_disk"] = True
     _persist_workflows()
+    logger.info("Workflows imported: %d records", len(data))
 
 
 def add_workflow(
@@ -66,6 +70,7 @@ def add_workflow(
         "status": "进行中",   # 进行中 / 已回复 / 已关闭
         "followups": [],      # 记录已完成的跟进
     })
+    logger.debug("Workflow added: customer=%s, product=%s", customer, product)
     _persist_workflows()
 
 
@@ -103,6 +108,7 @@ def mark_followup_done(wf_id: str, stage_label: str) -> None:
                 "stage_label": stage_label,
                 "done_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
             })
+            logger.debug("Followup marked done: wf=%s, stage=%s", wf_id, stage_label)
             _persist_workflows()
             return
 
@@ -112,6 +118,7 @@ def update_workflow_status(wf_id: str, status: str) -> None:
     for wf in _get_workflows():
         if wf["id"] == wf_id:
             wf["status"] = status
+            logger.debug("Workflow status updated: wf=%s -> %s", wf_id, status)
             _persist_workflows()
             return
 
@@ -156,6 +163,7 @@ def create_workflow_from_customer(customer_data: dict) -> bool:
         if (wf.get("customer", "").lower() == contact_lower
                 and wf.get("company", "").lower() == company_lower
                 and wf.get("product", "").lower() == product_lower):
+            logger.warning("Duplicate workflow rejected: %s / %s", contact, company)
             return False
 
     add_workflow(contact, product, company, email)

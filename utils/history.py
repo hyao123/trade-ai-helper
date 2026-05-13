@@ -12,6 +12,9 @@ from datetime import datetime
 import streamlit as st
 
 from utils.storage import load_json, save_json
+from utils.logger import get_logger
+
+logger = get_logger("history")
 
 _FILENAME = "history.json"
 
@@ -29,6 +32,7 @@ def import_history(data: list) -> None:
     st.session_state["generation_history"] = data
     st.session_state["_history_loaded_from_disk"] = True
     save_json(_FILENAME, data)
+    logger.info("History imported: %d records", len(data))
 
 
 def add_to_history(
@@ -53,8 +57,10 @@ def add_to_history(
         "params": params or {},
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
     })
+    logger.debug("Added history: feature=%s, title=%s", feature, title)
     # 最多保留 50 条
     if len(history) > 50:
+        logger.warning("History cap reached, truncating to 50")
         st.session_state["generation_history"] = history[:50]
     save_json(_FILENAME, st.session_state["generation_history"])
 
@@ -75,6 +81,7 @@ def clear_history() -> None:
     """清空所有历史记录。"""
     st.session_state["generation_history"] = []
     save_json(_FILENAME, [])
+    logger.info("History cleared")
 
 
 def get_history_count() -> int:

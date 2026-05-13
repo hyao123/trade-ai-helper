@@ -29,6 +29,9 @@ from config.prompts import (
     build_followup_prompt,
 )
 from utils.secrets import get_secret
+from utils.logger import get_logger
+
+logger = get_logger("ai_client")
 
 # ---------------------------------------------------------------------------
 # 客户端单例
@@ -95,11 +98,13 @@ def _check_preconditions(user_id: str = "default") -> str | None:
     _call_times[user_id] = [t for t in _call_times[user_id] if now - t < RATE_LIMIT_WINDOW]
     if len(_call_times[user_id]) >= RATE_LIMIT_MAX_CALLS:
         wait_min = RATE_LIMIT_WINDOW // 60
+        logger.warning("Rate limit hit for user=%s", user_id)
         return f"⚠️ 调用频率超限，每 {wait_min} 分钟最多 {RATE_LIMIT_MAX_CALLS} 次，请稍后再试。"
     return None
 
 
 def _handle_api_error(e: Exception) -> str:
+    logger.error("API error: %s: %s", type(e).__name__, e)
     if isinstance(e, AuthenticationError):
         return "⚠️ NVIDIA API Key 无效，请检查 NVIDIA_API_KEY 是否正确。"
     if isinstance(e, RateLimitError):
@@ -126,6 +131,7 @@ def call_llm(
     if err:
         return err
 
+    logger.info("API call: model=%s, user=%s", _MODEL, user_id)
     # 先消耗 slot，失败则回滚
     _rate_limit_consume(user_id)
 
@@ -145,8 +151,10 @@ def call_llm(
 
     try:
         resp = _get_client().chat.completions.create(**kwargs)
+        logger.info("API call success: model=%s, user=%s", _MODEL, user_id)
         return resp.choices[0].message.content or ""
     except Exception as e:
+        logger.error("API call failed: model=%s, user=%s", _MODEL, user_id)
         _rate_limit_rollback(user_id)  # 失败回滚
         return _handle_api_error(e)
 
@@ -174,6 +182,7 @@ def stream_llm(
         yield err
         return
 
+    logger.info("Stream API call: model=%s, user=%s", _MODEL, user_id)
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
@@ -202,6 +211,7 @@ def stream_llm(
         # 如果流完全没产出 token（空响应），不消耗 slot
     except Exception as e:
         # 流式失败不消耗 slot（slot_consumed 为 False 时已不消耗）
+        logger.error("Stream API call failed: model=%s, user=%s", _MODEL, user_id)
         yield _handle_api_error(e)
 
 

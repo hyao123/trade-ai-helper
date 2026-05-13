@@ -13,6 +13,10 @@ import datetime
 import os
 from fpdf import FPDF
 
+from utils.logger import get_logger
+
+logger = get_logger("pdf_gen")
+
 # ---------------------------------------------------------------------------
 # 字体配置
 # ---------------------------------------------------------------------------
@@ -156,7 +160,10 @@ def generate_quote_pdf(
     """
     # Guard against invalid logo_path
     if logo_path and not os.path.exists(logo_path):
+        logger.warning("Logo file not found: %s", logo_path)
         logo_path = None
+
+    logger.info("Generating PDF: %d SKUs", len(skus))
 
     pdf = QuotePDF(company=company_name, logo_path=logo_path)
     font_name = _setup_font(pdf)
@@ -260,4 +267,6 @@ def generate_quote_pdf(
         "without notice after the validity period. Thank you for your business!",
     )
 
-    return bytes(pdf.output())
+    result = bytes(pdf.output())
+    logger.info("PDF generated: %d bytes", len(result))
+    return result
