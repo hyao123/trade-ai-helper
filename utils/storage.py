@@ -58,3 +58,47 @@ def save_json(filename: str, data) -> None:
     except OSError as e:
         logger.error("Failed to save %s: %s", filename, e)
         raise
+
+
+def get_user_data_dir(username: str) -> Path:
+    """Return data/users/{username}/ directory. Creates it if needed."""
+    user_dir = get_data_dir() / "users" / username
+    user_dir.mkdir(parents=True, exist_ok=True)
+    return user_dir
+
+
+def load_user_json(username: str, filename: str, default=None):
+    """
+    Load JSON from data/users/{username}/{filename}.
+
+    Returns default (or [] if default is None) if file not found or invalid.
+    """
+    if default is None:
+        default = []
+    filepath = get_user_data_dir(username) / filename
+    try:
+        with open(filepath, encoding="utf-8") as f:
+            data = json.load(f)
+        logger.debug("Loaded user file %s/%s", username, filename)
+        return data
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        logger.debug("User file not found or invalid: %s/%s, using default", username, filename)
+        return default
+
+
+def save_user_json(username: str, filename: str, data) -> None:
+    """
+    Atomic write to data/users/{username}/{filename}.
+
+    Writes to a .tmp file first, then uses os.replace for atomicity.
+    """
+    filepath = get_user_data_dir(username) / filename
+    tmp_path = filepath.with_suffix(".tmp")
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, filepath)
+        logger.debug("Saved user file %s/%s", username, filename)
+    except OSError as e:
+        logger.error("Failed to save user file %s/%s: %s", username, filename, e)
+        raise

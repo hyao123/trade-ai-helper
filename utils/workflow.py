@@ -3,6 +3,7 @@ utils/workflow.py
 -----------------
 邮件跟进工作流管理。
 追踪"已发开发信"的客户，提醒跟进时间节点，形成完整外贸销售闭环。
+Supports per-user isolation when a user is logged in.
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ from datetime import datetime, timedelta
 
 import streamlit as st
 
-from utils.storage import load_json, save_json
+from utils.storage import load_json, save_json, load_user_json, save_user_json
 from utils.logger import get_logger
 
 logger = get_logger("workflow")
@@ -28,22 +29,51 @@ FOLLOWUP_RULES: list[dict] = [
 ]
 
 
+def _get_current_username() -> str | None:
+    """Get current logged-in username, or None for shared/admin mode."""
+    user = st.session_state.get("current_user")
+    if user and user.get("username") and user["username"] != "admin":
+        return user["username"]
+    return None
+
+
 def _get_workflows() -> list[dict]:
-    if "email_workflows" not in st.session_state or not st.session_state.get("_workflows_loaded_from_disk"):
-        st.session_state["email_workflows"] = load_json(_FILENAME, default=[])
-        st.session_state["_workflows_loaded_from_disk"] = True
-    return st.session_state["email_workflows"]
+    username = _get_current_username()
+    if username:
+        flag_key = f"_workflows_loaded_from_disk_{username}"
+        state_key = f"email_workflows_{username}"
+        if state_key not in st.session_state or not st.session_state.get(flag_key):
+            st.session_state[state_key] = load_user_json(username, _FILENAME, default=[])
+            st.session_state[flag_key] = True
+        return st.session_state[state_key]
+    else:
+        if "email_workflows" not in st.session_state or not st.session_state.get("_workflows_loaded_from_disk"):
+            st.session_state["email_workflows"] = load_json(_FILENAME, default=[])
+            st.session_state["_workflows_loaded_from_disk"] = True
+        return st.session_state["email_workflows"]
 
 
 def _persist_workflows() -> None:
     """Save current workflows to disk."""
-    save_json(_FILENAME, st.session_state.get("email_workflows", []))
+    username = _get_current_username()
+    if username:
+        state_key = f"email_workflows_{username}"
+        save_user_json(username, _FILENAME, st.session_state.get(state_key, []))
+    else:
+        save_json(_FILENAME, st.session_state.get("email_workflows", []))
 
 
 def import_workflows(data: list) -> None:
     """Bulk-import workflow data, replacing current state and persisting to disk."""
-    st.session_state["email_workflows"] = data
-    st.session_state["_workflows_loaded_from_disk"] = True
+    username = _get_current_username()
+    if username:
+        state_key = f"email_workflows_{username}"
+        flag_key = f"_workflows_loaded_from_disk_{username}"
+        st.session_state[state_key] = data
+        st.session_state[flag_key] = True
+    else:
+        st.session_state["email_workflows"] = data
+        st.session_state["_workflows_loaded_from_disk"] = True
     _persist_workflows()
     logger.info("Workflows imported: %d records", len(data))
 

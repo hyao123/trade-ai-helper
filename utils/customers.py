@@ -2,28 +2,51 @@
 utils/customers.py
 ------------------
 Customer data management with session_state cache and JSON persistence.
+Supports per-user isolation when a user is logged in.
 """
 
 from __future__ import annotations
 
 import streamlit as st
 
-from utils.storage import load_json, save_json
+from utils.storage import load_json, save_json, load_user_json, save_user_json
 
 _FILENAME = "customers.json"
 
 
+def _get_current_username() -> str | None:
+    """Get current logged-in username, or None for shared/admin mode."""
+    user = st.session_state.get("current_user")
+    if user and user.get("username") and user["username"] != "admin":
+        return user["username"]
+    return None
+
+
 def _get_customers() -> list[dict]:
     """Get customer list from session_state, loading from disk on first access."""
-    if "customers" not in st.session_state or not st.session_state.get("_customers_loaded_from_disk"):
-        st.session_state["customers"] = load_json(_FILENAME, default=[])
-        st.session_state["_customers_loaded_from_disk"] = True
-    return st.session_state["customers"]
+    username = _get_current_username()
+    if username:
+        flag_key = f"_customers_loaded_from_disk_{username}"
+        state_key = f"customers_{username}"
+        if state_key not in st.session_state or not st.session_state.get(flag_key):
+            st.session_state[state_key] = load_user_json(username, _FILENAME, default=[])
+            st.session_state[flag_key] = True
+        return st.session_state[state_key]
+    else:
+        if "customers" not in st.session_state or not st.session_state.get("_customers_loaded_from_disk"):
+            st.session_state["customers"] = load_json(_FILENAME, default=[])
+            st.session_state["_customers_loaded_from_disk"] = True
+        return st.session_state["customers"]
 
 
 def _persist_customers() -> None:
     """Save current customer list to disk."""
-    save_json(_FILENAME, st.session_state.get("customers", []))
+    username = _get_current_username()
+    if username:
+        state_key = f"customers_{username}"
+        save_user_json(username, _FILENAME, st.session_state.get(state_key, []))
+    else:
+        save_json(_FILENAME, st.session_state.get("customers", []))
 
 
 def get_customers() -> list[dict]:
@@ -56,8 +79,15 @@ def update_customer(index: int, data: dict) -> None:
 
 def import_customers(data: list) -> None:
     """Bulk-import customer data, replacing current state and persisting to disk."""
-    st.session_state["customers"] = data
-    st.session_state["_customers_loaded_from_disk"] = True
+    username = _get_current_username()
+    if username:
+        state_key = f"customers_{username}"
+        flag_key = f"_customers_loaded_from_disk_{username}"
+        st.session_state[state_key] = data
+        st.session_state[flag_key] = True
+    else:
+        st.session_state["customers"] = data
+        st.session_state["_customers_loaded_from_disk"] = True
     _persist_customers()
 
 

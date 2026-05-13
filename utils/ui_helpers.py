@@ -19,6 +19,7 @@ import types
 
 import streamlit as st
 from utils.secrets import get_secret
+from utils.user_auth import authenticate_user, register_user, get_current_user
 
 # ---------------------------------------------------------------------------
 # 全局 CSS
@@ -137,7 +138,7 @@ def _get_session_user_id() -> str:
 
 
 def show_sidebar_info() -> None:
-    """在侧栏显示剩余 API 调用次数和重置倒计时（仅使用公共 API）。"""
+    """在侧栏显示用户信息、剩余 API 调用次数和重置倒计时。"""
     from utils.ai_client import get_rate_limit_remaining, get_rate_limit_reset_seconds, RATE_LIMIT_MAX_CALLS, RATE_LIMIT_WINDOW
 
     uid = _get_session_user_id()
@@ -145,6 +146,19 @@ def show_sidebar_info() -> None:
     used = RATE_LIMIT_MAX_CALLS - remaining
 
     with st.sidebar:
+        # Show user info and logout button
+        current_user = get_current_user()
+        if current_user:
+            username = current_user.get("username", "")
+            tier = current_user.get("tier", "free")
+            tier_badge = {"free": "Free", "pro": "Pro", "enterprise": "Enterprise"}.get(tier, tier)
+            st.markdown(f"### 👤 {username}")
+            st.caption(f"Plan: **{tier_badge}**")
+            if st.button("🚪 Logout", key="_logout_btn", use_container_width=True):
+                st.session_state.pop("authenticated", None)
+                st.session_state.pop("current_user", None)
+                st.rerun()
+
         st.markdown("---")
         st.markdown("### 📊 使用状态")
         st.progress(used / RATE_LIMIT_MAX_CALLS if RATE_LIMIT_MAX_CALLS > 0 else 0)
@@ -158,7 +172,10 @@ def show_sidebar_info() -> None:
 
 
 def get_user_id() -> str:
-    """获取当前用户的 session-level user ID（供 AI 业务函数传递给 rate limiter）。"""
+    """获取当前用户的 user ID（供 AI 业务函数传递给 rate limiter）。"""
+    current_user = get_current_user()
+    if current_user:
+        return current_user.get("username", _get_session_user_id())
     return _get_session_user_id()
 
 
@@ -167,10 +184,12 @@ def get_user_id() -> str:
 # ---------------------------------------------------------------------------
 def check_auth() -> None:
     """
-    密码验证。
-    - APP_PASSWORD 未设置 → 直接通过
-    - 已通过验证 → 直接通过
-    - 未通过 → 渲染登录框并 st.stop()
+    Multi-user authentication with login/register tabs.
+    - APP_PASSWORD not set: pass through
+    - Already authenticated: pass through
+    - Not authenticated: show login/register UI and st.stop()
+    - APP_PASSWORD as admin fallback: if login password matches APP_PASSWORD,
+      authenticate as admin with enterprise tier.
     """
     app_password = get_secret("APP_PASSWORD")
     if not app_password:
@@ -183,18 +202,47 @@ def check_auth() -> None:
     <div class="login-box">
         <div style="font-size:2.5rem;">💼</div>
         <div class="login-title">外贸AI助手</div>
-        <div class="login-sub">请输入访问密码继续使用</div>
+        <div class="login-sub">请登录或注册账号继续使用</div>
     </div>
     """, unsafe_allow_html=True)
 
-    with st.form("login_form"):
-        pwd = st.text_input("访问密码", type="password", placeholder="请输入密码")
-        if st.form_submit_button("🔐 登录", use_container_width=True, type="primary"):
-            if hmac.compare_digest(pwd, app_password):
-                st.session_state.authenticated = True
-                st.rerun()
-            else:
-                st.error("❌ 密码错误，请重试")
+    login_tab, register_tab = st.tabs(["🔐 Login", "📝 Register"])
+
+    with login_tab:
+        with st.form("login_form"):
+            login_username = st.text_input("Username", placeholder="Enter username", key="login_username")
+            login_password = st.text_input("Password", type="password", placeholder="Enter password", key="login_password")
+            if st.form_submit_button("🔐 Login", use_container_width=True, type="primary"):
+                # Admin fallback: APP_PASSWORD grants admin access
+                if hmac.compare_digest(login_password, app_password):
+                    st.session_state.authenticated = True
+                    st.session_state["current_user"] = {"username": "admin", "tier": "enterprise"}
+                    st.rerun()
+                else:
+                    success, user_info = authenticate_user(login_username, login_password)
+                    if success:
+                        st.session_state.authenticated = True
+                        st.session_state["current_user"] = user_info
+                        st.rerun()
+                    else:
+                        st.error("❌ Invalid username or password")
+
+    with register_tab:
+        with st.form("register_form"):
+            reg_username = st.text_input("Username", placeholder="Choose a username (letters and numbers)", key="reg_username")
+            reg_email = st.text_input("Email (optional)", placeholder="your@email.com", key="reg_email")
+            reg_password = st.text_input("Password", type="password", placeholder="Choose a password", key="reg_password")
+            reg_confirm = st.text_input("Confirm Password", type="password", placeholder="Confirm your password", key="reg_confirm")
+            if st.form_submit_button("📝 Register", use_container_width=True, type="primary"):
+                if reg_password != reg_confirm:
+                    st.error("❌ Passwords do not match")
+                else:
+                    success, msg = register_user(reg_username, reg_password, reg_email)
+                    if success:
+                        st.success(f"✅ {msg}! Please login.")
+                    else:
+                        st.error(f"❌ {msg}")
+
     st.stop()
 
 
