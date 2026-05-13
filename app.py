@@ -2,6 +2,7 @@
 app.py — 首页（功能入口 + 导航）
 """
 import streamlit as st
+from config.i18n import t
 from utils.logger import configure_logging
 from utils.ui_helpers import inject_css, check_auth
 
@@ -17,13 +18,13 @@ inject_css()
 check_auth()
 
 # ── Hero ──────────────────────────────────────────────────────────────────
-st.markdown("""
+st.markdown(f"""
 <div class="hero-section">
-    <h1 class="hero-title">💼 外贸AI助手</h1>
-    <p class="hero-subtitle">AI 赋能外贸 · 开发信 · 询盘回复 · 报价单 · 多语种产品介绍</p>
+    <h1 class="hero-title">{t('hero_title')}</h1>
+    <p class="hero-subtitle">{t('hero_subtitle')}</p>
     <div class="price-tag">
-        <span>🆓 免费试用</span>
-        <span style="font-weight:700;font-size:1.1rem;">每小时20次</span>
+        <span>{t('free_trial')}</span>
+        <span style="font-weight:700;font-size:1.1rem;">{t('per_hour_20')}</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -31,11 +32,11 @@ st.markdown("""
 # ── Stats ─────────────────────────────────────────────────────────────────
 c1, c2, c3, c4, c5 = st.columns(5)
 for col, val, label in [
-    (c1, "10",     "核心功能"),
-    (c2, "5+",     "语种支持"),
-    (c3, "⚡ 流式", "实时输出"),
-    (c4, "Listing","Amazon/Shopify"),
-    (c5, "PDF",    "多SKU报价单"),
+    (c1, "10",     t("core_features")),
+    (c2, "5+",     t("languages_support")),
+    (c3, "⚡ 流式", t("realtime_output")),
+    (c4, "Listing", "Amazon/Shopify"),
+    (c5, "PDF",    t("multi_sku_quote")),
 ]:
     col.markdown(
         f'<div class="stat-card">'
@@ -48,7 +49,7 @@ for col, val, label in [
 st.markdown("---")
 
 # ── 功能卡片导航 ─────────────────────────────────────────────────────────
-st.markdown("### 🚀 选择功能开始使用")
+st.markdown(f"### {t('select_function')}")
 
 FEATURES = [
     {
@@ -142,7 +143,7 @@ for col, feat in zip(cols[:5], FEATURES[:5]):
             """,
             unsafe_allow_html=True,
         )
-        if st.button(f"进入 {feat['title']}", key=f"nav_{feat['title']}", use_container_width=True):
+        if st.button(f"{t('enter_feature')} {feat['title']}", key=f"nav_{feat['title']}", use_container_width=True):
             st.switch_page(feat["page"])
 
 cols2 = st.columns(5)
@@ -164,12 +165,12 @@ for col, feat in zip(cols2, FEATURES[5:]):
             """,
             unsafe_allow_html=True,
         )
-        if st.button(f"进入 {feat['title']}", key=f"nav2_{feat['title']}", use_container_width=True):
+        if st.button(f"{t('enter_feature')} {feat['title']}", key=f"nav2_{feat['title']}", use_container_width=True):
             st.switch_page(feat["page"])
 
 # ── 使用提示 ─────────────────────────────────────────────────────────────
 st.markdown("---")
-st.markdown("### 💡 使用提示")
+st.markdown(f"### {t('usage_tips')}")
 t1, t2, t3, t4 = st.columns(4)
 with t1:
     st.info("**⚡ 流式输出**\n\n开发信、询盘回复、产品介绍、跟进邮件均支持实时流式显示，无需等待即可看到内容逐字输出。")
@@ -182,4 +183,4 @@ with t4:
 
 # ── Footer ────────────────────────────────────────────────────────────────
 st.markdown("---")
-st.markdown('<div class="footer">💼 外贸AI助手 | 让外贸更简单 · Powered by NVIDIA NIM</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="footer">{t("footer")}</div>', unsafe_allow_html=True)

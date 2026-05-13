@@ -19,6 +19,11 @@ _mock_st = types.ModuleType("streamlit")
 _mock_st.session_state = {}
 sys.modules["streamlit"] = _mock_st
 
+# Mock dotenv before importing modules that use it (not available in test env)
+_mock_dotenv = types.ModuleType("dotenv")
+_mock_dotenv.load_dotenv = lambda *a, **kw: None
+sys.modules["dotenv"] = _mock_dotenv
+
 
 class TestUserAuth:
     """Tests for utils/user_auth.py authentication functions."""
@@ -310,6 +315,186 @@ class TestUserAuth:
                 user = get_current_user()
                 assert user is not None
                 assert user["username"] == "bob"
+
+    def test_register_user_includes_email_verification_fields(self):
+        """register_user includes email_verified=False and verification_token in user record."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import register_user, _load_users_db
+                register_user("verifyuser", "pass1234", email="test@example.com")
+                users = _load_users_db()
+                assert users["verifyuser"]["email_verified"] is False
+                assert "verification_token" in users["verifyuser"]
+                assert len(users["verifyuser"]["verification_token"]) > 0
+
+    def test_verify_email_token_success(self):
+        """verify_email_token succeeds with correct token."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import register_user, verify_email_token, _load_users_db
+                register_user("tokenuser", "pass1234", email="t@example.com")
+                users = _load_users_db()
+                token_data = users["tokenuser"]["verification_token"]
+                token = token_data["token"] if isinstance(token_data, dict) else token_data
+                success, msg = verify_email_token("tokenuser", token)
+                assert success is True
+                assert "success" in msg.lower()
+                # Verify the user is now marked as verified
+                users = _load_users_db()
+                assert users["tokenuser"]["email_verified"] is True
+                assert users["tokenuser"]["verification_token"] == ""
+
+    def test_verify_email_token_wrong_token(self):
+        """verify_email_token fails with wrong token."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import register_user, verify_email_token
+                register_user("wrongtokenuser", "pass1234", email="t@example.com")
+                success, msg = verify_email_token("wrongtokenuser", "wrong-token-value")
+                assert success is False
+                assert "invalid" in msg.lower()
+
+    def test_verify_email_token_nonexistent_user(self):
+        """verify_email_token fails for nonexistent user."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import verify_email_token
+                success, msg = verify_email_token("nosuchuser", "some-token")
+                assert success is False
+                assert "not found" in msg.lower()
+
+    def test_find_user_by_email_found(self):
+        """find_user_by_email returns correct username when email matches."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import register_user, find_user_by_email
+                register_user("emailfinder", "pass1234", email="finder@example.com")
+                result = find_user_by_email("finder@example.com")
+                assert result == "emailfinder"
+
+    def test_find_user_by_email_not_found(self):
+        """find_user_by_email returns None for nonexistent email."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import find_user_by_email
+                result = find_user_by_email("nobody@example.com")
+                assert result is None
+
+    def test_find_user_by_email_case_insensitive(self):
+        """find_user_by_email finds user regardless of email case."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import register_user, find_user_by_email
+                register_user("casemail", "pass1234", email="CaseTest@Example.COM")
+                result = find_user_by_email("casetest@example.com")
+                assert result == "casemail"
+
+    def test_request_password_reset_generates_token(self):
+        """request_password_reset stores a reset_token with token and expires fields."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import register_user, request_password_reset, _load_users_db
+                register_user("resetuser", "pass1234", email="reset@example.com")
+                success, msg = request_password_reset("reset@example.com")
+                assert success is True
+                users = _load_users_db()
+                assert "reset_token" in users["resetuser"]
+                assert "token" in users["resetuser"]["reset_token"]
+                assert "expires" in users["resetuser"]["reset_token"]
+                assert len(users["resetuser"]["reset_token"]["token"]) > 0
+
+    def test_request_password_reset_nonexistent_still_succeeds(self):
+        """request_password_reset returns (True, ...) for nonexistent user (security)."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import request_password_reset
+                success, msg = request_password_reset("nonexistent@example.com")
+                assert success is True
+
+    def test_reset_password_valid_token(self):
+        """reset_password works with valid token and updates password."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import register_user, request_password_reset, reset_password, authenticate_user, _load_users_db
+                register_user("resetok", "oldpass1", email="resetok@example.com")
+                request_password_reset("resetok@example.com")
+                users = _load_users_db()
+                token = users["resetok"]["reset_token"]["token"]
+                success, msg = reset_password("resetok", token, "newpass1")
+                assert success is True
+                # Verify new password works
+                auth_ok, _ = authenticate_user("resetok", "newpass1")
+                assert auth_ok is True
+                # Verify old password no longer works
+                auth_old, _ = authenticate_user("resetok", "oldpass1")
+                assert auth_old is False
+
+    def test_reset_password_wrong_token(self):
+        """reset_password fails with wrong token."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import register_user, request_password_reset, reset_password
+                register_user("resetwrong", "pass1234", email="wrong@example.com")
+                request_password_reset("wrong@example.com")
+                success, msg = reset_password("resetwrong", "wrong-token-value", "newpass1")
+                assert success is False
+
+    def test_reset_password_expired_token(self):
+        """reset_password fails when token is expired."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import register_user, request_password_reset, reset_password, _load_users_db, _save_users_db
+                from datetime import datetime, timedelta, timezone
+                register_user("resetexp", "pass1234", email="exp@example.com")
+                request_password_reset("exp@example.com")
+                # Manually set expired timestamp
+                users = _load_users_db()
+                token = users["resetexp"]["reset_token"]["token"]
+                expired_time = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+                users["resetexp"]["reset_token"]["expires"] = expired_time
+                _save_users_db(users)
+                success, msg = reset_password("resetexp", token, "newpass1")
+                assert success is False
+                assert "expired" in msg.lower()
+
+    def test_reset_password_short_password(self):
+        """reset_password fails for password shorter than 4 characters."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import register_user, request_password_reset, reset_password, _load_users_db
+                register_user("resetshort", "pass1234", email="short@example.com")
+                request_password_reset("short@example.com")
+                users = _load_users_db()
+                token = users["resetshort"]["reset_token"]["token"]
+                success, msg = reset_password("resetshort", token, "ab")
+                assert success is False
+                assert "at least 4" in msg.lower()
 
 
 # ---------------------------------------------------------------------------

@@ -18,8 +18,9 @@ import time
 import types
 
 import streamlit as st
+from config.i18n import t, LANGUAGES
 from utils.secrets import get_secret
-from utils.user_auth import authenticate_user, register_user, get_current_user
+from utils.user_auth import authenticate_user, register_user, get_current_user, request_password_reset, reset_password
 
 # ---------------------------------------------------------------------------
 # 全局 CSS
@@ -139,11 +140,38 @@ def _get_session_user_id() -> str:
 
 def show_sidebar_info() -> None:
     """在侧栏显示用户信息、剩余 API 调用次数和重置倒计时。"""
-    from utils.ai_client import get_rate_limit_remaining, get_rate_limit_reset_seconds, RATE_LIMIT_MAX_CALLS, RATE_LIMIT_WINDOW
+    from utils.ai_client import get_rate_limit_remaining, get_rate_limit_reset_seconds, RATE_LIMIT_MAX_CALLS
 
     uid = _get_session_user_id()
 
     with st.sidebar:
+        # Language selector at top
+        lang_options = list(LANGUAGES.keys())
+        current_lang = st.session_state.get("language", "zh")
+        current_display = next(
+            (k for k, v in LANGUAGES.items() if v == current_lang),
+            lang_options[0],
+        )
+        current_idx = lang_options.index(current_display) if current_display in lang_options else 0
+        selected_display = st.selectbox(
+            t("language"),
+            lang_options,
+            index=current_idx,
+            key="_lang_selector",
+        )
+        new_lang = LANGUAGES[selected_display]
+        if new_lang != st.session_state.get("language", "zh"):
+            st.session_state["language"] = new_lang
+            # Persist to user profile if logged in
+            current_user = get_current_user()
+            if current_user and current_user.get("username") not in (None, "admin"):
+                from utils.storage import load_json, save_json
+                users_db = load_json("users_db.json", default={})
+                if current_user["username"] in users_db:
+                    users_db[current_user["username"]]["language"] = new_lang
+                    save_json("users_db.json", users_db)
+            st.rerun()
+
         # Show user info and logout button
         current_user = get_current_user()
         if current_user:
@@ -151,14 +179,14 @@ def show_sidebar_info() -> None:
             tier = current_user.get("tier", "free")
             tier_badge = {"free": "Free", "pro": "Pro", "enterprise": "Enterprise"}.get(tier, tier)
             st.markdown(f"### 👤 {username}")
-            st.caption(f"Plan: **{tier_badge}**")
-            if st.button("🚪 Logout", key="_logout_btn", use_container_width=True):
+            st.caption(f"{t('plan_label')}: **{tier_badge}**")
+            if st.button(f"🚪 {t('logout')}", key="_logout_btn", use_container_width=True):
                 st.session_state.pop("authenticated", None)
                 st.session_state.pop("current_user", None)
                 st.rerun()
 
         st.markdown("---")
-        st.markdown("### 📊 使用状态")
+        st.markdown(f"### {t('usage_status')}")
 
         # Tier-based usage display for logged-in non-admin users
         if current_user and current_user.get("username") not in (None, "admin"):
@@ -172,21 +200,21 @@ def show_sidebar_info() -> None:
             if daily_limit is not None:
                 progress_val = count / daily_limit if daily_limit > 0 else 0
                 st.progress(min(progress_val, 1.0))
-                st.caption(f"\u4eca\u65e5\u5df2\u7528 **{count}/{daily_limit}** \u6b21")
+                st.caption(f"{t('used_today')} **{count}/{daily_limit}** {t('times')}")
             else:
                 st.progress(0.0)
-                st.caption(f"\u4eca\u65e5\u5df2\u7528 **{count}** \u6b21 (\u65e0\u9650\u5236)")
+                st.caption(f"{t('used_today')} **{count}** {t('times')} ({t('unlimited')})")
         else:
             # Sliding-window display for admin or non-logged-in mode
             remaining = get_rate_limit_remaining(uid)
             used = RATE_LIMIT_MAX_CALLS - remaining
             st.progress(used / RATE_LIMIT_MAX_CALLS if RATE_LIMIT_MAX_CALLS > 0 else 0)
-            st.caption(f"\u5df2\u7528 **{used}** / {RATE_LIMIT_MAX_CALLS} \u6b21\uff08\u6bcf {RATE_LIMIT_WINDOW // 60} \u5206\u949f\u91cd\u7f6e\uff09")
+            st.caption(f"{t('used')} **{used}** / {RATE_LIMIT_MAX_CALLS} {t('times')}")
 
             reset_secs = get_rate_limit_reset_seconds(uid)
             if reset_secs > 0:
                 minutes, seconds = divmod(reset_secs, 60)
-                st.caption(f"\ud83d\udd50 \u6700\u65e9\u91ca\u653e: {minutes}\u5206{seconds}\u79d2\u540e")
+                st.caption(t("earliest_release").format(minutes=minutes, seconds=seconds))
         st.markdown("---")
 
 
@@ -217,21 +245,31 @@ def check_auth() -> None:
     if st.session_state.get("authenticated"):
         return
 
-    st.markdown("""
+    # Determine which view to show: 'login', 'forgot', or 'reset'
+    auth_view = st.session_state.get("_auth_view", "login")
+
+    st.markdown(f"""
     <div class="login-box">
         <div style="font-size:2.5rem;">💼</div>
-        <div class="login-title">外贸AI助手</div>
-        <div class="login-sub">请登录或注册账号继续使用</div>
+        <div class="login-title">{t('login_title')}</div>
+        <div class="login-sub">{t('login_subtitle')}</div>
     </div>
     """, unsafe_allow_html=True)
 
-    login_tab, register_tab = st.tabs(["🔐 Login", "📝 Register"])
+    if auth_view == "forgot":
+        _show_forgot_password_view()
+        st.stop()
+    elif auth_view == "reset":
+        _show_reset_password_view()
+        st.stop()
+
+    login_tab, register_tab = st.tabs([t("login_tab"), t("register_tab")])
 
     with login_tab:
         with st.form("login_form"):
-            login_username = st.text_input("Username", placeholder="Enter username", key="login_username")
-            login_password = st.text_input("Password", type="password", placeholder="Enter password", key="login_password")
-            if st.form_submit_button("🔐 Login", use_container_width=True, type="primary"):
+            login_username = st.text_input(t("username"), placeholder=t("username_placeholder"), key="login_username")
+            login_password = st.text_input(t("password"), type="password", placeholder=t("password_placeholder"), key="login_password")
+            if st.form_submit_button(t("login_button"), use_container_width=True, type="primary"):
                 # Admin fallback: APP_PASSWORD grants admin access only for "admin" or empty username
                 login_name_lower = login_username.strip().lower()
                 if hmac.compare_digest(login_password, app_password) and login_name_lower in ("admin", ""):
@@ -243,27 +281,112 @@ def check_auth() -> None:
                     if success:
                         st.session_state.authenticated = True
                         st.session_state["current_user"] = user_info
+                        # Load language preference from user profile
+                        saved_lang = user_info.get("language")
+                        if saved_lang:
+                            st.session_state["language"] = saved_lang
                         st.rerun()
                     else:
-                        st.error("❌ Invalid username or password")
+                        st.error(f"❌ {t('invalid_credentials')}")
+
+        # Forgot password button (outside form since forms can't nest)
+        if st.button(f"🔑 {t('forgot_password')}", key="_forgot_pw_btn"):
+            st.session_state["_auth_view"] = "forgot"
+            st.rerun()
 
     with register_tab:
         with st.form("register_form"):
-            reg_username = st.text_input("Username", placeholder="Choose a username (letters and numbers)", key="reg_username")
-            reg_email = st.text_input("Email (optional)", placeholder="your@email.com", key="reg_email")
-            reg_password = st.text_input("Password", type="password", placeholder="Choose a password", key="reg_password")
-            reg_confirm = st.text_input("Confirm Password", type="password", placeholder="Confirm your password", key="reg_confirm")
-            if st.form_submit_button("📝 Register", use_container_width=True, type="primary"):
+            reg_username = st.text_input(t("username"), placeholder=t("choose_username_placeholder"), key="reg_username")
+            reg_email = st.text_input(t("email_optional"), placeholder=t("email_placeholder"), key="reg_email")
+            reg_password = st.text_input(t("password"), type="password", placeholder=t("choose_password_placeholder"), key="reg_password")
+            reg_confirm = st.text_input(t("confirm"), type="password", placeholder=t("confirm_password_placeholder"), key="reg_confirm")
+            if st.form_submit_button(t("register_button"), use_container_width=True, type="primary"):
                 if reg_password != reg_confirm:
-                    st.error("❌ Passwords do not match")
+                    st.error(f"❌ {t('passwords_not_match')}")
                 else:
                     success, msg = register_user(reg_username, reg_password, reg_email)
                     if success:
-                        st.success(f"✅ {msg}! Please login.")
+                        st.success(f"✅ {t('registration_successful')}")
                     else:
                         st.error(f"❌ {msg}")
 
     st.stop()
+
+
+def _show_forgot_password_view() -> None:
+    """Show the forgot password form for requesting a reset email."""
+    from utils.email_service import is_email_configured
+
+    with st.form("forgot_password_form"):
+        st.subheader(f"🔑 {t('forgot_password')}")
+        if not is_email_configured():
+            st.warning(f"⚠️ {t('email_not_configured')}")
+        email_or_user = st.text_input(
+            t("enter_email_or_username"),
+            placeholder=t("enter_email_or_username"),
+            key="_forgot_input",
+        )
+        if st.form_submit_button(t("send_reset_email"), use_container_width=True, type="primary"):
+            success, msg = request_password_reset(email_or_user)
+            if success:
+                st.success(f"✅ {t('reset_email_sent')}")
+            else:
+                st.error(f"❌ {msg}")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button(f"⬅️ {t('back_to_login')}", key="_back_login_from_forgot"):
+            st.session_state["_auth_view"] = "login"
+            st.rerun()
+    with col2:
+        if st.button(f"🔒 {t('reset_password')}", key="_go_to_reset"):
+            st.session_state["_auth_view"] = "reset"
+            st.rerun()
+
+
+def _show_reset_password_view() -> None:
+    """Show the reset password form for entering token and new password."""
+    with st.form("reset_password_form"):
+        st.subheader(f"🔒 {t('reset_password')}")
+        reset_username = st.text_input(
+            t("username"),
+            placeholder=t("username_placeholder"),
+            key="_reset_username",
+        )
+        reset_token = st.text_input(
+            t("enter_reset_token"),
+            placeholder=t("enter_reset_token"),
+            key="_reset_token",
+        )
+        reset_new_pw = st.text_input(
+            t("new_password"),
+            type="password",
+            placeholder=t("new_password"),
+            key="_reset_new_pw",
+        )
+        reset_confirm_pw = st.text_input(
+            t("confirm_new_password"),
+            type="password",
+            placeholder=t("confirm_new_password"),
+            key="_reset_confirm_pw",
+        )
+        if st.form_submit_button(t("reset_password"), use_container_width=True, type="primary"):
+            if reset_new_pw != reset_confirm_pw:
+                st.error(f"❌ {t('passwords_not_match')}")
+            else:
+                success, msg = reset_password(reset_username, reset_token, reset_new_pw)
+                if success:
+                    st.success(f"✅ {t('password_reset_success')}")
+                    st.session_state["_auth_view"] = "login"
+                else:
+                    if "expired" in msg.lower():
+                        st.error(f"❌ {t('token_expired')}")
+                    else:
+                        st.error(f"❌ {t('token_invalid')}")
+
+    if st.button(f"⬅️ {t('back_to_login')}", key="_back_login_from_reset"):
+        st.session_state["_auth_view"] = "login"
+        st.rerun()
 
 
 # ---------------------------------------------------------------------------
