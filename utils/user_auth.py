@@ -8,6 +8,7 @@ and per-user data isolation.
 from __future__ import annotations
 
 import hashlib
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -18,7 +19,7 @@ from utils.logger import get_logger
 
 logger = get_logger("user_auth")
 
-_SALT = "trade_ai_helper_salt_2024"
+_PBKDF2_ITERATIONS = 100_000
 _USERS_DB_FILENAME = "users_db.json"
 
 
@@ -34,10 +35,34 @@ def _get_users_dir() -> Path:
     return users_dir
 
 
-def _hash_password(password: str) -> str:
-    """Hash a password using SHA-256 with a static salt prefix."""
-    salted = f"{_SALT}{password}"
-    return hashlib.sha256(salted.encode("utf-8")).hexdigest()
+def _hash_password(password: str, salt: str | None = None) -> str:
+    """
+    Hash a password using PBKDF2-HMAC-SHA256 with a per-user random salt.
+
+    Returns a string in the format 'salt_hex:hash_hex'.
+    If salt is not provided, generates a new random 16-byte salt.
+    """
+    if salt is None:
+        salt = os.urandom(16).hex()
+    hash_bytes = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt.encode("utf-8"),
+        _PBKDF2_ITERATIONS,
+    )
+    return f"{salt}:{hash_bytes.hex()}"
+
+
+def _verify_password(password: str, stored_hash: str) -> bool:
+    """
+    Verify a password against a stored hash string.
+
+    The stored_hash format is 'salt_hex:hash_hex'.
+    """
+    if ":" not in stored_hash:
+        return False
+    salt = stored_hash.split(":")[0]
+    return _hash_password(password, salt) == stored_hash
 
 
 def _load_users_db() -> dict:
@@ -73,11 +98,12 @@ def register_user(username: str, password: str, email: str = "") -> tuple[bool, 
     if username in users:
         return False, "Username already exists"
 
-    # Create user profile
+    # Create user profile with per-user random salt
+    password_hash = _hash_password(password)
     users[username] = {
         "username": username,
         "email": email.strip(),
-        "password_hash": _hash_password(password),
+        "password_hash": password_hash,
         "tier": "free",
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
@@ -107,7 +133,7 @@ def authenticate_user(username: str, password: str) -> tuple[bool, dict | None]:
         return False, None
 
     user = users[username]
-    if user["password_hash"] == _hash_password(password):
+    if _verify_password(password, user["password_hash"]):
         # Return user info without password hash
         user_info = {
             "username": user["username"],
@@ -141,7 +167,7 @@ def change_password(username: str, old_password: str, new_password: str) -> tupl
     if username not in users:
         return False, "User not found"
 
-    if users[username]["password_hash"] != _hash_password(old_password):
+    if not _verify_password(old_password, users[username]["password_hash"]):
         return False, "Current password is incorrect"
 
     users[username]["password_hash"] = _hash_password(new_password)
@@ -152,6 +178,8 @@ def change_password(username: str, old_password: str, new_password: str) -> tupl
 
 def get_user_data_dir(username: str) -> Path:
     """Return the data directory for a specific user. Creates it if needed."""
+    if not username.isalnum():
+        raise ValueError("Invalid username")
     user_dir = _get_users_dir() / username
     user_dir.mkdir(parents=True, exist_ok=True)
     return user_dir

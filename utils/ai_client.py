@@ -169,6 +169,12 @@ def call_llm(
     except Exception as e:
         logger.error("API call failed: model=%s, user=%s", _MODEL, user_id)
         _rate_limit_rollback(user_id)  # 失败回滚
+        # Rollback tier-based daily usage if applicable
+        from utils.user_auth import get_current_user
+        current_user = get_current_user()
+        if current_user and current_user.get("username") not in (None, "admin"):
+            from utils.pricing import decrement_usage
+            decrement_usage(current_user["username"])
         return _handle_api_error(e)
 
 
@@ -225,6 +231,13 @@ def stream_llm(
     except Exception as e:
         # 流式失败不消耗 slot（slot_consumed 为 False 时已不消耗）
         logger.error("Stream API call failed: model=%s, user=%s", _MODEL, user_id)
+        # Rollback tier-based daily usage if no token was produced
+        if not slot_consumed:
+            from utils.user_auth import get_current_user
+            current_user = get_current_user()
+            if current_user and current_user.get("username") not in (None, "admin"):
+                from utils.pricing import decrement_usage
+                decrement_usage(current_user["username"])
         yield _handle_api_error(e)
 
 

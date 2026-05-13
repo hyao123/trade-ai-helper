@@ -185,15 +185,18 @@ class TestUserAuth:
                 assert success is True
 
     def test_password_hashing_consistent(self):
-        """_hash_password produces consistent results for same input."""
+        """_hash_password with same salt produces consistent results."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import _hash_password
-                h1 = _hash_password("testpassword")
-                h2 = _hash_password("testpassword")
+                from utils.user_auth import _hash_password, _verify_password
+                h1 = _hash_password("testpassword", salt="abcdef0123456789")
+                h2 = _hash_password("testpassword", salt="abcdef0123456789")
                 assert h1 == h2
+                # Format should be salt:hash
+                assert ":" in h1
+                assert h1.startswith("abcdef0123456789:")
 
     def test_password_hashing_different_inputs(self):
         """_hash_password produces different results for different inputs."""
@@ -202,9 +205,35 @@ class TestUserAuth:
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.user_auth import _hash_password
-                h1 = _hash_password("password1")
-                h2 = _hash_password("password2")
+                h1 = _hash_password("password1", salt="samesalt12345678")
+                h2 = _hash_password("password2", salt="samesalt12345678")
                 assert h1 != h2
+
+    def test_password_hashing_random_salt(self):
+        """_hash_password generates unique salts when salt is not provided."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import _hash_password
+                h1 = _hash_password("samepassword")
+                h2 = _hash_password("samepassword")
+                # Different salts produce different hashes
+                assert h1 != h2
+                # Both have salt:hash format
+                assert ":" in h1
+                assert ":" in h2
+
+    def test_verify_password(self):
+        """_verify_password correctly validates passwords against stored hashes."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import _hash_password, _verify_password
+                stored = _hash_password("mypassword")
+                assert _verify_password("mypassword", stored) is True
+                assert _verify_password("wrongpassword", stored) is False
 
     def test_change_password_success(self):
         """change_password works with correct old password."""

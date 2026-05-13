@@ -117,6 +117,36 @@ def increment_usage(username: str) -> tuple[bool, str]:
 # ---------------------------------------------------------------------------
 # Display helpers
 # ---------------------------------------------------------------------------
+def decrement_usage(username: str) -> None:
+    """
+    Decrease today's usage count by 1 (minimum 0).
+
+    Used to rollback a usage increment when an API call fails.
+    """
+    today_str = date.today().isoformat()
+    usage = load_user_json(username, _USAGE_FILENAME, default={})
+
+    # Only decrement if the usage is for today
+    if usage.get("date") != today_str:
+        return
+
+    current_count = usage.get("count", 0)
+    if current_count <= 0:
+        return
+
+    usage["count"] = current_count - 1
+
+    # Update today's entry in history
+    history = usage.get("history", [])
+    for entry in history:
+        if entry.get("date") == today_str:
+            entry["count"] = usage["count"]
+            break
+    usage["history"] = history
+
+    save_user_json(username, _USAGE_FILENAME, usage)
+
+
 def get_usage_display(username: str) -> str:
     """
     Return formatted usage string for sidebar display.

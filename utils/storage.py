@@ -62,6 +62,8 @@ def save_json(filename: str, data) -> None:
 
 def get_user_data_dir(username: str) -> Path:
     """Return data/users/{username}/ directory. Creates it if needed."""
+    if not username.isalnum():
+        raise ValueError("Invalid username")
     user_dir = get_data_dir() / "users" / username
     user_dir.mkdir(parents=True, exist_ok=True)
     return user_dir

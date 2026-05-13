@@ -106,7 +106,7 @@ if _current_user and _current_user.get("username") not in (None, "admin"):
     _export_access = check_feature_access(_current_user["username"], "data_export")
 
 if not _export_access:
-    st.info("🔒 数据导出功能需要 Pro 套餐，请升级以解锁")
+    st.info("🔒 数据导出/导入功能需要 Pro 套餐，请升级以解锁")
 else:
     st.caption("导出所有数据为 JSON 文件，可用于备份或迁移。导入会覆盖当前数据。")
 

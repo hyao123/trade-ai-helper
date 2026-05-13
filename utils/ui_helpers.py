@@ -232,8 +232,9 @@ def check_auth() -> None:
             login_username = st.text_input("Username", placeholder="Enter username", key="login_username")
             login_password = st.text_input("Password", type="password", placeholder="Enter password", key="login_password")
             if st.form_submit_button("🔐 Login", use_container_width=True, type="primary"):
-                # Admin fallback: APP_PASSWORD grants admin access
-                if hmac.compare_digest(login_password, app_password):
+                # Admin fallback: APP_PASSWORD grants admin access only for "admin" or empty username
+                login_name_lower = login_username.strip().lower()
+                if hmac.compare_digest(login_password, app_password) and login_name_lower in ("admin", ""):
                     st.session_state.authenticated = True
                     st.session_state["current_user"] = {"username": "admin", "tier": "enterprise"}
                     st.rerun()
