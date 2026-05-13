@@ -92,6 +92,24 @@ def increment_usage(username: str) -> tuple[bool, str]:
     # Increment
     usage["count"] = current_count + 1
     usage["date"] = today_str
+
+    # Update 7-day usage history
+    history = usage.get("history", [])
+    # Find or create today's entry in history
+    today_entry = None
+    for entry in history:
+        if entry.get("date") == today_str:
+            today_entry = entry
+            break
+    if today_entry is not None:
+        today_entry["count"] = usage["count"]
+    else:
+        history.append({"date": today_str, "count": usage["count"]})
+    # Keep only last 7 entries
+    if len(history) > 7:
+        history = history[-7:]
+    usage["history"] = history
+
     save_user_json(username, _USAGE_FILENAME, usage)
     return True, ""
 
@@ -142,3 +160,19 @@ def upgrade_user_tier(username: str, new_tier: str) -> bool:
     users[username]["tier"] = new_tier
     save_json(_USERS_DB_FILENAME, users)
     return True
+
+
+# ---------------------------------------------------------------------------
+# Usage history
+# ---------------------------------------------------------------------------
+def get_usage_history(username: str) -> list[dict]:
+    """
+    Return the 7-day usage history for a user.
+
+    Returns a list of dicts: [{'date': 'YYYY-MM-DD', 'count': N}, ...]
+    Up to 7 entries, most recent last.
+    """
+    usage = load_user_json(username, _USAGE_FILENAME, default={})
+    history = usage.get("history", [])
+    # Return at most 7 entries
+    return history[-7:]

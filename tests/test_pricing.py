@@ -222,6 +222,57 @@ class TestPricing:
                 from utils.pricing import get_user_tier
                 assert get_user_tier("nobody") == "free"
 
+    def test_get_usage_history_empty_for_new_user(self):
+        """get_usage_history returns empty list when no usage exists."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.pricing import get_usage_history
+                result = get_usage_history("newuser999")
+                assert result == []
+
+    def test_increment_usage_populates_history(self):
+        """increment_usage adds entries to the history list."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            self._create_user(tmp_dir, "histuser", "free")
+            with patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.pricing import increment_usage, get_usage_history
+                increment_usage("histuser")
+                history = get_usage_history("histuser")
+                assert len(history) == 1
+                assert history[0]["date"] == date.today().isoformat()
+                assert history[0]["count"] == 1
+
+                increment_usage("histuser")
+                history = get_usage_history("histuser")
+                assert len(history) == 1
+                assert history[0]["count"] == 2
+
+    def test_usage_history_capped_at_7_entries(self):
+        """History list never exceeds 7 entries."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            self._create_user(tmp_dir, "capuser", "free")
+            # Write usage.json with 8 historical entries
+            user_dir = tmp_dir / "users" / "capuser"
+            user_dir.mkdir(parents=True, exist_ok=True)
+            today_str = date.today().isoformat()
+            history = []
+            for i in range(8):
+                d = (date.today() - timedelta(days=8 - i)).isoformat()
+                history.append({"date": d, "count": i + 1})
+            usage = {"date": today_str, "count": 5, "history": history}
+            with open(user_dir / "usage.json", "w", encoding="utf-8") as f:
+                json.dump(usage, f)
+
+            with patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.pricing import increment_usage, get_usage_history
+                # Increment to trigger history update
+                increment_usage("capuser")
+                hist = get_usage_history("capuser")
+                assert len(hist) <= 7
+
 
 # ---------------------------------------------------------------------------
 # Simple runner for sandbox validation (pytest not available)
