@@ -46,9 +46,9 @@ def configure_logging() -> logging.Logger:
     # Format
     fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
-    # Console handler (INFO+)
+    # Console handler (respects LOG_LEVEL)
     console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
+    console.setLevel(level)
     console.setFormatter(fmt)
     logger.addHandler(console)
 
