@@ -142,8 +142,6 @@ def show_sidebar_info() -> None:
     from utils.ai_client import get_rate_limit_remaining, get_rate_limit_reset_seconds, RATE_LIMIT_MAX_CALLS, RATE_LIMIT_WINDOW
 
     uid = _get_session_user_id()
-    remaining = get_rate_limit_remaining(uid)
-    used = RATE_LIMIT_MAX_CALLS - remaining
 
     with st.sidebar:
         # Show user info and logout button
@@ -161,13 +159,34 @@ def show_sidebar_info() -> None:
 
         st.markdown("---")
         st.markdown("### 📊 使用状态")
-        st.progress(used / RATE_LIMIT_MAX_CALLS if RATE_LIMIT_MAX_CALLS > 0 else 0)
-        st.caption(f"已用 **{used}** / {RATE_LIMIT_MAX_CALLS} 次（每 {RATE_LIMIT_WINDOW // 60} 分钟重置）")
 
-        reset_secs = get_rate_limit_reset_seconds(uid)
-        if reset_secs > 0:
-            minutes, seconds = divmod(reset_secs, 60)
-            st.caption(f"🕐 最早释放: {minutes}分{seconds}秒后")
+        # Tier-based usage display for logged-in non-admin users
+        if current_user and current_user.get("username") not in (None, "admin"):
+            from utils.pricing import get_daily_usage, TIER_CONFIG
+            username = current_user["username"]
+            tier = current_user.get("tier", "free")
+            config = TIER_CONFIG.get(tier, TIER_CONFIG["free"])
+            daily_limit = config["daily_limit"]
+            count = get_daily_usage(username)
+
+            if daily_limit is not None:
+                progress_val = count / daily_limit if daily_limit > 0 else 0
+                st.progress(min(progress_val, 1.0))
+                st.caption(f"\u4eca\u65e5\u5df2\u7528 **{count}/{daily_limit}** \u6b21")
+            else:
+                st.progress(0.0)
+                st.caption(f"\u4eca\u65e5\u5df2\u7528 **{count}** \u6b21 (\u65e0\u9650\u5236)")
+        else:
+            # Sliding-window display for admin or non-logged-in mode
+            remaining = get_rate_limit_remaining(uid)
+            used = RATE_LIMIT_MAX_CALLS - remaining
+            st.progress(used / RATE_LIMIT_MAX_CALLS if RATE_LIMIT_MAX_CALLS > 0 else 0)
+            st.caption(f"\u5df2\u7528 **{used}** / {RATE_LIMIT_MAX_CALLS} \u6b21\uff08\u6bcf {RATE_LIMIT_WINDOW // 60} \u5206\u949f\u91cd\u7f6e\uff09")
+
+            reset_secs = get_rate_limit_reset_seconds(uid)
+            if reset_secs > 0:
+                minutes, seconds = divmod(reset_secs, 60)
+                st.caption(f"\ud83d\udd50 \u6700\u65e9\u91ca\u653e: {minutes}\u5206{seconds}\u79d2\u540e")
         st.markdown("---")
 
 

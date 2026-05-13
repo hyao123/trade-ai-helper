@@ -94,6 +94,19 @@ def _check_preconditions(user_id: str = "default") -> str | None:
     """返回错误信息字符串；None 表示可以继续调用。不消耗 rate limit slot。"""
     if not get_secret("NVIDIA_API_KEY"):
         return "⚠️ 请先设置 NVIDIA_API_KEY（.env 文件或 Streamlit Cloud Secrets）"
+
+    # Tier-based daily limit check (only for logged-in non-admin users)
+    from utils.user_auth import get_current_user
+    current_user = get_current_user()
+    if current_user and current_user.get("username") not in (None, "admin"):
+        from utils.pricing import increment_usage
+        username = current_user["username"]
+        ok, err_msg = increment_usage(username)
+        if not ok:
+            logger.warning("Daily tier limit hit for user=%s", username)
+            return err_msg
+
+    # Sliding-window burst guard (secondary)
     now = time.time()
     _call_times[user_id] = [t for t in _call_times[user_id] if now - t < RATE_LIMIT_WINDOW]
     if len(_call_times[user_id]) >= RATE_LIMIT_MAX_CALLS:

@@ -8,6 +8,8 @@ import os
 import streamlit as st
 from utils.ui_helpers import inject_css, check_auth
 from utils.pdf_gen import generate_quote_pdf
+from utils.pricing import check_feature_access
+from utils.user_auth import get_current_user
 
 st.set_page_config(page_title="报价单 | 外贸AI助手", page_icon="📄", layout="wide")
 inject_css()
@@ -172,25 +174,35 @@ with col_c2:
 
 # --- 公司Logo（可选）---
 st.markdown("#### 🖼️ 公司Logo（可选）")
-if os.path.exists(LOGO_PATH):
-    st.image(LOGO_PATH, width=150, caption="当前Logo")
-    if st.button("🗑️ 删除Logo", key="remove_logo"):
-        os.remove(LOGO_PATH)
-        st.success("Logo已删除")
-        st.rerun()
 
-uploaded_logo = st.file_uploader(
-    "上传公司Logo",
-    type=["png", "jpg", "jpeg"],
-    help="支持 PNG/JPG 格式，建议尺寸不超过 500x200px",
-    key="logo_uploader",
-)
-if uploaded_logo:
-    os.makedirs(os.path.dirname(LOGO_PATH), exist_ok=True)
-    with open(LOGO_PATH, "wb") as f:
-        f.write(uploaded_logo.getvalue())
-    st.success("✅ Logo已保存")
-    st.rerun()
+# Feature gating: logo upload requires Pro tier
+_current_user = get_current_user()
+_logo_access = True
+if _current_user and _current_user.get("username") not in (None, "admin"):
+    _logo_access = check_feature_access(_current_user["username"], "logo_upload")
+
+if not _logo_access:
+    st.info("🔒 Logo 上传功能需要 Pro 套餐，请升级以解锁")
+else:
+    if os.path.exists(LOGO_PATH):
+        st.image(LOGO_PATH, width=150, caption="当前Logo")
+        if st.button("🗑️ 删除Logo", key="remove_logo"):
+            os.remove(LOGO_PATH)
+            st.success("Logo已删除")
+            st.rerun()
+
+    uploaded_logo = st.file_uploader(
+        "上传公司Logo",
+        type=["png", "jpg", "jpeg"],
+        help="支持 PNG/JPG 格式，建议尺寸不超过 500x200px",
+        key="logo_uploader",
+    )
+    if uploaded_logo:
+        os.makedirs(os.path.dirname(LOGO_PATH), exist_ok=True)
+        with open(LOGO_PATH, "wb") as f:
+            f.write(uploaded_logo.getvalue())
+        st.success("✅ Logo已保存")
+        st.rerun()
 
 generate_clicked = st.button("🚀 生成报价单 (PDF)", type="primary", use_container_width=True)
 st.markdown("</div>", unsafe_allow_html=True)

@@ -5,6 +5,8 @@ pages/9_📋_历史记录.py
 import streamlit as st
 from utils.ui_helpers import inject_css, check_auth, copy_button
 from utils.history import get_history, clear_history, get_history_count
+from utils.pricing import check_feature_access
+from utils.user_auth import get_current_user
 
 st.set_page_config(page_title="历史记录 | 外贸AI助手", page_icon="📋", layout="wide")
 inject_css()
@@ -96,52 +98,62 @@ else:
 # ── 数据导出/导入 ────────────────────────────────────
 st.markdown("---")
 st.markdown("### 💾 数据导出 / 导入")
-st.caption("导出所有数据为 JSON 文件，可用于备份或迁移。导入会覆盖当前数据。")
 
-import json as _json
-from utils.history import _get_history
-from utils.templates import _get_store
-from utils.customers import import_customers
-from utils.workflow import import_workflows
-from utils.history import import_history
-from utils.templates import import_templates
+# Feature gating: data export requires Pro tier
+_current_user = get_current_user()
+_export_access = True
+if _current_user and _current_user.get("username") not in (None, "admin"):
+    _export_access = check_feature_access(_current_user["username"], "data_export")
 
-# 收集所有可导出数据
-export_data = {
-    "history": _get_history(),
-    "templates": _get_store(),
-    "customers": st.session_state.get("customers", []),
-    "workflows": st.session_state.get("email_workflows", []),
-}
+if not _export_access:
+    st.info("🔒 数据导出功能需要 Pro 套餐，请升级以解锁")
+else:
+    st.caption("导出所有数据为 JSON 文件，可用于备份或迁移。导入会覆盖当前数据。")
 
-col_exp, col_imp = st.columns(2)
-with col_exp:
-    export_json = _json.dumps(export_data, ensure_ascii=False, indent=2)
-    st.download_button(
-        "📥 导出全部数据 (JSON)",
-        export_json,
-        file_name="trade_ai_helper_backup.json",
-        mime="application/json",
-        use_container_width=True,
-    )
-with col_imp:
-    uploaded = st.file_uploader("📤 导入数据", type=["json"], key="import_json")
-    if uploaded:
-        try:
-            imported = _json.loads(uploaded.read().decode("utf-8"))
-            if st.button("确认导入（会覆盖当前数据）", type="primary", use_container_width=True):
-                if "history" in imported:
-                    import_history(imported["history"])
-                if "templates" in imported:
-                    import_templates(imported["templates"])
-                if "customers" in imported:
-                    import_customers(imported["customers"])
-                if "workflows" in imported:
-                    import_workflows(imported["workflows"])
-                st.success("✅ 数据导入成功！")
-                st.rerun()
-        except Exception as e:
-            st.error(f"❌ 导入失败：{e}")
+    import json as _json
+    from utils.history import _get_history
+    from utils.templates import _get_store
+    from utils.customers import import_customers
+    from utils.workflow import import_workflows
+    from utils.history import import_history
+    from utils.templates import import_templates
+
+    # 收集所有可导出数据
+    export_data = {
+        "history": _get_history(),
+        "templates": _get_store(),
+        "customers": st.session_state.get("customers", []),
+        "workflows": st.session_state.get("email_workflows", []),
+    }
+
+    col_exp, col_imp = st.columns(2)
+    with col_exp:
+        export_json = _json.dumps(export_data, ensure_ascii=False, indent=2)
+        st.download_button(
+            "📥 导出全部数据 (JSON)",
+            export_json,
+            file_name="trade_ai_helper_backup.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+    with col_imp:
+        uploaded = st.file_uploader("📤 导入数据", type=["json"], key="import_json")
+        if uploaded:
+            try:
+                imported = _json.loads(uploaded.read().decode("utf-8"))
+                if st.button("确认导入（会覆盖当前数据）", type="primary", use_container_width=True):
+                    if "history" in imported:
+                        import_history(imported["history"])
+                    if "templates" in imported:
+                        import_templates(imported["templates"])
+                    if "customers" in imported:
+                        import_customers(imported["customers"])
+                    if "workflows" in imported:
+                        import_workflows(imported["workflows"])
+                    st.success("✅ 数据导入成功！")
+                    st.rerun()
+            except Exception as e:
+                st.error(f"❌ 导入失败：{e}")
 
 st.markdown("---")
 st.markdown('<div class="footer">💼 外贸AI助手 · 历史记录</div>', unsafe_allow_html=True)
