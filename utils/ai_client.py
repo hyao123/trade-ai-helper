@@ -323,3 +323,71 @@ def generate_social_post(
     from config.prompts import build_social_post_prompt
     prompt, system = build_social_post_prompt(product, features, platform, audience, promo)
     return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
+
+
+def generate_bulk_email(
+    company: str,
+    contact_name: str,
+    product: str,
+    industry: str = "",
+    country: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    from config.prompts import build_bulk_email_prompt
+    prompt, system = build_bulk_email_prompt(company, contact_name, product, industry, country)
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
+
+
+def generate_negotiation(
+    scenario: str,
+    product: str,
+    current_offer: str,
+    bottom_line: str,
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    from config.prompts import build_negotiation_prompt
+    prompt, system = build_negotiation_prompt(scenario, product, current_offer, bottom_line)
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
+
+
+def generate_holiday_greeting(
+    holiday: str,
+    customer_name: str,
+    company: str,
+    relationship_level: str,
+    product_mention: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    from config.prompts import build_holiday_greeting_prompt
+    prompt, system = build_holiday_greeting_prompt(holiday, customer_name, company, relationship_level, product_mention)
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
+
+
+def generate_email_polish(
+    content: str,
+    source_lang: str,
+    target_lang: str,
+    mode: str,
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    from config.prompts import build_email_polish_prompt
+    prompt, system = build_email_polish_prompt(content, source_lang, target_lang, mode)
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
+
+
+def generate_complaint_response(
+    complaint_type: str,
+    severity: str,
+    relationship: str,
+    proposed_solution: str,
+    customer_complaint: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    from config.prompts import build_complaint_response_prompt
+    prompt, system = build_complaint_response_prompt(complaint_type, severity, relationship, proposed_solution, customer_complaint)
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
