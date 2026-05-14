@@ -864,3 +864,158 @@ Requirements:
 4. Show empathy without admitting excessive liability
 5. Output in English, plain text only, no markdown symbols."""
     return prompt, system
+
+
+
+# ---------------------------------------------------------------------------
+# 智能报价（Smart Quotation - AI-powered pricing suggestions）
+# ---------------------------------------------------------------------------
+def build_smart_quote_prompt(
+    product: str,
+    target_market: str,
+    order_quantity: int,
+    production_cost: str = "",
+    competitor_info: str = "",
+    trade_term: str = "FOB",
+) -> tuple[str, str | None]:
+    """构建智能报价 Prompt，基于市场/数量/成本给出定价建议。"""
+    product = sanitize_prompt_param(product, "product")
+    target_market = sanitize_prompt_param(target_market, "target_market")
+    production_cost = sanitize_prompt_param(production_cost, "production_cost")
+    competitor_info = sanitize_prompt_param(competitor_info, "competitor_info")
+    trade_term = sanitize_prompt_param(trade_term, "trade_term")
+
+    cost_info = f"\nProduction/Procurement Cost: {production_cost}" if production_cost else ""
+    competitor_section = f"\nCompetitor Reference: {competitor_info}" if competitor_info else ""
+
+    system = (
+        "你是一位有20年经验的外贸定价策略专家，精通国际市场定价、"
+        "成本核算和竞争分析。你帮助外贸企业制定科学的报价策略。"
+    )
+    prompt = f"""Please provide a comprehensive pricing strategy and quotation recommendation:
+
+Product: {product}
+Target Market: {target_market}
+Order Quantity: {order_quantity} units
+Trade Term: {trade_term}{cost_info}{competitor_section}
+
+Please output in the following format:
+
+## Recommended Price Range
+[Provide a specific price range in USD, with low/mid/high tiers]
+- Economy Price: $X.XX (high volume, thin margin)
+- Standard Price: $X.XX (balanced, recommended)
+- Premium Price: $X.XX (value-added, brand positioning)
+
+## Pricing Strategy Analysis
+[2-3 paragraphs analyzing:]
+- Market positioning for the target market
+- Volume-based pricing tiers (MOQ discounts)
+- Competitive considerations
+
+## Cost Breakdown Suggestion
+[Itemized cost structure:]
+- Material/Product cost: XX%
+- Labor/Processing: XX%
+- Packaging: XX%
+- Logistics ({trade_term}): XX%
+- Profit margin: XX%
+
+## Volume Discount Schedule
+[Table format:]
+- 100-499 units: Base price
+- 500-999 units: X% discount
+- 1000-4999 units: X% discount
+- 5000+ units: X% discount
+
+## Key Recommendations
+[3-5 bullet points with actionable pricing advice for this specific product/market]
+
+Requirements:
+1. All prices in USD
+2. Be specific with numbers, not vague ranges
+3. Consider the target market's purchasing power
+4. Factor in trade term costs
+5. Output in English, plain text with section headers only."""
+    return prompt, system
+
+
+# ---------------------------------------------------------------------------
+# A/B 测试变体生成（Generate email variants for A/B testing）
+# ---------------------------------------------------------------------------
+def build_ab_variant_prompt(
+    product: str,
+    customer_type: str,
+    num_variants: int = 3,
+    focus: str = "subject_line",
+) -> tuple[str, str | None]:
+    """构建 A/B 测试邮件变体生成 Prompt。"""
+    product = sanitize_prompt_param(product, "product")
+    customer_type = sanitize_prompt_param(customer_type, "customer_type")
+    focus = sanitize_prompt_param(focus, "focus")
+
+    system = (
+        "你是一位精通邮件营销和转化率优化的外贸专家，"
+        "擅长设计 A/B 测试方案并撰写高转化率的邮件变体。"
+    )
+
+    if focus == "subject_line":
+        prompt = f"""Generate {num_variants} different email subject line variants for A/B testing:
+
+Product: {product}
+Target Customer Type: {customer_type}
+
+For each variant, provide:
+1. A unique subject line (under 60 characters)
+2. The psychological trigger used (curiosity, urgency, value, social proof, etc.)
+3. Expected effectiveness rating (1-10)
+
+Output format (repeat for each variant):
+
+### Variant [A/B/C...]
+Subject: [subject line text]
+Trigger: [psychological trigger]
+Rating: [X/10]
+Rationale: [1 sentence explaining why this might work]
+
+---
+
+Requirements:
+1. Each variant must use a DIFFERENT approach/angle
+2. All subject lines in English
+3. Keep under 60 characters each
+4. Make them distinctly different to test meaningful hypotheses
+5. Output plain text only."""
+    else:
+        prompt = f"""Generate {num_variants} different cold email body variants for A/B testing:
+
+Product: {product}
+Target Customer Type: {customer_type}
+
+For each variant, provide a complete email body (50-80 words) with a different:
+- Tone (professional/friendly/urgent)
+- Opening hook
+- Value proposition angle
+- Call to action
+
+Output format (repeat for each variant):
+
+### Variant [A/B/C...]
+Subject: [matching subject line]
+
+[Email body text]
+
+Style: [tone description]
+Hook: [opening strategy]
+CTA: [call to action type]
+
+---
+
+Requirements:
+1. Each variant must be distinctly different in approach
+2. All content in English
+3. 50-80 words per email body
+4. Include subject line for each
+5. Output plain text only."""
+
+    return prompt, system

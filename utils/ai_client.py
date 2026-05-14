@@ -459,3 +459,35 @@ def generate_complaint_response(
     from config.prompts import build_complaint_response_prompt
     prompt, system = build_complaint_response_prompt(complaint_type, severity, relationship, proposed_solution, customer_complaint)
     return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
+
+
+
+def generate_smart_quote(
+    product: str,
+    target_market: str,
+    order_quantity: int,
+    production_cost: str = "",
+    competitor_info: str = "",
+    trade_term: str = "FOB",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    from config.prompts import build_smart_quote_prompt
+    prompt, system = build_smart_quote_prompt(
+        product, target_market, order_quantity,
+        production_cost, competitor_info, trade_term,
+    )
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
+
+
+def generate_ab_variants(
+    product: str,
+    customer_type: str,
+    num_variants: int = 3,
+    focus: str = "subject_line",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    from config.prompts import build_ab_variant_prompt
+    prompt, system = build_ab_variant_prompt(product, customer_type, num_variants, focus)
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
