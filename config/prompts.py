@@ -314,6 +314,289 @@ def build_bulk_email_prompt(
     product = sanitize_prompt_param(product, "product")
     industry = sanitize_prompt_param(industry, "industry")
     country = sanitize_prompt_param(country, "country")
+    industry_info = f"\nIndustry: {industry}" if industry else ""
+    country_info = f"\nCountry: {country}" if country else ""
+    system = "你是一位有10年经验的外贸业务开发专家，擅长撰写高回复率的个性化批量开发信。"
+    prompt = f"""Please generate a personalized cold email for bulk outreach:
+
+Company: {company}
+Contact Name: {contact_name}
+Product: {product}{industry_info}{country_info}
+
+Output format (strictly follow):
+Subject: [Email subject line, under 60 characters, highlight core value]
+
+Dear {contact_name},
+
+[Email body, 50-80 words, concise and professional]
+- Personalized opening referencing their company/industry
+- Brief product introduction with 1-2 key advantages
+- Clear Call to Action
+
+[Your Name]
+[Your Company]
+
+Requirements:
+1. Subject line must be compelling and personalized
+2. Opening must reference the recipient's company or industry
+3. Keep it short and scannable
+4. Professional but warm tone
+5. Output in English, plain text only, no markdown symbols."""
+    return prompt, system
+
+
+# ---------------------------------------------------------------------------
+# 谈判话术（Negotiation Scripts）
+# ---------------------------------------------------------------------------
+NEGOTIATION_SCENARIOS: dict[str, str] = {
+    "客户砍价": "Customer is asking for a lower price / price negotiation",
+    "要求延长账期": "Customer requests extended payment terms",
+    "要求降低MOQ": "Customer wants to reduce minimum order quantity",
+    "催货": "Customer is pressing for faster delivery / urgent shipment",
+    "要求免费样品": "Customer requests free samples",
+    "竞争对手比价": "Customer comparing prices with competitors",
+}
+
+
+def build_negotiation_prompt(
+    scenario: str,
+    product: str,
+    current_offer: str,
+    bottom_line: str,
+) -> tuple[str, str | None]:
+    """构建谈判话术 Prompt。"""
+    scenario = sanitize_prompt_param(scenario, "scenario")
+    product = sanitize_prompt_param(product, "product")
+    current_offer = sanitize_prompt_param(current_offer, "current_offer")
+    bottom_line = sanitize_prompt_param(bottom_line, "bottom_line")
+    scenario_desc = NEGOTIATION_SCENARIOS.get(scenario, scenario)
+    system = "你是一位有15年经验的外贸谈判专家，精通国际贸易谈判策略和话术技巧。"
+    prompt = f"""Please generate a negotiation response script:
+
+Scenario: {scenario_desc}
+Product: {product}
+Current Offer: {current_offer}
+Bottom Line: {bottom_line}
+
+Output format:
+
+## Opening Response
+[Professional opening response, 2-3 sentences, acknowledge concern while maintaining position]
+
+## Counter-Offer Suggestion
+[Specific counter-offer with reasoning, show flexibility while protecting margins]
+
+## Backup Plan
+[Alternative solution if counter-offer is rejected, creative options]
+
+## Key Phrases
+[5-8 useful English phrases for this scenario, each on a new line]
+
+Requirements:
+1. All content in English
+2. Professional and diplomatic tone
+3. Protect seller's interests while maintaining relationship
+4. Include specific tactics relevant to the scenario
+5. Output plain text only, no markdown symbols except section headers."""
+    return prompt, system
+
+
+# ---------------------------------------------------------------------------
+# 节日祝福（Holiday Greetings）
+# ---------------------------------------------------------------------------
+HOLIDAYS: list[str] = [
+    "Christmas",
+    "New Year",
+    "Eid",
+    "Diwali",
+    "Chinese New Year",
+    "Thanksgiving",
+    "Easter",
+    "Ramadan",
+]
+
+
+def build_holiday_greeting_prompt(
+    holiday: str,
+    customer_name: str,
+    company: str,
+    relationship_level: str,
+    product_mention: str = "",
+) -> tuple[str, str | None]:
+    """构建节日祝福 Prompt，支持不同节日和客户关系级别。"""
+    holiday = sanitize_prompt_param(holiday, "holiday")
+    customer_name = sanitize_prompt_param(customer_name, "customer_name")
+    company = sanitize_prompt_param(company, "company")
+    relationship_level = sanitize_prompt_param(relationship_level, "relationship_level")
+    product_mention = sanitize_prompt_param(product_mention, "product_mention")
+    product_info = f"\nProduct to mention: {product_mention}" if product_mention else ""
+    system = "你是一位深谙国际商务礼仪的外贸业务专家，擅长撰写得体且有温度的节日祝福邮件。"
+    prompt = f"""Please generate a culturally appropriate holiday greeting email:
+
+Holiday: {holiday}
+Customer Name: {customer_name}
+Company: {company}
+Relationship Level: {relationship_level}{product_info}
+
+Relationship level guide:
+- 新客户: Formal, professional, brief greeting with hope for future cooperation
+- 老客户: Warm, appreciative, reference past cooperation
+- VIP: Personal, heartfelt, emphasize special relationship
+
+Output format:
+Subject: [Holiday greeting subject line, warm and professional]
+
+Dear {customer_name},
+
+[Greeting body, 60-100 words]
+- Culturally appropriate holiday wishes
+- Tone matching relationship level
+- Brief business appreciation (subtle, not salesy)
+- Well wishes for the coming period
+
+Warm regards,
+[Your Name]
+[Your Company]
+
+Requirements:
+1. Be culturally sensitive and appropriate for the holiday
+2. Match tone to relationship level
+3. Keep it genuine, not promotional
+4. Output in English, plain text only, no markdown symbols."""
+    return prompt, system
+
+
+# ---------------------------------------------------------------------------
+# 邮件润色/翻译（Email Polish & Translation）
+# ---------------------------------------------------------------------------
+def build_email_polish_prompt(
+    content: str,
+    source_lang: str,
+    target_lang: str,
+    mode: str,
+) -> tuple[str, str | None]:
+    """构建邮件润色/翻译 Prompt。mode: 翻译/润色/翻译+润色。"""
+    content = sanitize_input(content, max_length=3000)
+    source_lang = sanitize_prompt_param(source_lang, "source_lang")
+    target_lang = sanitize_prompt_param(target_lang, "target_lang")
+    mode = sanitize_prompt_param(mode, "mode")
+    system = "你是一位精通多语言商务写作的外贸邮件专家，擅长邮件翻译和润色优化。"
+
+    if mode == "翻译":
+        task_desc = f"Translate the following email from {source_lang} to {target_lang}. Keep the meaning and tone intact."
+        requirements = f"""Requirements:
+1. Accurate translation from {source_lang} to {target_lang}
+2. Maintain the original tone and intent
+3. Use natural, professional {target_lang} expressions
+4. Keep formatting and structure consistent
+5. Output the translated text only, plain text, no markdown symbols."""
+    elif mode == "润色":
+        task_desc = f"Polish and improve the following email in {source_lang}. Make it more professional, clear, and impactful."
+        requirements = f"""Requirements:
+1. Improve grammar, word choice, and sentence structure
+2. Maintain the original meaning and intent
+3. Make it sound more professional and polished
+4. Keep the same language ({source_lang})
+5. Output the polished text only, plain text, no markdown symbols."""
+    else:  # 翻译+润色
+        task_desc = f"Translate the following email from {source_lang} to {target_lang}, then polish it to be more professional and impactful."
+        requirements = f"""Requirements:
+1. First translate accurately from {source_lang} to {target_lang}
+2. Then polish the translation for professional quality
+3. Improve word choice and sentence flow in {target_lang}
+4. Make it sound natural and compelling
+5. Output the final polished translation only, plain text, no markdown symbols."""
+
+    prompt = f"""{task_desc}
+
+Original email content:
+---
+{content}
+---
+
+{requirements}"""
+    return prompt, system
+
+
+# ---------------------------------------------------------------------------
+# 客诉回复（Complaint Response）
+# ---------------------------------------------------------------------------
+COMPLAINT_TYPES: list[str] = [
+    "质量问题",
+    "交期延误",
+    "数量短缺",
+    "包装破损",
+    "规格不符",
+]
+
+COMPLAINT_SEVERITIES: list[str] = ["轻微", "中等", "严重"]
+
+COMPLAINT_RELATIONSHIPS: list[str] = ["新客户", "老客户", "大客户"]
+
+COMPLAINT_SOLUTIONS: list[str] = ["换货", "补发", "折扣补偿", "退款"]
+
+
+def build_complaint_response_prompt(
+    complaint_type: str,
+    severity: str,
+    relationship: str,
+    proposed_solution: str,
+    customer_complaint: str = "",
+) -> tuple[str, str | None]:
+    """构建客诉回复 Prompt。"""
+    complaint_type = sanitize_prompt_param(complaint_type, "complaint_type")
+    severity = sanitize_prompt_param(severity, "severity")
+    relationship = sanitize_prompt_param(relationship, "relationship")
+    proposed_solution = sanitize_prompt_param(proposed_solution, "proposed_solution")
+    customer_complaint = sanitize_input(customer_complaint, max_length=2000)
+    complaint_detail = f"\nCustomer's original complaint:\n{customer_complaint}" if customer_complaint else ""
+    system = "你是一位有丰富经验的外贸客服经理，擅长处理国际贸易客诉并维护客户关系。"
+    prompt = f"""Please generate a professional complaint response email:
+
+Complaint Type: {complaint_type}
+Severity: {severity}
+Customer Relationship: {relationship}
+Proposed Solution: {proposed_solution}{complaint_detail}
+
+Output format:
+Subject: [Professional subject line acknowledging the issue]
+
+Dear [Customer],
+
+[Response body, 100-150 words, structured as:]
+1. Acknowledgment: Sincerely acknowledge the issue and apologize
+2. Solution: State the proposed solution ({proposed_solution}) with timeline
+3. Prevention: Explain steps to prevent recurrence
+4. Closing: Reaffirm commitment to quality and partnership
+
+[Your Name]
+[Your Company]
+
+Requirements:
+1. Tone matches severity (more apologetic for severe issues)
+2. Adjust formality based on relationship level
+3. Be specific about the solution and next steps
+4. Show empathy without admitting excessive liability
+5. Output in English, plain text only, no markdown symbols."""
+    return prompt, system
+
+
+# ---------------------------------------------------------------------------
+# 批量开发信（Bulk Cold Email）
+# ---------------------------------------------------------------------------
+def build_bulk_email_prompt(
+    company: str,
+    contact_name: str,
+    product: str,
+    industry: str = "",
+    country: str = "",
+) -> tuple[str, str | None]:
+    """构建批量开发信 Prompt，适合批量个性化发送场景。"""
+    company = sanitize_prompt_param(company, "company")
+    contact_name = sanitize_prompt_param(contact_name, "contact_name")
+    product = sanitize_prompt_param(product, "product")
+    industry = sanitize_prompt_param(industry, "industry")
+    country = sanitize_prompt_param(country, "country")
     industry_info = f"\n行业: {industry}" if industry else ""
     country_info = f"\n国家/地区: {country}" if country else ""
     system = "你是一位有10年经验的外贸业务开发专家，擅长撰写高回复率的个性化批量开发信。"
