@@ -12,7 +12,6 @@ import types
 import unittest
 from unittest.mock import patch
 
-
 # ---------------------------------------------------------------------------
 # Stub streamlit
 # ---------------------------------------------------------------------------
@@ -45,7 +44,7 @@ class TestUserPrefs(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self._patch_storage(Path(tmp)):
                 _st.session_state.clear()
-                from utils.user_prefs import get_prefs, _DEFAULTS
+                from utils.user_prefs import _DEFAULTS, get_prefs
                 prefs = get_prefs()
                 for key, val in _DEFAULTS.items():
                     self.assertEqual(prefs.get(key), val)
@@ -54,7 +53,7 @@ class TestUserPrefs(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self._patch_storage(Path(tmp)):
                 _st.session_state.clear()
-                from utils.user_prefs import set_pref, get_pref
+                from utils.user_prefs import get_pref, set_pref
                 set_pref("company_name", "Shenzhen Test Co.")
                 result = get_pref("company_name")
                 self.assertEqual(result, "Shenzhen Test Co.")
@@ -63,7 +62,7 @@ class TestUserPrefs(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self._patch_storage(Path(tmp)):
                 _st.session_state.clear()
-                from utils.user_prefs import update_prefs, get_pref
+                from utils.user_prefs import get_pref, update_prefs
                 update_prefs({
                     "company_name": "Test Co",
                     "contact_name": "Tom",
@@ -77,7 +76,7 @@ class TestUserPrefs(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self._patch_storage(Path(tmp)):
                 _st.session_state.clear()
-                from utils.user_prefs import save_seller_identity, get_pref
+                from utils.user_prefs import get_pref, save_seller_identity
                 save_seller_identity("ACME Corp", "Alice", "alice@acme.com", "+1-555-0100")
                 self.assertEqual(get_pref("company_name"), "ACME Corp")
                 self.assertEqual(get_pref("contact_name"), "Alice")
@@ -89,7 +88,11 @@ class TestUserPrefs(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self._patch_storage(Path(tmp)):
                 _st.session_state.clear()
-                from utils.user_prefs import get_ai_style_suffix, _DEFAULTS, update_prefs
+                from utils.user_prefs import (
+                    _DEFAULTS,
+                    get_ai_style_suffix,
+                    update_prefs,
+                )
                 # Reset to defaults
                 update_prefs({
                     "ai_style_tone": _DEFAULTS["ai_style_tone"],
@@ -124,7 +127,7 @@ class TestUserPrefs(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self._patch_storage(Path(tmp)):
                 _st.session_state.clear()
-                from utils.user_prefs import set_pref, get_pref
+                from utils.user_prefs import get_pref, set_pref
                 set_pref("default_language", "西班牙语")
                 _st.session_state.clear()  # Simulate new page load
                 result = get_pref("default_language")
@@ -202,7 +205,7 @@ class TestConversation(unittest.TestCase):
         self.assertEqual(conv.turn_count(), 5)
 
     def test_trim_prevents_overflow(self):
-        from utils.conversation import Conversation, _MAX_TURNS
+        from utils.conversation import _MAX_TURNS, Conversation
         conv = Conversation("test_trim")
         # Add more turns than the limit
         for i in range(_MAX_TURNS + 5):

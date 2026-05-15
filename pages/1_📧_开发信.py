@@ -8,6 +8,7 @@ import streamlit as st
 
 from utils.ai_client import generate_email
 from utils.conversation import Conversation, stream_with_context
+from utils.email_service import is_email_configured, send_ai_generated_email
 from utils.templates import (
     delete_template,
     get_template_data,
@@ -16,6 +17,7 @@ from utils.templates import (
 )
 from utils.ui_helpers import (
     check_auth,
+    extract_subject,
     get_user_id,
     inject_css,
     show_regenerate_buttons,
@@ -213,6 +215,49 @@ if generate_clicked:
             conv.add_assistant(full_text)
 
         show_regenerate_buttons("email")
+
+# ── 邮件直发（SMTP）────────────────────────────────────
+last_email_result = st.session_state.results.get("email", "")
+if last_email_result and not last_email_result.startswith("⚠️"):
+    st.markdown("---")
+    st.markdown("### 📨 直接发送邮件")
+    if not is_email_configured():
+        st.caption("💡 在 Secrets 中配置 SMTP_HOST / SMTP_USER / SMTP_PASSWORD 等参数后可直接发送邮件。")
+    else:
+        with st.expander("📨 发送此邮件给客户", expanded=False):
+            from utils.ui_helpers import extract_subject
+            subject_val, body_val = extract_subject(last_email_result)
+            send_to = st.text_input(
+                "收件人邮箱 *",
+                key="direct_send_to",
+                placeholder="customer@company.com",
+            )
+            send_subject = st.text_input(
+                "邮件主题", value=subject_val, key="direct_send_subject"
+            )
+            send_body = st.text_area(
+                "邮件正文", value=body_val, height=200, key="direct_send_body"
+            )
+            send_name = st.text_input(
+                "发件人姓名", value=get_pref("contact_name"), key="direct_send_name"
+            )
+            if st.button("📨 发送", type="primary", use_container_width=True, key="direct_send_btn"):
+                if not send_to.strip():
+                    st.warning("⚠️ 请填写收件人邮箱")
+                elif not send_subject.strip():
+                    st.warning("⚠️ 请填写邮件主题")
+                else:
+                    with st.spinner("正在发送邮件..."):
+                        ok, msg = send_ai_generated_email(
+                            to_email=send_to.strip(),
+                            subject=send_subject.strip(),
+                            body=send_body.strip(),
+                            from_name=send_name.strip(),
+                        )
+                    if ok:
+                        st.success(f"✅ {msg}")
+                    else:
+                        st.error(f"❌ 发送失败: {msg}")
 
 elif st.session_state.results.get("email"):
     show_result(

@@ -732,3 +732,125 @@ Requirements:
 5. Output plain text only."""
 
     return prompt, system
+
+
+
+# ---------------------------------------------------------------------------
+# HS 编码查询（HS Code Lookup）
+# ---------------------------------------------------------------------------
+def build_hs_code_prompt(
+    product: str,
+    description: str = "",
+    target_country: str = "",
+) -> tuple[str, str | None]:
+    """构建 HS 编码查询 Prompt。"""
+    product = sanitize_prompt_param(product, "product")
+    description = sanitize_input(description, max_length=1000)
+    target_country = sanitize_prompt_param(target_country, "target_country")
+
+    country_info = f"\nTarget Import Country: {target_country}" if target_country else ""
+    desc_info = f"\nDetailed Description: {description}" if description else ""
+
+    system = (
+        "你是一位精通国际贸易 HS 编码分类的外贸专家，熟悉 WCO《商品名称及编码协调制度》。"
+        "你能根据产品描述准确建议最合适的 HS 编码，并解释其含义和注意事项。"
+    )
+    prompt = f"""Please identify the most appropriate HS Code(s) for the following product:
+
+Product Name: {product}{desc_info}{country_info}
+
+Please provide:
+
+## Primary HS Code Recommendation
+[6-digit HS code with full description]
+Example: 8516.10 — Electric instantaneous or storage water heaters
+
+## Chapter & Section
+[HS Chapter number and section description]
+
+## Classification Reasoning
+[2-3 sentences explaining why this HS code is appropriate]
+
+## Alternative HS Codes to Consider
+[List 2-3 alternative codes if applicable, with brief reason for each]
+
+## Important Notes
+[Duty rates context, common misclassification warnings, or country-specific variations]
+
+## Export Control
+[Any export control considerations for this product category]
+
+Requirements:
+1. Be specific with the 6-digit HS code
+2. Explain classification logic clearly
+3. Mention if the product might require additional digits (8 or 10 digits for specific countries)
+4. Output in English, plain text with section headers."""
+    return prompt, system
+
+
+# ---------------------------------------------------------------------------
+# 邮件回复意图识别（Email Reply Intent Recognition）
+# ---------------------------------------------------------------------------
+INTENT_CATEGORIES: dict[str, str] = {
+    "感兴趣": "Customer is interested and wants more information or a quote",
+    "婉拒": "Customer politely declines or is not interested at this time",
+    "需要信息": "Customer needs more details (specs, price, samples, certifications)",
+    "价格谈判": "Customer wants to negotiate on price or payment terms",
+    "样品请求": "Customer wants to order or receive samples",
+    "下单意向": "Customer shows clear purchase intention or asks for PI/contract",
+    "投诉/问题": "Customer raises a complaint or issue",
+    "未回复迹象": "Auto-reply or unclear intent",
+}
+
+
+def build_intent_recognition_prompt(
+    email_content: str,
+    context: str = "",
+) -> tuple[str, str | None]:
+    """构建邮件回复意图识别 Prompt。"""
+    email_content = sanitize_input(email_content, max_length=3000)
+    context = sanitize_prompt_param(context, "context")
+
+    context_info = f"\nContext/Background: {context}" if context else ""
+
+    system = (
+        "你是一位有丰富经验的外贸业务员，精通英文商务邮件分析，"
+        "能准确识别客户回复邮件中的真实意图和下一步行动信号。"
+    )
+    prompt = f"""Analyze the following customer email reply and identify the intent:
+
+Customer Email:
+---
+{email_content}
+---{context_info}
+
+Please provide:
+
+## Primary Intent
+[Select the most fitting category and state it clearly]
+Categories: 感兴趣 / 婉拒 / 需要信息 / 价格谈判 / 样品请求 / 下单意向 / 投诉/问题 / 其他
+
+## Confidence Level
+[High / Medium / Low — with brief reasoning]
+
+## Key Signals
+[List 2-4 specific phrases or clues from the email that indicate this intent]
+
+## Sentiment Analysis
+[Positive / Neutral / Negative — brief explanation]
+
+## Urgency Level
+[High (respond within 2h) / Medium (respond today) / Low (respond within 2-3 days)]
+
+## Recommended Next Action
+[Specific, actionable advice on how to respond — e.g., "Send a detailed quotation with FOB pricing and MOQ options"]
+
+## Suggested Response Template
+[One short paragraph template for the reply, 30-50 words, in English]
+
+Requirements:
+1. Be specific about intent, not vague
+2. Base analysis only on what's written in the email
+3. Output in English with Chinese intent label
+4. Plain text with section headers only."""
+    return prompt, system

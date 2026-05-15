@@ -118,3 +118,107 @@ def update_customer_stage(company: str, contact: str, new_stage: str) -> bool:
             _persist_customers()
             return True
     return False
+
+
+
+# ---------------------------------------------------------------------------
+# Customer scoring & tagging helpers
+# ---------------------------------------------------------------------------
+
+# Stage weights for automatic score calculation
+_STAGE_SCORES: dict[str, int] = {
+    "新客户": 10,
+    "待开发": 10,
+    "已发信": 20,
+    "已联系": 25,
+    "已询盘": 40,
+    "已报价": 55,
+    "已发样": 65,
+    "谈判中": 75,
+    "已下单": 90,
+    "长期合作": 95,
+    "长期客户": 95,
+}
+
+PREDEFINED_TAGS: list[str] = [
+    "VIP", "高潜力", "价格敏感", "快速决策", "需要跟进",
+    "样品请求", "大订单", "季节性", "竞争激烈", "推荐客户",
+]
+
+
+def compute_customer_score(customer: dict) -> int:
+    """
+    Compute a 0-100 engagement score for a customer.
+
+    Based on:
+    - Stage weight (primary, 0-60 pts)
+    - Recency of last contact (0-25 pts)
+    - Data completeness (0-15 pts)
+    """
+    import datetime
+
+    stage = customer.get("stage", "新客户")
+    stage_score = min(_STAGE_SCORES.get(stage, 10), 60)
+
+    # Recency score (25 pts max)
+    recency_score = 0
+    last_contact = customer.get("last_contact", "")
+    if last_contact:
+        try:
+            days = (datetime.date.today() - datetime.date.fromisoformat(last_contact)).days
+            if days <= 7:
+                recency_score = 25
+            elif days <= 30:
+                recency_score = 18
+            elif days <= 90:
+                recency_score = 10
+            else:
+                recency_score = 3
+        except (ValueError, TypeError):
+            pass
+
+    # Completeness score (15 pts max)
+    complete_score = 0
+    if customer.get("email"):
+        complete_score += 5
+    if customer.get("phone") or customer.get("contact"):
+        complete_score += 5
+    if customer.get("product") or customer.get("notes"):
+        complete_score += 5
+
+    return min(stage_score + recency_score + complete_score, 100)
+
+
+def get_customer_tags(index: int) -> list[str]:
+    """Return the tags list for a customer by index."""
+    customers = _get_customers()
+    if 0 <= index < len(customers):
+        return customers[index].get("tags", [])
+    return []
+
+
+def add_tag(index: int, tag: str) -> None:
+    """Add a tag to a customer (no duplicates)."""
+    customers = _get_customers()
+    if 0 <= index < len(customers):
+        tags = customers[index].get("tags", [])
+        if tag not in tags:
+            tags.append(tag)
+            customers[index]["tags"] = tags
+            _persist_customers()
+
+
+def remove_tag(index: int, tag: str) -> None:
+    """Remove a tag from a customer."""
+    customers = _get_customers()
+    if 0 <= index < len(customers):
+        tags = customers[index].get("tags", [])
+        if tag in tags:
+            tags.remove(tag)
+            customers[index]["tags"] = tags
+            _persist_customers()
+
+
+def get_customers_by_tag(tag: str) -> list[dict]:
+    """Return all customers that have the given tag."""
+    return [c for c in _get_customers() if tag in c.get("tags", [])]

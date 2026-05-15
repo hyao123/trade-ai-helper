@@ -5,7 +5,9 @@ pages/10_📅_跟进日历.py
 import streamlit as st
 
 from utils.customers import find_customer, update_customer_stage
+from utils.email_service import is_email_configured
 from utils.ui_helpers import check_auth, inject_css
+from utils.user_auth import get_current_user
 from utils.workflow import (
     FOLLOWUP_RULES,
     add_workflow,
@@ -13,6 +15,7 @@ from utils.workflow import (
     get_due_workflows,
     get_workflow_stats,
     mark_followup_done,
+    send_due_reminders,
     update_workflow_status,
 )
 
@@ -27,6 +30,25 @@ st.markdown("""
     <p class="hero-subtitle">记录已发邮件，智能提醒跟进节点，不再漏掉任何商机</p>
 </div>
 """, unsafe_allow_html=True)
+
+# ── 邮件提醒发送 ──────────────────────────────────────
+current_user = get_current_user()
+if current_user and current_user.get("email") and is_email_configured():
+    user_email = current_user["email"]
+    due_count = len(get_due_workflows())
+    if due_count > 0:
+        st.info(
+            f"📨 你有 **{due_count}** 个跟进任务到期，可以发送邮件提醒到 `{user_email}`",
+        )
+        if st.button("📨 发送邮件提醒到我的邮箱", use_container_width=True, key="send_reminders"):
+            with st.spinner("正在发送提醒邮件..."):
+                sent, failed = send_due_reminders(user_email)
+            if sent > 0:
+                st.success(f"✅ 成功发送 {sent} 封提醒邮件到 {user_email}")
+            if failed > 0:
+                st.warning(f"⚠️ {failed} 封发送失败")
+elif current_user and not current_user.get("email"):
+    st.caption("💡 在账户管理页设置邮箱后，可开启自动跟进提醒功能")
 
 # ── 统计数据 ──────────────────────────────────────────
 stats = get_workflow_stats()
