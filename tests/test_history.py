@@ -4,10 +4,10 @@ Unit tests for utils/history.py - generation history management.
 """
 from __future__ import annotations
 
-import sys
 import os
-import types
+import sys
 import tempfile
+import types
 from pathlib import Path
 from unittest.mock import patch
 
@@ -126,7 +126,11 @@ class TestHistory:
             tmp_dir = Path(tmp_str)
             with patch("utils.history.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.history import add_to_history, clear_history, get_history_count
+                from utils.history import (
+                    add_to_history,
+                    clear_history,
+                    get_history_count,
+                )
                 add_to_history("开发信", "A", "content")
                 add_to_history("开发信", "B", "content")
                 clear_history()
@@ -155,7 +159,12 @@ class TestHistory:
             tmp_dir = Path(tmp_str)
             with patch("utils.history.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.history import add_to_history, import_history, get_history, get_history_count
+                from utils.history import (
+                    add_to_history,
+                    get_history,
+                    get_history_count,
+                    import_history,
+                )
                 add_to_history("开发信", "Old", "old content")
                 new_data = [
                     {"feature": "询盘回复", "title": "New1", "content": "c1", "params": {}, "timestamp": "2024-01-01 12:00"},
@@ -192,8 +201,9 @@ class TestHistory:
             tmp_dir = Path(tmp_str)
             with patch("utils.history.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.history import add_to_history, get_history
                 import re
+
+                from utils.history import add_to_history, get_history
                 add_to_history("开发信", "TS Test", "content")
                 items = get_history()
                 ts = items[0]["timestamp"]

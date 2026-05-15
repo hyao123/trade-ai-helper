@@ -8,11 +8,11 @@ Functions return (success: bool, message: str) tuples and handle errors graceful
 from __future__ import annotations
 
 import smtplib
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
-from utils.secrets import get_secret
 from utils.logger import get_logger
+from utils.secrets import get_secret
 
 logger = get_logger("email_service")
 

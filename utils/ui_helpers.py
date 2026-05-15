@@ -14,13 +14,19 @@ import hmac
 import html
 import json
 import re
-import time
 import types
 
 import streamlit as st
-from config.i18n import t, LANGUAGES
+
+from config.i18n import LANGUAGES, t
 from utils.secrets import get_secret
-from utils.user_auth import authenticate_user, register_user, get_current_user, request_password_reset, reset_password
+from utils.user_auth import (
+    authenticate_user,
+    get_current_user,
+    register_user,
+    request_password_reset,
+    reset_password,
+)
 
 # ---------------------------------------------------------------------------
 # 全局 CSS
@@ -140,7 +146,11 @@ def _get_session_user_id() -> str:
 
 def show_sidebar_info() -> None:
     """在侧栏显示用户信息、剩余 API 调用次数和重置倒计时。"""
-    from utils.ai_client import get_rate_limit_remaining, get_rate_limit_reset_seconds, RATE_LIMIT_MAX_CALLS
+    from utils.ai_client import (
+        RATE_LIMIT_MAX_CALLS,
+        get_rate_limit_remaining,
+        get_rate_limit_reset_seconds,
+    )
 
     uid = _get_session_user_id()
 
@@ -190,7 +200,7 @@ def show_sidebar_info() -> None:
 
         # Tier-based usage display for logged-in non-admin users
         if current_user and current_user.get("username") not in (None, "admin"):
-            from utils.pricing import get_daily_usage, TIER_CONFIG
+            from utils.pricing import TIER_CONFIG, get_daily_usage
             username = current_user["username"]
             tier = current_user.get("tier", "free")
             config = TIER_CONFIG.get(tier, TIER_CONFIG["free"])

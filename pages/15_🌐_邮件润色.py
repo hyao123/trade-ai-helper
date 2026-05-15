@@ -3,8 +3,15 @@ pages/15_🌐_邮件润色.py
 邮件翻译+润色：将邮件翻译成目标语言并/或润色优化，对比展示原文和改进版。
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id, show_regenerate_buttons, copy_button
+
 from utils.ai_client import generate_email_polish
+from utils.ui_helpers import (
+    check_auth,
+    get_user_id,
+    inject_css,
+    show_regenerate_buttons,
+    show_result,
+)
 
 st.set_page_config(page_title="邮件润色 | 外贸AI助手", page_icon="🌐", layout="wide")
 inject_css()

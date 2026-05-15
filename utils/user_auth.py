@@ -15,8 +15,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from utils.storage import get_data_dir, load_json, save_json
 from utils.logger import get_logger
+from utils.storage import get_data_dir, load_json, save_json
 
 logger = get_logger("user_auth")
 

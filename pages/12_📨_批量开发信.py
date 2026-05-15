@@ -6,9 +6,15 @@ import csv
 import io
 
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id, copy_button
+
 from utils.ai_client import generate_bulk_email
 from utils.history import add_to_history
+from utils.ui_helpers import (
+    check_auth,
+    copy_button,
+    get_user_id,
+    inject_css,
+)
 
 st.set_page_config(page_title="批量开发信 | 外贸AI助手", page_icon="📨", layout="wide")
 inject_css()

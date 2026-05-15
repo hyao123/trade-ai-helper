@@ -3,9 +3,10 @@ pages/9_📋_历史记录.py
 查看所有 AI 生成的历史记录，支持筛选、搜索、复用。
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, copy_button
-from utils.history import get_history, clear_history, get_history_count
+
+from utils.history import clear_history, get_history, get_history_count
 from utils.pricing import check_feature_access
+from utils.ui_helpers import check_auth, copy_button, inject_css
 from utils.user_auth import get_current_user
 
 st.set_page_config(page_title="历史记录 | 外贸AI助手", page_icon="📋", layout="wide")
@@ -111,12 +112,11 @@ else:
     st.caption("导出所有数据为 JSON 文件，可用于备份或迁移。导入会覆盖当前数据。")
 
     import json as _json
-    from utils.history import _get_history
-    from utils.templates import _get_store
+
     from utils.customers import import_customers
+    from utils.history import _get_history, import_history
+    from utils.templates import _get_store, import_templates
     from utils.workflow import import_workflows
-    from utils.history import import_history
-    from utils.templates import import_templates
 
     # 收集所有可导出数据
     export_data = {

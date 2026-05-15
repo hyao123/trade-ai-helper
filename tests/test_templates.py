@@ -4,10 +4,10 @@ Unit tests for utils/templates.py - template save/load/delete system.
 """
 from __future__ import annotations
 
-import sys
 import os
-import types
+import sys
 import tempfile
+import types
 from pathlib import Path
 from unittest.mock import patch
 
@@ -34,7 +34,7 @@ class TestTemplates:
             tmp_dir = Path(tmp_str)
             with patch("utils.templates.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.templates import save_template, load_templates
+                from utils.templates import load_templates, save_template
                 save_template("email", "Welcome", {"subject": "Hi", "body": "Hello"})
                 templates = load_templates("email")
                 assert len(templates) == 1
@@ -45,7 +45,7 @@ class TestTemplates:
             tmp_dir = Path(tmp_str)
             with patch("utils.templates.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.templates import save_template, load_templates
+                from utils.templates import load_templates, save_template
                 save_template("email", "Welcome", {"subject": "Hi"})
                 templates = load_templates("email")
                 t = templates[0]
@@ -59,7 +59,7 @@ class TestTemplates:
             tmp_dir = Path(tmp_str)
             with patch("utils.templates.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.templates import save_template, load_templates
+                from utils.templates import load_templates, save_template
                 save_template("email", "Welcome", {"subject": "Old"})
                 save_template("email", "Welcome", {"subject": "New"})
                 templates = load_templates("email")
@@ -72,7 +72,7 @@ class TestTemplates:
             tmp_dir = Path(tmp_str)
             with patch("utils.templates.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.templates import save_template, load_templates
+                from utils.templates import load_templates, save_template
                 save_template("email", "T1", {"a": 1})
                 save_template("email", "T2", {"b": 2})
                 templates = load_templates("email")
@@ -97,7 +97,11 @@ class TestTemplates:
             tmp_dir = Path(tmp_str)
             with patch("utils.templates.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.templates import save_template, delete_template, load_templates
+                from utils.templates import (
+                    delete_template,
+                    load_templates,
+                    save_template,
+                )
                 save_template("email", "Keep", {"a": 1})
                 save_template("email", "Remove", {"b": 2})
                 delete_template("email", "Remove")
@@ -111,7 +115,11 @@ class TestTemplates:
             tmp_dir = Path(tmp_str)
             with patch("utils.templates.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.templates import save_template, delete_template, load_templates
+                from utils.templates import (
+                    delete_template,
+                    load_templates,
+                    save_template,
+                )
                 save_template("email", "Keep", {"a": 1})
                 # Should not raise
                 delete_template("email", "DoesNotExist")
@@ -124,7 +132,7 @@ class TestTemplates:
             tmp_dir = Path(tmp_str)
             with patch("utils.templates.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.templates import save_template, get_template_names
+                from utils.templates import get_template_names, save_template
                 save_template("email", "Alpha", {"a": 1})
                 save_template("email", "Beta", {"b": 2})
                 names = get_template_names("email")
@@ -138,7 +146,7 @@ class TestTemplates:
             tmp_dir = Path(tmp_str)
             with patch("utils.templates.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.templates import save_template, get_template_data
+                from utils.templates import get_template_data, save_template
                 save_template("email", "MyTemplate", {"subject": "Hello", "body": "World"})
                 data = get_template_data("email", "MyTemplate")
                 assert data == {"subject": "Hello", "body": "World"}
@@ -159,7 +167,11 @@ class TestTemplates:
             tmp_dir = Path(tmp_str)
             with patch("utils.templates.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.templates import save_template, import_templates, load_templates
+                from utils.templates import (
+                    import_templates,
+                    load_templates,
+                    save_template,
+                )
                 save_template("email", "Old", {"x": 1})
                 new_data = {
                     "inquiry": [
@@ -185,7 +197,11 @@ class TestTemplates:
             tmp_dir = Path(tmp_str)
             with patch("utils.templates.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.templates import save_template, load_templates, delete_template
+                from utils.templates import (
+                    delete_template,
+                    load_templates,
+                    save_template,
+                )
                 save_template("email", "E1", {"a": 1})
                 save_template("inquiry", "I1", {"b": 2})
                 save_template("listing", "L1", {"c": 3})

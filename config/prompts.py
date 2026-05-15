@@ -123,7 +123,7 @@ def build_product_intro_prompt(
     product = sanitize_prompt_param(product, "product")
     features = sanitize_prompt_param(features, "features")
     target = sanitize_prompt_param(target, "target")
-    langs = [LANG_MAP.get(l, l) for l in languages]
+    langs = [LANG_MAP.get(lang, lang) for lang in languages]
     lang_str = ", ".join(langs)
     system = "你是一位专业的外贸文案撰写师，擅长为B2B产品撰写多语言推广文案。"
     prompt = f"""请为以下产品撰写 {lang_str} 的产品介绍文案：
@@ -580,287 +580,155 @@ Requirements:
 5. Output in English, plain text only, no markdown symbols."""
     return prompt, system
 
-
 # ---------------------------------------------------------------------------
-# 批量开发信（Bulk Cold Email）
+# 智能报价（Smart Quotation - AI-powered pricing suggestions）
 # ---------------------------------------------------------------------------
-def build_bulk_email_prompt(
-    company: str,
-    contact_name: str,
+def build_smart_quote_prompt(
     product: str,
-    industry: str = "",
-    country: str = "",
+    target_market: str,
+    order_quantity: int,
+    production_cost: str = "",
+    competitor_info: str = "",
+    trade_term: str = "FOB",
 ) -> tuple[str, str | None]:
-    """构建批量开发信 Prompt，适合批量个性化发送场景。"""
-    company = sanitize_prompt_param(company, "company")
-    contact_name = sanitize_prompt_param(contact_name, "contact_name")
+    """构建智能报价 Prompt，基于市场/数量/成本给出定价建议。"""
     product = sanitize_prompt_param(product, "product")
-    industry = sanitize_prompt_param(industry, "industry")
-    country = sanitize_prompt_param(country, "country")
-    industry_info = f"\n行业: {industry}" if industry else ""
-    country_info = f"\n国家/地区: {country}" if country else ""
-    system = "你是一位有10年经验的外贸业务开发专家，擅长撰写高回复率的个性化批量开发信。"
-    prompt = f"""Please generate a personalized cold email for bulk outreach with the following details:
+    target_market = sanitize_prompt_param(target_market, "target_market")
+    production_cost = sanitize_prompt_param(production_cost, "production_cost")
+    competitor_info = sanitize_prompt_param(competitor_info, "competitor_info")
+    trade_term = sanitize_prompt_param(trade_term, "trade_term")
 
-Company: {company}
-Contact Name: {contact_name}
-Product: {product}{industry_info}{country_info}
+    cost_info = f"\nProduction/Procurement Cost: {production_cost}" if production_cost else ""
+    competitor_section = f"\nCompetitor Reference: {competitor_info}" if competitor_info else ""
 
-Output format (strictly follow this format):
-Subject: [Email subject line, under 60 characters, highlight core value proposition]
+    system = (
+        "你是一位有20年经验的外贸定价策略专家，精通国际市场定价、"
+        "成本核算和竞争分析。你帮助外贸企业制定科学的报价策略。"
+    )
+    prompt = f"""Please provide a comprehensive pricing strategy and quotation recommendation:
 
-Dear {contact_name},
-
-[Email body, 50-80 words, concise and professional]
-- Open with a personalized reference to their company/industry
-- Briefly introduce your product and 1-2 key advantages
-- Include a clear Call to Action (schedule a call, request samples, etc.)
-
-[Your Name]
-[Your Company]
-
-Requirements:
-1. Subject line must be compelling and personalized
-2. Opening must reference the recipient's company or industry specifically
-3. Keep it short and scannable (suitable for bulk sending)
-4. Professional but warm tone
-5. Output in English, plain text only, no markdown symbols."""
-    return prompt, system
-
-
-# ---------------------------------------------------------------------------
-# 谈判话术（Negotiation Scripts）
-# ---------------------------------------------------------------------------
-NEGOTIATION_SCENARIOS: dict[str, str] = {
-    "客户砍价": "Customer is asking for a lower price / price negotiation",
-    "要求延长账期": "Customer requests extended payment terms",
-    "要求降低MOQ": "Customer wants to reduce minimum order quantity",
-    "催货": "Customer is pressing for faster delivery / urgent shipment",
-    "要求免费样品": "Customer requests free samples",
-    "竞争对手比价": "Customer comparing prices with competitors",
-}
-
-
-def build_negotiation_prompt(
-    scenario: str,
-    product: str,
-    current_offer: str,
-    bottom_line: str,
-) -> tuple[str, str | None]:
-    """构建谈判话术 Prompt。"""
-    scenario = sanitize_prompt_param(scenario, "scenario")
-    product = sanitize_prompt_param(product, "product")
-    current_offer = sanitize_prompt_param(current_offer, "current_offer")
-    bottom_line = sanitize_prompt_param(bottom_line, "bottom_line")
-    scenario_desc = NEGOTIATION_SCENARIOS.get(scenario, scenario)
-    system = "你是一位有15年经验的外贸谈判专家，精通国际贸易谈判策略和话术技巧。"
-    prompt = f"""Please generate a negotiation response script for the following scenario:
-
-Scenario: {scenario_desc}
 Product: {product}
-Current Offer: {current_offer}
-Bottom Line: {bottom_line}
+Target Market: {target_market}
+Order Quantity: {order_quantity} units
+Trade Term: {trade_term}{cost_info}{competitor_section}
 
 Please output in the following format:
 
-## Opening Response
-[Professional opening response to the customer's request, 2-3 sentences, acknowledge their concern while maintaining your position]
+## Recommended Price Range
+[Provide a specific price range in USD, with low/mid/high tiers]
+- Economy Price: $X.XX (high volume, thin margin)
+- Standard Price: $X.XX (balanced, recommended)
+- Premium Price: $X.XX (value-added, brand positioning)
 
-## Counter-Offer Suggestion
-[Specific counter-offer with reasoning, show flexibility while protecting margins, include numbers/terms where applicable]
+## Pricing Strategy Analysis
+[2-3 paragraphs analyzing:]
+- Market positioning for the target market
+- Volume-based pricing tiers (MOQ discounts)
+- Competitive considerations
 
-## Backup Plan
-[Alternative solution if counter-offer is rejected, creative options like volume discounts, bundling, adjusted terms]
+## Cost Breakdown Suggestion
+[Itemized cost structure:]
+- Material/Product cost: XX%
+- Labor/Processing: XX%
+- Packaging: XX%
+- Logistics ({trade_term}): XX%
+- Profit margin: XX%
 
-## Key Phrases
-[5-8 useful English phrases for this negotiation scenario, each on a new line with brief context]
+## Volume Discount Schedule
+[Table format:]
+- 100-499 units: Base price
+- 500-999 units: X% discount
+- 1000-4999 units: X% discount
+- 5000+ units: X% discount
+
+## Key Recommendations
+[3-5 bullet points with actionable pricing advice for this specific product/market]
 
 Requirements:
-1. All content in English
-2. Professional and diplomatic tone
-3. Protect seller's interests while maintaining relationship
-4. Include specific tactics relevant to the scenario
-5. Output plain text only, no markdown symbols except section headers."""
+1. All prices in USD
+2. Be specific with numbers, not vague ranges
+3. Consider the target market's purchasing power
+4. Factor in trade term costs
+5. Output in English, plain text with section headers only."""
     return prompt, system
 
 
 # ---------------------------------------------------------------------------
-# 节日祝福（Holiday Greetings）
+# A/B 测试变体生成（Generate email variants for A/B testing）
 # ---------------------------------------------------------------------------
-HOLIDAYS: list[str] = [
-    "Christmas",
-    "New Year",
-    "Eid",
-    "Diwali",
-    "Chinese New Year",
-    "Thanksgiving",
-    "Easter",
-    "Ramadan",
-]
-
-
-def build_holiday_greeting_prompt(
-    holiday: str,
-    customer_name: str,
-    company: str,
-    relationship_level: str,
-    product_mention: str = "",
+def build_ab_variant_prompt(
+    product: str,
+    customer_type: str,
+    num_variants: int = 3,
+    focus: str = "subject_line",
 ) -> tuple[str, str | None]:
-    """构建节日祝福 Prompt，支持不同节日和客户关系级别。"""
-    holiday = sanitize_prompt_param(holiday, "holiday")
-    customer_name = sanitize_prompt_param(customer_name, "customer_name")
-    company = sanitize_prompt_param(company, "company")
-    relationship_level = sanitize_prompt_param(relationship_level, "relationship_level")
-    product_mention = sanitize_prompt_param(product_mention, "product_mention")
-    product_info = f"\n产品提及: {product_mention}" if product_mention else ""
-    system = "你是一位深谙国际商务礼仪的外贸业务专家，擅长撰写得体且有温度的节日祝福邮件。"
-    prompt = f"""Please generate a culturally appropriate holiday greeting email:
+    """构建 A/B 测试邮件变体生成 Prompt。"""
+    product = sanitize_prompt_param(product, "product")
+    customer_type = sanitize_prompt_param(customer_type, "customer_type")
+    focus = sanitize_prompt_param(focus, "focus")
 
-Holiday: {holiday}
-Customer Name: {customer_name}
-Your Company: {company}
-Relationship Level: {relationship_level}{product_info}
+    system = (
+        "你是一位精通邮件营销和转化率优化的外贸专家，"
+        "擅长设计 A/B 测试方案并撰写高转化率的邮件变体。"
+    )
 
-Relationship level guide:
-- 新客户: Formal, professional, brief greeting with hope for future cooperation
-- 老客户: Warm, appreciative, reference past cooperation and continued partnership
-- VIP: Personal, heartfelt, emphasize special relationship and exclusive appreciation
+    if focus == "subject_line":
+        prompt = f"""Generate {num_variants} different email subject line variants for A/B testing:
 
-Output format:
-Subject: [Holiday greeting subject line, warm and professional]
+Product: {product}
+Target Customer Type: {customer_type}
 
-Dear {customer_name},
+For each variant, provide:
+1. A unique subject line (under 60 characters)
+2. The psychological trigger used (curiosity, urgency, value, social proof, etc.)
+3. Expected effectiveness rating (1-10)
 
-[Greeting body, 60-100 words]
-- Culturally appropriate holiday wishes
-- Tone matching the relationship level
-- Brief mention of business appreciation (subtle, not salesy)
-- Well wishes for the coming period
+Output format (repeat for each variant):
 
-Warm regards,
-[Your Name]
-[Your Company]
+### Variant [A/B/C...]
+Subject: [subject line text]
+Trigger: [psychological trigger]
+Rating: [X/10]
+Rationale: [1 sentence explaining why this might work]
 
-Requirements:
-1. Be culturally sensitive and appropriate for the specific holiday
-2. Match tone to relationship level
-3. Keep it genuine, not overly promotional
-4. Output in English, plain text only, no markdown symbols."""
-    return prompt, system
-
-
-# ---------------------------------------------------------------------------
-# 邮件润色/翻译（Email Polish & Translation）
-# ---------------------------------------------------------------------------
-def build_email_polish_prompt(
-    content: str,
-    source_lang: str,
-    target_lang: str,
-    mode: str,
-) -> tuple[str, str | None]:
-    """构建邮件润色/翻译 Prompt。mode: 翻译/润色/翻译+润色。"""
-    content = sanitize_input(content, max_length=3000)
-    source_lang = sanitize_prompt_param(source_lang, "source_lang")
-    target_lang = sanitize_prompt_param(target_lang, "target_lang")
-    mode = sanitize_prompt_param(mode, "mode")
-    system = "你是一位精通多语言商务写作的外贸邮件专家，擅长邮件翻译和润色优化。"
-
-    if mode == "翻译":
-        task_desc = f"Translate the following email from {source_lang} to {target_lang}. Keep the meaning and tone intact."
-        requirements = f"""Requirements:
-1. Accurate translation from {source_lang} to {target_lang}
-2. Maintain the original tone and intent
-3. Use natural, professional {target_lang} expressions
-4. Keep formatting and structure consistent
-5. Output the translated text only, plain text, no markdown symbols."""
-    elif mode == "润色":
-        task_desc = f"Polish and improve the following email in {source_lang}. Make it more professional, clear, and impactful."
-        requirements = f"""Requirements:
-1. Improve grammar, word choice, and sentence structure
-2. Maintain the original meaning and intent
-3. Make it sound more professional and polished
-4. Keep the same language ({source_lang})
-5. Output the polished text only, plain text, no markdown symbols."""
-    else:  # 翻译+润色
-        task_desc = f"Translate the following email from {source_lang} to {target_lang}, then polish it to be more professional and impactful."
-        requirements = f"""Requirements:
-1. First translate accurately from {source_lang} to {target_lang}
-2. Then polish the translation for professional quality
-3. Improve word choice and sentence flow in {target_lang}
-4. Make it sound natural and compelling to native speakers
-5. Output the final polished translation only, plain text, no markdown symbols."""
-
-    prompt = f"""{task_desc}
-
-Original email content:
----
-{content}
 ---
 
-{requirements}"""
-    return prompt, system
+Requirements:
+1. Each variant must use a DIFFERENT approach/angle
+2. All subject lines in English
+3. Keep under 60 characters each
+4. Make them distinctly different to test meaningful hypotheses
+5. Output plain text only."""
+    else:
+        prompt = f"""Generate {num_variants} different cold email body variants for A/B testing:
 
+Product: {product}
+Target Customer Type: {customer_type}
 
-# ---------------------------------------------------------------------------
-# 客诉回复（Complaint Response）
-# ---------------------------------------------------------------------------
-COMPLAINT_TYPES: list[str] = [
-    "质量问题",
-    "交期延误",
-    "数量短缺",
-    "包装破损",
-    "规格不符",
-]
+For each variant, provide a complete email body (50-80 words) with a different:
+- Tone (professional/friendly/urgent)
+- Opening hook
+- Value proposition angle
+- Call to action
 
-COMPLAINT_SEVERITIES: list[str] = ["轻微", "中等", "严重"]
+Output format (repeat for each variant):
 
-COMPLAINT_RELATIONSHIPS: list[str] = ["新客户", "老客户", "大客户"]
+### Variant [A/B/C...]
+Subject: [matching subject line]
 
-COMPLAINT_SOLUTIONS: list[str] = ["换货", "补发", "折扣补偿", "退款"]
+[Email body text]
 
+Style: [tone description]
+Hook: [opening strategy]
+CTA: [call to action type]
 
-def build_complaint_response_prompt(
-    complaint_type: str,
-    severity: str,
-    relationship: str,
-    proposed_solution: str,
-    customer_complaint: str = "",
-) -> tuple[str, str | None]:
-    """构建客诉回复 Prompt。"""
-    complaint_type = sanitize_prompt_param(complaint_type, "complaint_type")
-    severity = sanitize_prompt_param(severity, "severity")
-    relationship = sanitize_prompt_param(relationship, "relationship")
-    proposed_solution = sanitize_prompt_param(proposed_solution, "proposed_solution")
-    customer_complaint = sanitize_input(customer_complaint, max_length=2000)
-    complaint_detail = f"\n客户原文: {customer_complaint}" if customer_complaint else ""
-    system = "你是一位有丰富经验的外贸客服经理，擅长处理国际贸易客诉并维护客户关系。"
-    prompt = f"""Please generate a professional complaint response email:
-
-Complaint Type: {complaint_type}
-Severity: {severity}
-Customer Relationship: {relationship}
-Proposed Solution: {proposed_solution}{complaint_detail}
-
-Please output in the following format:
-
-Subject: [Professional subject line acknowledging the issue]
-
-Dear [Customer],
-
-[Response body, 100-150 words, structured as follows:]
-
-1. Acknowledgment: Sincerely acknowledge the issue and apologize
-2. Solution: Clearly state the proposed solution ({proposed_solution}) with timeline
-3. Prevention: Briefly explain steps to prevent recurrence
-4. Closing: Reaffirm commitment to quality and partnership
-
-[Your Name]
-[Your Company]
+---
 
 Requirements:
-1. Tone should match severity (more apologetic for severe issues)
-2. Adjust formality based on relationship level
-3. Be specific about the solution and next steps
-4. Show empathy without admitting excessive liability
-5. Output in English, plain text only, no markdown symbols."""
+1. Each variant must be distinctly different in approach
+2. All content in English
+3. 50-80 words per email body
+4. Include subject line for each
+5. Output plain text only."""
+
     return prompt, system

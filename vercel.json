@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "builds": [],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/",
+      "status": 308,
+      "headers": {
+        "Location": "https://trade-ai-helper.streamlit.app"
+      }
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "destination": "https://trade-ai-helper.streamlit.app",
+      "permanent": true
+    }
+  ]
+}

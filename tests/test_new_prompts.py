@@ -6,23 +6,21 @@ from __future__ import annotations
 
 import csv
 import io
-import sys
 import os
+import sys
 
 # Add project root to path so imports work
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config.prompts import (
-    build_bulk_email_prompt,
-    build_negotiation_prompt,
-    build_holiday_greeting_prompt,
-    build_email_polish_prompt,
-    build_complaint_response_prompt,
-    NEGOTIATION_SCENARIOS,
-    HOLIDAYS,
     COMPLAINT_TYPES,
-    COMPLAINT_SEVERITIES,
-    COMPLAINT_SOLUTIONS,
+    HOLIDAYS,
+    NEGOTIATION_SCENARIOS,
+    build_bulk_email_prompt,
+    build_complaint_response_prompt,
+    build_email_polish_prompt,
+    build_holiday_greeting_prompt,
+    build_negotiation_prompt,
 )
 
 

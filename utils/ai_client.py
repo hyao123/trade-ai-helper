@@ -15,21 +15,26 @@ NVIDIA NIM API 文档：https://docs.api.nvidia.com/nim/docs/api-quickstart
 
 from __future__ import annotations
 
-import os
 import time
 from collections import defaultdict
 from typing import Generator
 
-from openai import OpenAI, AuthenticationError, RateLimitError, APIStatusError, APITimeoutError
+from openai import (
+    APIStatusError,
+    APITimeoutError,
+    AuthenticationError,
+    OpenAI,
+    RateLimitError,
+)
 
 from config.prompts import (
     build_email_prompt,
+    build_followup_prompt,
     build_inquiry_prompt,
     build_product_intro_prompt,
-    build_followup_prompt,
 )
-from utils.secrets import get_secret
 from utils.logger import get_logger
+from utils.secrets import get_secret
 
 logger = get_logger("ai_client")
 
@@ -393,69 +398,32 @@ def generate_complaint_response(
     return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
 
 
-def generate_bulk_email(
-    company: str,
-    contact_name: str,
+def generate_smart_quote(
     product: str,
-    industry: str = "",
-    country: str = "",
+    target_market: str,
+    order_quantity: int,
+    production_cost: str = "",
+    competitor_info: str = "",
+    trade_term: str = "FOB",
     stream: bool = False,
     user_id: str = "default",
 ) -> str | Generator[str, None, None]:
-    from config.prompts import build_bulk_email_prompt
-    prompt, system = build_bulk_email_prompt(company, contact_name, product, industry, country)
+    from config.prompts import build_smart_quote_prompt
+    prompt, system = build_smart_quote_prompt(
+        product, target_market, order_quantity,
+        production_cost, competitor_info, trade_term,
+    )
     return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
 
 
-def generate_negotiation(
-    scenario: str,
+def generate_ab_variants(
     product: str,
-    current_offer: str,
-    bottom_line: str,
+    customer_type: str,
+    num_variants: int = 3,
+    focus: str = "subject_line",
     stream: bool = False,
     user_id: str = "default",
 ) -> str | Generator[str, None, None]:
-    from config.prompts import build_negotiation_prompt
-    prompt, system = build_negotiation_prompt(scenario, product, current_offer, bottom_line)
-    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
-
-def generate_holiday_greeting(
-    holiday: str,
-    customer_name: str,
-    company: str,
-    relationship_level: str,
-    product_mention: str = "",
-    stream: bool = False,
-    user_id: str = "default",
-) -> str | Generator[str, None, None]:
-    from config.prompts import build_holiday_greeting_prompt
-    prompt, system = build_holiday_greeting_prompt(holiday, customer_name, company, relationship_level, product_mention)
-    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
-
-def generate_email_polish(
-    content: str,
-    source_lang: str,
-    target_lang: str,
-    mode: str,
-    stream: bool = False,
-    user_id: str = "default",
-) -> str | Generator[str, None, None]:
-    from config.prompts import build_email_polish_prompt
-    prompt, system = build_email_polish_prompt(content, source_lang, target_lang, mode)
-    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
-
-def generate_complaint_response(
-    complaint_type: str,
-    severity: str,
-    relationship: str,
-    proposed_solution: str,
-    customer_complaint: str = "",
-    stream: bool = False,
-    user_id: str = "default",
-) -> str | Generator[str, None, None]:
-    from config.prompts import build_complaint_response_prompt
-    prompt, system = build_complaint_response_prompt(complaint_type, severity, relationship, proposed_solution, customer_complaint)
+    from config.prompts import build_ab_variant_prompt
+    prompt, system = build_ab_variant_prompt(product, customer_type, num_variants, focus)
     return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)

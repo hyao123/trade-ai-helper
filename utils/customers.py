@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from utils.storage import load_json, save_json, load_user_json, save_user_json
+from utils.storage import load_json, load_user_json, save_json, save_user_json
 
 _FILENAME = "customers.json"
 
