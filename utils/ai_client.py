@@ -263,7 +263,11 @@ def generate_email(
     stream: bool = False,
     user_id: str = "default",
 ) -> str | Generator[str, None, None]:
+    from utils.user_prefs import get_ai_style_suffix
     prompt, system = build_email_prompt(product, customer, features, tone, language)
+    suffix = get_ai_style_suffix()
+    if suffix:
+        prompt = prompt + suffix
     return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
 
 
@@ -275,7 +279,11 @@ def reply_inquiry(
     stream: bool = False,
     user_id: str = "default",
 ) -> str | Generator[str, None, None]:
+    from utils.user_prefs import get_ai_style_suffix
     prompt, system = build_inquiry_prompt(inquiry, customer_name, your_name, company_name)
+    suffix = get_ai_style_suffix()
+    if suffix:
+        prompt = prompt + suffix
     return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
 
 
