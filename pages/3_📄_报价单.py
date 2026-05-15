@@ -12,6 +12,7 @@ from utils.pdf_gen import generate_quote_pdf
 from utils.pricing import check_feature_access
 from utils.ui_helpers import check_auth, inject_css
 from utils.user_auth import get_current_user
+from utils.user_prefs import get_pref, save_seller_identity
 
 st.set_page_config(page_title="报价单 | 外贸AI助手", page_icon="📄", layout="wide")
 inject_css()
@@ -168,11 +169,11 @@ st.markdown("#### 🏢 公司信息")
 
 col_c1, col_c2 = st.columns(2)
 with col_c1:
-    company_name = st.text_input("公司名称", value=st.session_state.get("quote_company_saved", "Your Company Name"))
-    contact_name = st.text_input("联系人姓名", value=st.session_state.get("quote_contact_saved", "Your Name"))
+    company_name = st.text_input("公司名称", value=st.session_state.get("quote_company_saved", get_pref("company_name") or "Your Company Name"))
+    contact_name = st.text_input("联系人姓名", value=st.session_state.get("quote_contact_saved", get_pref("contact_name") or "Your Name"))
 with col_c2:
-    email = st.text_input("联系邮箱", value=st.session_state.get("quote_email_saved", "sales@yourcompany.com"))
-    phone = st.text_input("联系电话", value=st.session_state.get("quote_phone_saved", "+86-XXX-XXXXXXX"))
+    email = st.text_input("联系邮箱", value=st.session_state.get("quote_email_saved", get_pref("email") or "sales@yourcompany.com"))
+    phone = st.text_input("联系电话", value=st.session_state.get("quote_phone_saved", get_pref("phone") or "+86-XXX-XXXXXXX"))
 
 # --- 公司Logo（可选）---
 st.markdown("#### 🖼️ 公司Logo（可选）")
@@ -222,6 +223,8 @@ if generate_clicked:
         st.session_state["quote_contact_saved"] = contact_name
         st.session_state["quote_email_saved"]   = email
         st.session_state["quote_phone_saved"]   = phone
+        # Also persist to user prefs for future pages
+        save_seller_identity(company_name, contact_name, email, phone)
         st.session_state["quote_buyer_company"] = buyer_company
         st.session_state["quote_buyer_contact"] = buyer_contact
         st.session_state["quote_buyer_email"]   = buyer_email

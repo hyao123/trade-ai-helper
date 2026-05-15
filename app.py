@@ -33,7 +33,7 @@ st.markdown(f"""
 # ── Stats ─────────────────────────────────────────────────────────────────
 c1, c2, c3, c4, c5 = st.columns(5)
 for col, val, label in [
-    (c1, "23",     t("core_features")),
+    (c1, "25",     t("core_features")),
     (c2, "5+",     t("languages_support")),
     (c3, "⚡ 流式", t("realtime_output")),
     (c4, "Listing", "Amazon/Shopify"),
@@ -172,6 +172,21 @@ FEATURES = [
         "desc": "Free / Pro / Enterprise 套餐对比，Stripe 支付，即时解锁高级功能",
         "badge": "⭐ 升级",
         "page": "pages/23_💳_套餐升级.py",
+    },
+    # ── AI 质量提升功能 ──────────────────────────────────
+    {
+        "icon": "⚙️",
+        "title": "AI偏好设置",
+        "desc": "公司信息自动预填、AI 写作风格个性化、自定义附加指令和禁用词",
+        "badge": "🆕 一次设置",
+        "page": "pages/0_⚙️_AI偏好.py",
+    },
+    {
+        "icon": "🔁",
+        "title": "批量生成",
+        "desc": "同一产品一键生成多封风格各异的开发信，用于 A/B 测试或直接选优",
+        "badge": "🚀 效率工具",
+        "page": "pages/24_🔁_批量生成.py",
     },
 ]
 
