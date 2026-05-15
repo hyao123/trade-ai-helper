@@ -4,10 +4,10 @@ Unit tests for utils/workflow.py - email follow-up workflow management.
 """
 from __future__ import annotations
 
-import sys
 import os
-import types
+import sys
 import tempfile
+import types
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -102,7 +102,7 @@ class TestWorkflow:
             tmp_dir = Path(tmp_str)
             with patch("utils.workflow.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.workflow import get_all_workflows, get_due_workflows
+                from utils.workflow import get_due_workflows
                 # Manually insert a workflow with sent_ts 4 days ago
                 four_days_ago = datetime.now() - timedelta(days=4)
                 _mock_st.session_state["email_workflows"] = [{
@@ -153,7 +153,11 @@ class TestWorkflow:
             tmp_dir = Path(tmp_str)
             with patch("utils.workflow.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.workflow import add_workflow, get_all_workflows, mark_followup_done
+                from utils.workflow import (
+                    add_workflow,
+                    get_all_workflows,
+                    mark_followup_done,
+                )
                 add_workflow("John", "LED Lamp", "ABC")
                 wfs = get_all_workflows()
                 wf_id = wfs[0]["id"]
@@ -169,7 +173,11 @@ class TestWorkflow:
             tmp_dir = Path(tmp_str)
             with patch("utils.workflow.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.workflow import add_workflow, get_all_workflows, mark_followup_done
+                from utils.workflow import (
+                    add_workflow,
+                    get_all_workflows,
+                    mark_followup_done,
+                )
                 add_workflow("John", "LED Lamp", "ABC")
                 # Should not raise
                 mark_followup_done("nonexistent_id", "3天跟进")
@@ -182,7 +190,11 @@ class TestWorkflow:
             tmp_dir = Path(tmp_str)
             with patch("utils.workflow.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.workflow import add_workflow, get_all_workflows, update_workflow_status
+                from utils.workflow import (
+                    add_workflow,
+                    get_all_workflows,
+                    update_workflow_status,
+                )
                 add_workflow("John", "LED Lamp", "ABC")
                 wfs = get_all_workflows()
                 wf_id = wfs[0]["id"]
@@ -196,7 +208,12 @@ class TestWorkflow:
             tmp_dir = Path(tmp_str)
             with patch("utils.workflow.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.workflow import add_workflow, update_workflow_status, get_all_workflows, get_workflow_stats
+                from utils.workflow import (
+                    add_workflow,
+                    get_all_workflows,
+                    get_workflow_stats,
+                    update_workflow_status,
+                )
                 add_workflow("A", "P1", "C1")
                 add_workflow("B", "P2", "C2")
                 add_workflow("C", "P3", "C3")
@@ -236,7 +253,10 @@ class TestWorkflow:
             tmp_dir = Path(tmp_str)
             with patch("utils.workflow.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.workflow import create_workflow_from_customer, get_all_workflows
+                from utils.workflow import (
+                    create_workflow_from_customer,
+                    get_all_workflows,
+                )
                 customer_data = {
                     "company": "ABC Trading",
                     "contact": "John Smith",
@@ -255,7 +275,10 @@ class TestWorkflow:
             tmp_dir = Path(tmp_str)
             with patch("utils.workflow.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.workflow import create_workflow_from_customer, get_all_workflows
+                from utils.workflow import (
+                    create_workflow_from_customer,
+                    get_all_workflows,
+                )
                 customer_data = {
                     "company": "ABC Trading",
                     "contact": "John Smith",
@@ -273,7 +296,11 @@ class TestWorkflow:
             tmp_dir = Path(tmp_str)
             with patch("utils.workflow.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.workflow import add_workflow, import_workflows, get_all_workflows
+                from utils.workflow import (
+                    add_workflow,
+                    get_all_workflows,
+                    import_workflows,
+                )
                 add_workflow("Old", "OldProduct", "OldCo")
                 new_data = [
                     {

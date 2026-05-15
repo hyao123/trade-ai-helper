@@ -5,13 +5,14 @@ pages/20_📊_客户分析.py
 from __future__ import annotations
 
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth
-from utils.customers import get_customers
+
 from utils.analytics import (
-    generate_full_report,
-    STAGE_ORDER,
     STAGE_LABELS_EN,
+    STAGE_ORDER,
+    generate_full_report,
 )
+from utils.customers import get_customers
+from utils.ui_helpers import check_auth, inject_css
 
 st.set_page_config(page_title="客户分析 | 外贸AI助手", page_icon="📊", layout="wide")
 inject_css()

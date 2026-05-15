@@ -4,10 +4,10 @@ Unit tests for utils/user_auth.py - multi-user authentication system.
 """
 from __future__ import annotations
 
-import sys
 import os
-import types
+import sys
 import tempfile
+import types
 from pathlib import Path
 from unittest.mock import patch
 
@@ -39,7 +39,7 @@ class TestUserAuth:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import register_user, _load_users_db
+                from utils.user_auth import _load_users_db, register_user
                 success, msg = register_user("testuser", "pass1234")
                 assert success is True
                 assert "successful" in msg.lower()
@@ -68,7 +68,7 @@ class TestUserAuth:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import register_user, _load_users_db
+                from utils.user_auth import _load_users_db, register_user
                 register_user("emailuser", "pass1234", email="test@example.com")
                 users = _load_users_db()
                 assert users["emailuser"]["email"] == "test@example.com"
@@ -146,7 +146,7 @@ class TestUserAuth:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import register_user, authenticate_user
+                from utils.user_auth import authenticate_user, register_user
                 register_user("authuser", "mypassword")
                 success, user_info = authenticate_user("authuser", "mypassword")
                 assert success is True
@@ -161,7 +161,7 @@ class TestUserAuth:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import register_user, authenticate_user
+                from utils.user_auth import authenticate_user, register_user
                 register_user("authuser2", "correct")
                 success, user_info = authenticate_user("authuser2", "wrong")
                 assert success is False
@@ -184,7 +184,7 @@ class TestUserAuth:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import register_user, authenticate_user
+                from utils.user_auth import authenticate_user, register_user
                 register_user("CaseUser", "pass1234")
                 success, user_info = authenticate_user("caseuser", "pass1234")
                 assert success is True
@@ -195,7 +195,7 @@ class TestUserAuth:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import _hash_password, _verify_password
+                from utils.user_auth import _hash_password
                 h1 = _hash_password("testpassword", salt="abcdef0123456789")
                 h2 = _hash_password("testpassword", salt="abcdef0123456789")
                 assert h1 == h2
@@ -246,7 +246,11 @@ class TestUserAuth:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import register_user, change_password, authenticate_user
+                from utils.user_auth import (
+                    authenticate_user,
+                    change_password,
+                    register_user,
+                )
                 register_user("chguser", "oldpass1")
                 success, msg = change_password("chguser", "oldpass1", "newpass1")
                 assert success is True
@@ -264,7 +268,7 @@ class TestUserAuth:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import register_user, change_password
+                from utils.user_auth import change_password, register_user
                 register_user("chguser2", "realpass")
                 success, msg = change_password("chguser2", "wrongpass", "newpass1")
                 assert success is False
@@ -276,7 +280,7 @@ class TestUserAuth:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import register_user, change_password
+                from utils.user_auth import change_password, register_user
                 register_user("chguser3", "realpass")
                 success, msg = change_password("chguser3", "realpass", "ab")
                 assert success is False
@@ -322,7 +326,7 @@ class TestUserAuth:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import register_user, _load_users_db
+                from utils.user_auth import _load_users_db, register_user
                 register_user("verifyuser", "pass1234", email="test@example.com")
                 users = _load_users_db()
                 assert users["verifyuser"]["email_verified"] is False
@@ -335,7 +339,11 @@ class TestUserAuth:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import register_user, verify_email_token, _load_users_db
+                from utils.user_auth import (
+                    _load_users_db,
+                    register_user,
+                    verify_email_token,
+                )
                 register_user("tokenuser", "pass1234", email="t@example.com")
                 users = _load_users_db()
                 token_data = users["tokenuser"]["verification_token"]
@@ -377,7 +385,7 @@ class TestUserAuth:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import register_user, find_user_by_email
+                from utils.user_auth import find_user_by_email, register_user
                 register_user("emailfinder", "pass1234", email="finder@example.com")
                 result = find_user_by_email("finder@example.com")
                 assert result == "emailfinder"
@@ -398,7 +406,7 @@ class TestUserAuth:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import register_user, find_user_by_email
+                from utils.user_auth import find_user_by_email, register_user
                 register_user("casemail", "pass1234", email="CaseTest@Example.COM")
                 result = find_user_by_email("casetest@example.com")
                 assert result == "casemail"
@@ -409,7 +417,11 @@ class TestUserAuth:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import register_user, request_password_reset, _load_users_db
+                from utils.user_auth import (
+                    _load_users_db,
+                    register_user,
+                    request_password_reset,
+                )
                 register_user("resetuser", "pass1234", email="reset@example.com")
                 success, msg = request_password_reset("reset@example.com")
                 assert success is True
@@ -435,7 +447,13 @@ class TestUserAuth:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import register_user, request_password_reset, reset_password, authenticate_user, _load_users_db
+                from utils.user_auth import (
+                    _load_users_db,
+                    authenticate_user,
+                    register_user,
+                    request_password_reset,
+                    reset_password,
+                )
                 register_user("resetok", "oldpass1", email="resetok@example.com")
                 request_password_reset("resetok@example.com")
                 users = _load_users_db()
@@ -455,7 +473,11 @@ class TestUserAuth:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import register_user, request_password_reset, reset_password
+                from utils.user_auth import (
+                    register_user,
+                    request_password_reset,
+                    reset_password,
+                )
                 register_user("resetwrong", "pass1234", email="wrong@example.com")
                 request_password_reset("wrong@example.com")
                 success, msg = reset_password("resetwrong", "wrong-token-value", "newpass1")
@@ -467,8 +489,15 @@ class TestUserAuth:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import register_user, request_password_reset, reset_password, _load_users_db, _save_users_db
                 from datetime import datetime, timedelta, timezone
+
+                from utils.user_auth import (
+                    _load_users_db,
+                    _save_users_db,
+                    register_user,
+                    request_password_reset,
+                    reset_password,
+                )
                 register_user("resetexp", "pass1234", email="exp@example.com")
                 request_password_reset("exp@example.com")
                 # Manually set expired timestamp
@@ -487,7 +516,12 @@ class TestUserAuth:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.user_auth import register_user, request_password_reset, reset_password, _load_users_db
+                from utils.user_auth import (
+                    _load_users_db,
+                    register_user,
+                    request_password_reset,
+                    reset_password,
+                )
                 register_user("resetshort", "pass1234", email="short@example.com")
                 request_password_reset("short@example.com")
                 users = _load_users_db()

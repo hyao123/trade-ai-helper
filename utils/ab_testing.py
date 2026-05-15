@@ -13,15 +13,14 @@ Features:
 from __future__ import annotations
 
 import datetime
-import hashlib
 import random
 import uuid
 from dataclasses import dataclass, field
 
 import streamlit as st
 
-from utils.storage import load_user_json, save_user_json, load_json, save_json
 from utils.logger import get_logger
+from utils.storage import load_json, load_user_json, save_json, save_user_json
 
 logger = get_logger("ab_testing")
 
@@ -208,7 +207,6 @@ def simulate_results(test: ABTest, total_sends: int = 100) -> ABTest:
     """
     for variant in test.variants:
         # Base rates with some randomness
-        content_length = len(variant.content)
         subject_length = len(variant.subject_line)
 
         # Heuristic: shorter subjects tend to have higher open rates

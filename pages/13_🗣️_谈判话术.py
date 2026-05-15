@@ -3,8 +3,15 @@ pages/13_🗣️_谈判话术.py
 AI 生成谈判话术：针对不同场景生成开场白、还价建议、备选方案和关键话术。
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id, show_regenerate_buttons
+
 from utils.ai_client import generate_negotiation
+from utils.ui_helpers import (
+    check_auth,
+    get_user_id,
+    inject_css,
+    show_regenerate_buttons,
+    show_result,
+)
 
 st.set_page_config(page_title="谈判话术 | 外贸AI助手", page_icon="🗣️", layout="wide")
 inject_css()

@@ -4,11 +4,11 @@ Unit tests for utils/logger.py - logging configuration.
 """
 from __future__ import annotations
 
-import sys
-import os
-import types
 import logging
+import os
+import sys
 import tempfile
+import types
 from pathlib import Path
 from unittest.mock import patch
 
@@ -47,7 +47,6 @@ class TestLogger:
         _reset_logger()
         with tempfile.TemporaryDirectory() as tmp_str:
             tmp_dir = Path(tmp_str)
-            logs_dir = tmp_dir / "logs"
             # Patch the logger module so it creates logs/ inside our temp dir
             with patch("utils.logger.Path.resolve", return_value=tmp_dir / "utils" / "logger.py"):
                 # Simpler approach: just verify logs/ exists after calling

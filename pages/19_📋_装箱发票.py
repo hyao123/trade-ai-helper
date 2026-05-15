@@ -5,9 +5,14 @@ pages/19_📋_装箱发票.py
 from __future__ import annotations
 
 import uuid
+
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth
-from utils.packing_invoice_pdf import generate_packing_list_pdf, generate_commercial_invoice_pdf
+
+from utils.packing_invoice_pdf import (
+    generate_commercial_invoice_pdf,
+    generate_packing_list_pdf,
+)
+from utils.ui_helpers import check_auth, inject_css
 
 st.set_page_config(page_title="装箱发票 | 外贸AI助手", page_icon="📋", layout="wide")
 inject_css()

@@ -33,15 +33,18 @@ sys.modules.setdefault("streamlit", _st)
 # container_calc tests
 # ---------------------------------------------------------------------------
 from utils.container_calc import (
-    CartonSpec, calculate_loading, calculate_all_containers,
-    recommend_container, CONTAINER_SPECS,
+    CONTAINER_SPECS,
+    CartonSpec,
+    calculate_all_containers,
+    calculate_loading,
+    recommend_container,
 )
 
 
 class TestContainerCalc(unittest.TestCase):
 
-    def _make_carton(self, l=600, w=400, h=350, kg=15.0, qty=24):
-        return CartonSpec(length_mm=l, width_mm=w, height_mm=h,
+    def _make_carton(self, length=600, w=400, h=350, kg=15.0, qty=24):
+        return CartonSpec(length_mm=length, width_mm=w, height_mm=h,
                           gross_weight_kg=kg, quantity_per_carton=qty)
 
     def test_40hq_gives_most_cartons(self):
@@ -121,8 +124,11 @@ class TestContainerCalc(unittest.TestCase):
 # analytics tests
 # ---------------------------------------------------------------------------
 from utils.analytics import (
-    generate_full_report, compute_funnel, compute_conversion_rate,
-    compute_activity_metrics, compute_segmentation, compute_monthly_activity,
+    compute_activity_metrics,
+    compute_funnel,
+    compute_monthly_activity,
+    compute_segmentation,
+    generate_full_report,
 )
 
 
@@ -192,7 +198,10 @@ class TestAnalytics(unittest.TestCase):
 # ab_testing tests (non-streamlit logic only)
 # ---------------------------------------------------------------------------
 from utils.ab_testing import (
-    ABVariant, ABTest, compute_confidence, simulate_results,
+    ABTest,
+    ABVariant,
+    compute_confidence,
+    simulate_results,
 )
 
 
@@ -234,7 +243,7 @@ class TestABTesting(unittest.TestCase):
         self.assertEqual(v.content, v2.content)
 
     def test_ab_test_serialization_roundtrip(self):
-        variants = [self._make_variant(label=l) for l in ["A", "B"]]
+        variants = [self._make_variant(label=lbl) for lbl in ["A", "B"]]
         test = ABTest(
             test_id="t1", name="Test 1", product="LED Light",
             created_at="2026-05-14 10:00", status="draft", variants=variants,
@@ -262,7 +271,7 @@ class TestABTesting(unittest.TestCase):
         self.assertEqual(compute_confidence(va, vb), 0.0)
 
     def test_simulate_results_sets_sends(self):
-        variants = [self._make_variant(sends=0, opens=0, label=l) for l in ["A", "B", "C"]]
+        variants = [self._make_variant(sends=0, opens=0, label=lbl) for lbl in ["A", "B", "C"]]
         test = ABTest(
             test_id="sim1", name="Sim Test", product="Product",
             created_at="2026-05-14", status="draft", variants=variants,
@@ -292,7 +301,7 @@ class TestABTesting(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # prompt builder tests
 # ---------------------------------------------------------------------------
-from config.prompts import build_smart_quote_prompt, build_ab_variant_prompt
+from config.prompts import build_ab_variant_prompt, build_smart_quote_prompt
 
 
 class TestTier2Prompts(unittest.TestCase):

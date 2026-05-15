@@ -3,8 +3,15 @@ pages/2_📩_询盘回复.py
 粘贴客户询盘，AI 生成专业英文回复草稿，支持流式输出。
 """
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id, show_regenerate_buttons
+
 from utils.ai_client import reply_inquiry
+from utils.ui_helpers import (
+    check_auth,
+    get_user_id,
+    inject_css,
+    show_regenerate_buttons,
+    show_result,
+)
 
 st.set_page_config(page_title="询盘回复 | 外贸AI助手", page_icon="📩", layout="wide")
 inject_css()

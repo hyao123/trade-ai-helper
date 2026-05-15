@@ -4,14 +4,14 @@ Unit tests for utils/pricing.py - tiered pricing and usage tracking.
 """
 from __future__ import annotations
 
-import sys
-import os
-import types
-import tempfile
 import json
+import os
+import sys
+import tempfile
+import types
+from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import patch
-from datetime import date, timedelta
 
 # Add project root to path so imports work
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -65,7 +65,7 @@ class TestPricing:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "testuser", "free")
             with patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.pricing import increment_usage, get_daily_usage
+                from utils.pricing import get_daily_usage, increment_usage
                 ok, msg = increment_usage("testuser")
                 assert ok is True
                 assert msg == ""
@@ -166,7 +166,7 @@ class TestPricing:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "upgradeuser", "free")
             with patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.pricing import upgrade_user_tier, get_user_tier
+                from utils.pricing import get_user_tier, upgrade_user_tier
                 assert get_user_tier("upgradeuser") == "free"
                 result = upgrade_user_tier("upgradeuser", "pro")
                 assert result is True
@@ -237,7 +237,7 @@ class TestPricing:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "histuser", "free")
             with patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.pricing import increment_usage, get_usage_history
+                from utils.pricing import get_usage_history, increment_usage
                 increment_usage("histuser")
                 history = get_usage_history("histuser")
                 assert len(history) == 1
@@ -267,7 +267,7 @@ class TestPricing:
                 json.dump(usage, f)
 
             with patch("utils.storage.get_data_dir", return_value=tmp_dir):
-                from utils.pricing import increment_usage, get_usage_history
+                from utils.pricing import get_usage_history, increment_usage
                 # Increment to trigger history update
                 increment_usage("capuser")
                 hist = get_usage_history("capuser")

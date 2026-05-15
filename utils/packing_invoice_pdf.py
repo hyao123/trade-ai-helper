@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import datetime
 import os
+
 from fpdf import FPDF
 
 from utils.logger import get_logger

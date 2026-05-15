@@ -2,9 +2,10 @@
 app.py — 首页（功能入口 + 导航）
 """
 import streamlit as st
+
 from config.i18n import t
 from utils.logger import configure_logging
-from utils.ui_helpers import inject_css, check_auth
+from utils.ui_helpers import check_auth, inject_css
 
 configure_logging()
 

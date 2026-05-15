@@ -5,12 +5,16 @@ A/B 测试：生成邮件变体，模拟测试结果，对比转化率。
 from __future__ import annotations
 
 import streamlit as st
-from utils.ui_helpers import inject_css, check_auth, show_result, get_user_id
+
 from utils.ab_testing import (
-    load_ab_tests, create_ab_test, delete_ab_test,
-    simulate_results, compute_confidence, get_test_summary,
-    ABVariant, ABTest,
+    ABVariant,
+    compute_confidence,
+    create_ab_test,
+    delete_ab_test,
+    load_ab_tests,
+    simulate_results,
 )
+from utils.ui_helpers import check_auth, get_user_id, inject_css, show_result
 
 st.set_page_config(page_title="A/B测试 | 外贸AI助手", page_icon="🧪", layout="wide")
 inject_css()

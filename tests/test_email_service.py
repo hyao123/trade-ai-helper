@@ -4,10 +4,10 @@ Unit tests for utils/email_service.py - email sending via SMTP.
 """
 from __future__ import annotations
 
-import sys
 import os
+import sys
 import types
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 # Add project root to path so imports work
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

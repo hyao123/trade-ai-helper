@@ -4,8 +4,8 @@ Unit tests for core utility functions (no API calls needed).
 """
 from __future__ import annotations
 
-import sys
 import os
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -72,7 +72,7 @@ class TestRateLimiting:
     """Tests for ai_client rate limiting functions."""
 
     def test_rate_limit_check_allows_within_limit(self):
-        from utils.ai_client import _rate_limit_check, _call_times, RATE_LIMIT_MAX_CALLS
+        from utils.ai_client import RATE_LIMIT_MAX_CALLS, _call_times, _rate_limit_check
         # Reset state
         test_user = "test_user_allow"
         _call_times[test_user] = []
@@ -82,7 +82,11 @@ class TestRateLimiting:
         assert remaining == RATE_LIMIT_MAX_CALLS - 1
 
     def test_rate_limit_check_blocks_at_limit(self):
-        from utils.ai_client import _rate_limit_check, _call_times, RATE_LIMIT_MAX_CALLS, RATE_LIMIT_WINDOW
+        from utils.ai_client import (
+            RATE_LIMIT_MAX_CALLS,
+            _call_times,
+            _rate_limit_check,
+        )
         test_user = "test_user_block"
         # Fill up all slots
         now = time.time()
@@ -93,7 +97,12 @@ class TestRateLimiting:
         assert remaining == 0
 
     def test_rate_limit_expired_slots_freed(self):
-        from utils.ai_client import _rate_limit_check, _call_times, RATE_LIMIT_MAX_CALLS, RATE_LIMIT_WINDOW
+        from utils.ai_client import (
+            RATE_LIMIT_MAX_CALLS,
+            RATE_LIMIT_WINDOW,
+            _call_times,
+            _rate_limit_check,
+        )
         test_user = "test_user_expired"
         # All slots expired
         _call_times[test_user] = [time.time() - RATE_LIMIT_WINDOW - 10] * RATE_LIMIT_MAX_CALLS
@@ -102,7 +111,11 @@ class TestRateLimiting:
         assert allowed is True
 
     def test_get_rate_limit_remaining(self):
-        from utils.ai_client import get_rate_limit_remaining, _call_times, RATE_LIMIT_MAX_CALLS
+        from utils.ai_client import (
+            RATE_LIMIT_MAX_CALLS,
+            _call_times,
+            get_rate_limit_remaining,
+        )
         test_user = "test_user_remaining"
         _call_times[test_user] = []
         assert get_rate_limit_remaining(test_user) == RATE_LIMIT_MAX_CALLS
@@ -243,6 +256,7 @@ class TestCRMIntegration:
     def _get_customers_module(self, mock_st, tmp_dir):
         """Import customers module with mocked streamlit and storage."""
         import importlib
+
         import utils.customers as customers_mod
         importlib.reload(customers_mod)
         with patch("utils.customers.st", mock_st), \
@@ -252,6 +266,7 @@ class TestCRMIntegration:
     def _get_workflow_module(self, mock_st, tmp_dir):
         """Import workflow module with mocked streamlit and storage."""
         import importlib
+
         import utils.workflow as workflow_mod
         importlib.reload(workflow_mod)
         with patch("utils.workflow.st", mock_st), \
@@ -318,7 +333,11 @@ class TestCRMIntegration:
         tmp_dir = Path(tempfile.mkdtemp())
         with patch("utils.customers.st", mock_st), \
              patch("utils.storage.get_data_dir", return_value=tmp_dir):
-            from utils.customers import add_customer, find_customer, update_customer_stage
+            from utils.customers import (
+                add_customer,
+                find_customer,
+                update_customer_stage,
+            )
             mock_st.session_state.clear()
             add_customer({
                 "company": "XYZ Ltd",
