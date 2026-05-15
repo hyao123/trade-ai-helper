@@ -39,3 +39,21 @@ jobs:
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
+
+  # ── Auto-merge: runs only on PRs targeting master, after lint-and-test passes ──
+  auto-merge:
+    name: Auto-merge to master
+    needs: lint-and-test                 # only runs when CI passes
+    if: github.event_name == 'pull_request' && github.base_ref == 'master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Enable auto-merge (squash)
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          merge-method: squash
