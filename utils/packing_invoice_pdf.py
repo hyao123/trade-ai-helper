@@ -371,3 +371,191 @@ def generate_commercial_invoice_pdf(
     result = bytes(pdf.output())
     logger.info("Commercial invoice PDF generated: %d bytes", len(result))
     return result
+
+
+
+# ---------------------------------------------------------------------------
+# Proforma Invoice PDF
+# ---------------------------------------------------------------------------
+def generate_proforma_invoice_pdf(
+    items: list[dict],
+    seller: dict,
+    buyer: dict,
+    trade_terms: dict,
+) -> bytes:
+    """
+    Generate a Proforma Invoice PDF.
+
+    Earlier stage than Commercial Invoice — used for price confirmation,
+    customs pre-clearance, and securing Letters of Credit.
+
+    Args:
+        items: list of dicts with keys:
+            - product, quantity, unit, unit_price, amount, description
+        seller: dict with company, address, phone, bank_info
+        buyer: dict with company, address, contact
+        trade_terms: dict with proforma_no, date, payment_terms,
+                     trade_term (FOB/CIF/etc), currency, port, validity,
+                     delivery_time
+
+    Returns:
+        PDF bytes
+    """
+    logger.info("Generating proforma invoice: %d items", len(items))
+
+    pdf = PackingListPDF(title="PROFORMA INVOICE")
+    font_name = _setup_font(pdf)
+    pdf._font_name = font_name
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=18)
+
+    # Invoice header
+    pdf.set_font(font_name, "", 9)
+    pdf.set_text_color(107, 114, 128)
+    pi_no = trade_terms.get("proforma_no", "PI-001")
+    pi_date = trade_terms.get("date", datetime.datetime.now().strftime("%Y-%m-%d"))
+    pdf.cell(0, 6, f"Proforma Invoice No: {pi_no}    Date: {pi_date}", 0, 1, "R")
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(2)
+
+    # Seller & Buyer
+    col_w = 95
+    _section_header(pdf, font_name, "Parties")
+    pdf.set_font(font_name, "B", 9)
+    pdf.cell(col_w, 6, "SELLER / EXPORTER:", 0, 0, "L")
+    pdf.cell(col_w, 6, "BUYER / IMPORTER:", 0, 1, "L")
+    pdf.set_font(font_name, "", 9)
+    pdf.cell(col_w, 5, seller.get("company", ""), 0, 0, "L")
+    pdf.cell(col_w, 5, buyer.get("company", ""), 0, 1, "L")
+    pdf.cell(col_w, 5, seller.get("address", ""), 0, 0, "L")
+    pdf.cell(col_w, 5, buyer.get("address", ""), 0, 1, "L")
+    pdf.cell(col_w, 5, seller.get("phone", ""), 0, 0, "L")
+    pdf.cell(col_w, 5, buyer.get("contact", ""), 0, 1, "L")
+    pdf.ln(3)
+
+    # Trade terms
+    _section_header(pdf, font_name, "Terms & Conditions")
+    currency = trade_terms.get("currency", "USD")
+    tc1, tc2 = 95, 95
+    pdf.set_font(font_name, "B", 9)
+    pdf.set_text_color(107, 114, 128)
+    pdf.cell(tc1 // 2, 6, "Payment Terms:", 0, 0)
+    pdf.set_font(font_name, "", 9)
+    pdf.set_text_color(17, 24, 39)
+    pdf.cell(tc1 // 2, 6, trade_terms.get("payment_terms", ""), 0, 0)
+    pdf.set_font(font_name, "B", 9)
+    pdf.set_text_color(107, 114, 128)
+    pdf.cell(tc2 // 2, 6, "Trade Term:", 0, 0)
+    pdf.set_font(font_name, "", 9)
+    pdf.set_text_color(17, 24, 39)
+    pdf.cell(tc2 // 2, 6, trade_terms.get("trade_term", "FOB"), 0, 1)
+
+    pdf.set_font(font_name, "B", 9)
+    pdf.set_text_color(107, 114, 128)
+    pdf.cell(tc1 // 2, 6, "Port of Shipment:", 0, 0)
+    pdf.set_font(font_name, "", 9)
+    pdf.set_text_color(17, 24, 39)
+    pdf.cell(tc1 // 2, 6, trade_terms.get("port", ""), 0, 0)
+    pdf.set_font(font_name, "B", 9)
+    pdf.set_text_color(107, 114, 128)
+    pdf.cell(tc2 // 2, 6, "Delivery Time:", 0, 0)
+    pdf.set_font(font_name, "", 9)
+    pdf.set_text_color(17, 24, 39)
+    pdf.cell(tc2 // 2, 6, trade_terms.get("delivery_time", ""), 0, 1)
+
+    pdf.set_font(font_name, "B", 9)
+    pdf.set_text_color(107, 114, 128)
+    pdf.cell(tc1 // 2, 6, "Validity:", 0, 0)
+    pdf.set_font(font_name, "", 9)
+    pdf.set_text_color(17, 24, 39)
+    pdf.cell(tc1 // 2, 6, trade_terms.get("validity", "30 days"), 0, 0)
+    pdf.set_font(font_name, "B", 9)
+    pdf.set_text_color(107, 114, 128)
+    pdf.cell(tc2 // 2, 6, "Currency:", 0, 0)
+    pdf.set_font(font_name, "", 9)
+    pdf.set_text_color(17, 24, 39)
+    pdf.cell(tc2 // 2, 6, currency, 0, 1)
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(3)
+
+    # Items table
+    _section_header(pdf, font_name, "Product Details")
+    COL = [55, 20, 18, 30, 30, 37]
+    HEADERS = ["Description", "Qty", "Unit", "Unit Price", "Amount", "Remarks"]
+
+    pdf.set_fill_color(30, 58, 95)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font(font_name, "B", 8)
+    for w, h in zip(COL, HEADERS):
+        pdf.cell(w, 7, h, 0, 0, "C", fill=True)
+    pdf.ln()
+    pdf.set_text_color(0, 0, 0)
+
+    grand_total = 0.0
+    fill = False
+
+    for item in items:
+        pdf.set_fill_color(248, 250, 252) if fill else pdf.set_fill_color(255, 255, 255)
+        pdf.set_font(font_name, "", 8)
+
+        amount = float(item.get("amount", 0))
+        grand_total += amount
+
+        row = [
+            str(item.get("product", ""))[:28],
+            str(item.get("quantity", "")),
+            str(item.get("unit", "PCS")),
+            f"{currency} {float(item.get('unit_price', 0)):.2f}",
+            f"{currency} {amount:,.2f}",
+            str(item.get("description", ""))[:18],
+        ]
+        for w, val in zip(COL, row):
+            pdf.cell(w, 6, val, 0, 0, "C", fill=True)
+        pdf.ln()
+        fill = not fill
+
+    # Total row
+    pdf.set_fill_color(30, 58, 95)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font(font_name, "B", 9)
+    total_w = sum(COL[:4])
+    pdf.cell(total_w, 8, "  TOTAL AMOUNT", 0, 0, "L", fill=True)
+    pdf.cell(COL[4], 8, f"{currency} {grand_total:,.2f}", 0, 0, "C", fill=True)
+    pdf.cell(COL[5], 8, "", 0, 0, "C", fill=True)
+    pdf.ln()
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(5)
+
+    # Bank info
+    bank_info = seller.get("bank_info", "")
+    if bank_info:
+        _section_header(pdf, font_name, "Banking Details")
+        pdf.set_font(font_name, "", 9)
+        pdf.multi_cell(0, 5, bank_info)
+        pdf.ln(4)
+
+    # Acceptance clause
+    _section_header(pdf, font_name, "Acceptance")
+    pdf.set_font(font_name, "", 8)
+    pdf.set_text_color(107, 114, 128)
+    pdf.multi_cell(
+        0, 5,
+        "This proforma invoice is subject to the terms and conditions stated above. "
+        "Please confirm your acceptance by signing and returning one copy. "
+        "Prices are valid for the period stated."
+    )
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(10)
+
+    # Signature lines
+    pdf.set_font(font_name, "", 9)
+    pdf.cell(95, 6, "________________________", 0, 0, "C")
+    pdf.cell(95, 6, "________________________", 0, 1, "C")
+    pdf.set_font(font_name, "", 8)
+    pdf.set_text_color(107, 114, 128)
+    pdf.cell(95, 5, "Authorized Signature (Seller)", 0, 0, "C")
+    pdf.cell(95, 5, "Confirmed by Buyer / Date", 0, 1, "C")
+
+    result = bytes(pdf.output())
+    logger.info("Proforma invoice PDF generated: %d bytes", len(result))
+    return result

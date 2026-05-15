@@ -435,3 +435,27 @@ def generate_ab_variants(
     from config.prompts import build_ab_variant_prompt
     prompt, system = build_ab_variant_prompt(product, customer_type, num_variants, focus)
     return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
+
+
+
+def lookup_hs_code(
+    product: str,
+    description: str = "",
+    target_country: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    from config.prompts import build_hs_code_prompt
+    prompt, system = build_hs_code_prompt(product, description, target_country)
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
+
+
+def recognize_email_intent(
+    email_content: str,
+    context: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    from config.prompts import build_intent_recognition_prompt
+    prompt, system = build_intent_recognition_prompt(email_content, context)
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)

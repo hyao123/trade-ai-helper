@@ -33,7 +33,7 @@ st.markdown(f"""
 # ── Stats ─────────────────────────────────────────────────────────────────
 c1, c2, c3, c4, c5 = st.columns(5)
 for col, val, label in [
-    (c1, "25",     t("core_features")),
+    (c1, "28",     t("core_features")),
     (c2, "5+",     t("languages_support")),
     (c3, "⚡ 流式", t("realtime_output")),
     (c4, "Listing", "Amazon/Shopify"),
@@ -187,6 +187,27 @@ FEATURES = [
         "desc": "同一产品一键生成多封风格各异的开发信，用于 A/B 测试或直接选优",
         "badge": "🚀 效率工具",
         "page": "pages/24_🔁_批量生成.py",
+    },
+    {
+        "icon": "📜",
+        "title": "形式发票",
+        "desc": "生成 Proforma Invoice PDF，用于价格确认、L/C 申请和海关预清关",
+        "badge": "📥 PI · PDF",
+        "page": "pages/25_📜_形式发票.py",
+    },
+    {
+        "icon": "🔍",
+        "title": "意图识别",
+        "desc": "粘贴客户回复邮件，AI 分析意图、情感和紧迫度，给出下一步建议",
+        "badge": "🧠 AI分析",
+        "page": "pages/26_🔍_意图识别.py",
+    },
+    {
+        "icon": "🏷️",
+        "title": "HS编码查询",
+        "desc": "输入产品名称，AI 建议 HS Code、分析分类依据、提示关税注意事项",
+        "badge": "🌐 海关",
+        "page": "pages/27_🏷️_HS编码.py",
     },
 ]
 

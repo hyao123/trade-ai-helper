@@ -1,12 +1,20 @@
 """
 pages/7_📇_客户管理.py
-轻量级客户 CRM：管理客户信息，追踪沟通历史。
+轻量级客户 CRM：管理客户信息，追踪沟通历史，支持评分和标签。
 """
 from datetime import datetime
 
 import streamlit as st
 
-from utils.customers import add_customer, delete_customer, get_customers
+from utils.customers import (
+    PREDEFINED_TAGS,
+    add_customer,
+    add_tag,
+    compute_customer_score,
+    delete_customer,
+    get_customers,
+    remove_tag,
+)
 from utils.ui_helpers import check_auth, inject_css
 from utils.workflow import create_workflow_from_customer
 
@@ -103,17 +111,59 @@ else:
             or q in c.get("product", "").lower()
         ]
 
+    # Sort options + tag filter
+    col_f3, col_f4 = st.columns(2)
+    with col_f3:
+        sort_by = st.selectbox("排序方式", ["最新添加", "评分最高", "最近联系"], key="crm_sort")
+    with col_f4:
+        all_tags = sorted({t for c in filtered for t in c.get("tags", [])})
+        filter_tag = st.selectbox("按标签筛选", ["全部"] + all_tags, key="crm_filter_tag")
+
+    if filter_tag != "全部":
+        filtered = [c for c in filtered if filter_tag in c.get("tags", [])]
+    if sort_by == "评分最高":
+        filtered = sorted(filtered, key=lambda c: compute_customer_score(c), reverse=True)
+    elif sort_by == "最近联系":
+        filtered = sorted(filtered, key=lambda c: c.get("last_contact", ""), reverse=True)
+
     # 渲染表格
     for i, cust in enumerate(filtered):
-        with st.expander(f"**{cust['company']}** — {cust['contact']} ({cust['stage']})", expanded=False):
+        score = compute_customer_score(cust)
+        tags = cust.get("tags", [])
+        tags_str = " ".join(f"#{t}" for t in tags) if tags else ""
+        score_color = "#22c55e" if score >= 70 else "#f59e0b" if score >= 40 else "#6b7280"
+        score_badge = (
+            f'<span style="background:{score_color};color:white;padding:0.15rem 0.5rem;'
+            f'border-radius:8px;font-size:0.75rem;font-weight:700;">{score}分</span>'
+        )
+        with st.expander(
+            f"**{cust['company']}** — {cust['contact']} ({cust['stage']})  {tags_str}",
+            expanded=False,
+        ):
             c1, c2, c3 = st.columns(3)
             c1.write(f"📧 {cust['email'] or '—'}")
             c2.write(f"🌍 {cust['country']}")
-            c3.write(f"📦 {cust['product'] or '—'}")
+            c3.markdown(f"📦 {cust['product'] or '—'}  {score_badge}", unsafe_allow_html=True)
 
             st.caption(f"添加日期: {cust['created_at']} | 最后联系: {cust['last_contact']}")
             if cust.get("notes"):
                 st.write(f"📝 {cust['notes']}")
+
+            # 标签管理
+            st.markdown("**🏷️ 标签：**")
+            tag_cols = st.columns(len(PREDEFINED_TAGS) + 1)
+            real_idx = customers.index(cust)
+            for ti, tag in enumerate(PREDEFINED_TAGS):
+                has_tag = tag in tags
+                with tag_cols[ti]:
+                    if has_tag:
+                        if st.button(f"✅ {tag}", key=f"tag_rm_{real_idx}_{tag}", use_container_width=True):
+                            remove_tag(real_idx, tag)
+                            st.rerun()
+                    else:
+                        if st.button(f"＋ {tag}", key=f"tag_add_{real_idx}_{tag}", use_container_width=True):
+                            add_tag(real_idx, tag)
+                            st.rerun()
 
             # 操作按钮
             col_a1, col_a2, col_a3 = st.columns(3)
