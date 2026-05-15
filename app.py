@@ -33,7 +33,7 @@ st.markdown(f"""
 # ── Stats ─────────────────────────────────────────────────────────────────
 c1, c2, c3, c4, c5 = st.columns(5)
 for col, val, label in [
-    (c1, "21",     t("core_features")),
+    (c1, "23",     t("core_features")),
     (c2, "5+",     t("languages_support")),
     (c3, "⚡ 流式", t("realtime_output")),
     (c4, "Listing", "Amazon/Shopify"),
@@ -159,6 +159,20 @@ FEATURES = [
         "badge": "🔬 科学优化",
         "page": "pages/21_🧪_AB测试.py",
     },
+    {
+        "icon": "📈",
+        "title": "数据导出",
+        "desc": "备份全量数据（JSON/CSV），跨设备迁移账户，Pro 专属功能",
+        "badge": "🔒 Pro",
+        "page": "pages/22_📈_数据导出.py",
+    },
+    {
+        "icon": "💳",
+        "title": "套餐升级",
+        "desc": "Free / Pro / Enterprise 套餐对比，Stripe 支付，即时解锁高级功能",
+        "badge": "⭐ 升级",
+        "page": "pages/23_💳_套餐升级.py",
+    },
 ]
 
 cols = st.columns(5)
@@ -207,20 +221,28 @@ for col, feat in zip(cols2, FEATURES[5:10]):
 
 # ── Tier 2 功能行 ─────────────────────────────────────────────────────────
 st.markdown("---")
-st.markdown("### 🚀 Tier 2 — 贸易工具")
-cols3 = st.columns(5)
-for col, feat in zip(cols3, FEATURES[10:15]):
+st.markdown("### 🚀 Tier 2 — 贸易工具 & 平台")
+
+def _render_feature_card(col, feat: dict, key_prefix: str) -> None:
+    """Render a feature card with navigation button."""
     with col:
+        is_pro = feat.get("badge", "").startswith("🔒") or feat.get("badge", "").startswith("⭐")
+        bg_style = (
+            "border: 1.5px solid #8b5cf6; background: linear-gradient(135deg, #faf5ff 0%, #eff6ff 100%);"
+            if not is_pro else
+            "border: 1.5px solid #f59e0b; background: linear-gradient(135deg, #fffbeb 0%, #fff 100%);"
+        )
+        badge_bg = "#f3e8ff" if not is_pro else "#fef3c7"
+        badge_color = "#7c3aed" if not is_pro else "#b45309"
         st.markdown(
             f"""
-            <div class="main-form" style="text-align:center;cursor:pointer;min-height:200px;
-                         border: 1.5px solid #8b5cf6; background: linear-gradient(135deg, #faf5ff 0%, #eff6ff 100%);">
+            <div class="main-form" style="text-align:center;cursor:pointer;min-height:200px;{bg_style}">
                 <div style="font-size:2.5rem;margin-bottom:0.5rem;">{feat['icon']}</div>
                 <div class="form-title" style="margin-bottom:0.5rem;">{feat['title']}</div>
                 <p style="font-size:0.82rem;color:#6b7280;line-height:1.5;margin-bottom:0.75rem;">
                     {feat['desc']}
                 </p>
-                <span style="background:#f3e8ff;color:#7c3aed;padding:0.2rem 0.6rem;
+                <span style="background:{badge_bg};color:{badge_color};padding:0.2rem 0.6rem;
                              border-radius:12px;font-size:0.75rem;font-weight:600;">
                     {feat['badge']}
                 </span>
@@ -228,8 +250,21 @@ for col, feat in zip(cols3, FEATURES[10:15]):
             """,
             unsafe_allow_html=True,
         )
-        if st.button(f"{t('enter_feature')} {feat['title']}", key=f"nav3_{feat['title']}", use_container_width=True):
+        if st.button(f"{t('enter_feature')} {feat['title']}", key=f"{key_prefix}_{feat['title']}", use_container_width=True):
             st.switch_page(feat["page"])
+
+tier2_feats = FEATURES[10:]
+# Row 3: first 5 Tier 2 features
+cols3 = st.columns(5)
+for col, feat in zip(cols3, tier2_feats[:5]):
+    _render_feature_card(col, feat, "nav3")
+
+# Row 4: remaining Tier 2 features (up to 5)
+if len(tier2_feats) > 5:
+    cols4 = st.columns(5)
+    remaining = tier2_feats[5:]
+    for col, feat in zip(cols4, remaining):
+        _render_feature_card(col, feat, "nav4")
 
 # ── 使用提示 ─────────────────────────────────────────────────────────────
 st.markdown("---")
