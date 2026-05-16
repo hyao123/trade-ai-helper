@@ -116,7 +116,33 @@ _CSS = """
     .login-title { font-size: 1.4rem; font-weight: 700; color: #1e3a5f; margin-bottom: 0.5rem; }
     .login-sub   { color: #6b7280; font-size: 0.9rem; margin-bottom: 1.5rem; }
 
-    [data-testid="stSidebar"] { background: linear-gradient(180deg, #1e3a5f 0%, #0f172a 100%); }
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #1e3a5f 0%, #0f172a 100%);
+    }
+    [data-testid="stSidebar"] * {
+        color: #e2e8f0 !important;
+    }
+    [data-testid="stSidebar"] .stSelectbox label,
+    [data-testid="stSidebar"] .stButton button {
+        color: #e2e8f0 !important;
+    }
+    [data-testid="stSidebar"] .stSelectbox > div > div {
+        background: rgba(255,255,255,0.1) !important;
+        border-color: rgba(255,255,255,0.2) !important;
+        color: #ffffff !important;
+    }
+    [data-testid="stSidebar"] .stProgress > div > div {
+        background-color: rgba(255,255,255,0.2) !important;
+    }
+    [data-testid="stSidebar"] .stProgress > div > div > div {
+        background-color: #3b82f6 !important;
+    }
+    [data-testid="stSidebar"] hr {
+        border-color: rgba(255,255,255,0.15) !important;
+    }
+    [data-testid="stSidebar"] .stMarkdown a {
+        color: #93c5fd !important;
+    }
     .footer { text-align: center; padding: 1.5rem; color: #9ca3af; font-size: 0.8rem; }
 
     @media (max-width: 768px) { .block-container { padding: 0.75rem !important; } }
