@@ -119,8 +119,39 @@ _CSS = """
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #1e3a5f 0%, #0f172a 100%);
     }
-    [data-testid="stSidebar"] * {
+    [data-testid="stSidebar"],
+    [data-testid="stSidebar"] *,
+    [data-testid="stSidebar"] span,
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3 {
         color: #e2e8f0 !important;
+    }
+    /* Navigation page links */
+    [data-testid="stSidebar"] a,
+    [data-testid="stSidebar"] a span,
+    [data-testid="stSidebar"] [data-testid="stSidebarNavLink"],
+    [data-testid="stSidebar"] [data-testid="stSidebarNavLink"] span,
+    [data-testid="stSidebar"] li span,
+    [data-testid="stSidebar"] nav a,
+    [data-testid="stSidebar"] nav span {
+        color: #e2e8f0 !important;
+    }
+    [data-testid="stSidebar"] a:hover,
+    [data-testid="stSidebar"] a:hover span,
+    [data-testid="stSidebar"] [data-testid="stSidebarNavLink"]:hover span {
+        color: #ffffff !important;
+        background: rgba(255,255,255,0.08) !important;
+    }
+    /* Active page highlight */
+    [data-testid="stSidebar"] [aria-current="page"],
+    [data-testid="stSidebar"] [aria-current="page"] span {
+        color: #ffffff !important;
+        font-weight: 700 !important;
+        background: rgba(59,130,246,0.2) !important;
+        border-radius: 6px;
     }
     [data-testid="stSidebar"] .stSelectbox label,
     [data-testid="stSidebar"] .stButton button {
