@@ -62,9 +62,9 @@ if generate_clicked:
         )
         show_result(
             result,
-            result_key="customer_profile",
+            result_key="customer_analysis_20",
             label="🔍 客户画像分析",
-            file_name=f"customer_profile_{company_name[:20]}.txt",
+            file_name=f"customer_analysis_{company_name[:20]}.txt",
             height=350,
             show_subject_line=False,
             history_feature="客户分析",
