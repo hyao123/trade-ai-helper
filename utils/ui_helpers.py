@@ -116,133 +116,23 @@ _CSS = """
     .login-title { font-size: 1.4rem; font-weight: 700; color: #1e3a5f; margin-bottom: 0.5rem; }
     .login-sub   { color: #6b7280; font-size: 0.9rem; margin-bottom: 1.5rem; }
 
-    /* ── Sidebar dark background ── */
+    /* ── Sidebar light theme ── */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1e3a5f 0%, #0f172a 100%) !important;
-    }
-
-    /* Broad wildcard: force ALL text inside sidebar to light color */
-    [data-testid="stSidebar"] *,
-    [data-testid="stSidebar"] div,
-    [data-testid="stSidebar"] span,
-    [data-testid="stSidebar"] p,
-    [data-testid="stSidebar"] label,
-    [data-testid="stSidebar"] small,
-    [data-testid="stSidebar"] h1,
-    [data-testid="stSidebar"] h2,
-    [data-testid="stSidebar"] h3,
-    [data-testid="stSidebar"] h4,
-    [data-testid="stSidebar"] h5,
-    [data-testid="stSidebar"] h6,
-    [data-testid="stSidebar"] li,
-    [data-testid="stSidebar"] a,
-    section[data-testid="stSidebar"] div,
-    section[data-testid="stSidebar"] span,
-    section[data-testid="stSidebar"] p,
-    section[data-testid="stSidebar"] label {
-        color: #e2e8f0 !important;
-    }
-
-    /* Navigation items - stSidebarNav and children */
-    [data-testid="stSidebar"] [data-testid="stSidebarNav"] *,
-    [data-testid="stSidebar"] [data-testid="stSidebarNavItems"] *,
-    [data-testid="stSidebar"] [data-testid="stSidebarNavLink"],
-    [data-testid="stSidebar"] [data-testid="stSidebarNavLink"] span,
-    [data-testid="stSidebar"] [data-testid="stSidebarNavLink"] p,
-    [data-testid="stSidebar"] nav a,
-    [data-testid="stSidebar"] nav span,
-    [data-testid="stSidebar"] nav li,
-    [data-testid="stSidebar"] nav li a,
-    [data-testid="stSidebar"] nav li a span,
-    [data-testid="stSidebar"] ul li a,
-    [data-testid="stSidebar"] ul li a span,
-    [data-testid="stSidebar"] ul[data-testid="stSidebarNavItems"] li span,
-    [data-testid="stSidebar"] a span,
-    [data-testid="stSidebar"] a[data-testid="stSidebarNavLink"] span {
-        color: #e2e8f0 !important;
-    }
-
-    /* Hover state for navigation links */
-    [data-testid="stSidebar"] a:hover,
-    [data-testid="stSidebar"] a:hover *,
-    [data-testid="stSidebar"] a:hover span,
-    [data-testid="stSidebar"] [data-testid="stSidebarNavLink"]:hover,
-    [data-testid="stSidebar"] [data-testid="stSidebarNavLink"]:hover span,
-    [data-testid="stSidebar"] nav a:hover,
-    [data-testid="stSidebar"] nav a:hover span {
-        color: #ffffff !important;
-        background: rgba(255,255,255,0.08) !important;
+        background: #f0f2f6 !important;
     }
 
     /* Active page highlight */
     [data-testid="stSidebar"] [aria-current="page"],
-    [data-testid="stSidebar"] [aria-current="page"] *,
-    [data-testid="stSidebar"] [aria-current="page"] span,
-    [data-testid="stSidebar"] a[aria-current="page"] span {
-        color: #ffffff !important;
+    [data-testid="stSidebar"] [aria-current="page"] span {
+        color: #3b82f6 !important;
         font-weight: 700 !important;
-        background: rgba(59,130,246,0.2) !important;
+        background: rgba(59,130,246,0.08) !important;
         border-radius: 6px;
-    }
-
-    /* Selectbox: label, rendered value, and dropdown items */
-    [data-testid="stSidebar"] .stSelectbox label,
-    [data-testid="stSidebar"] .stSelectbox label span,
-    [data-testid="stSidebar"] .stSelectbox [data-baseweb="select"] span,
-    [data-testid="stSidebar"] .stSelectbox [data-baseweb="select"] div,
-    [data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] *,
-    [data-testid="stSidebar"] [data-baseweb="select"] .st-emotion-cache-1dimb5e,
-    [data-testid="stSidebar"] [data-baseweb="select"] [data-testid="stMarkdownContainer"],
-    [data-testid="stSidebar"] [data-baseweb="select"] [data-testid="stMarkdownContainer"] p {
-        color: #ffffff !important;
-    }
-    [data-testid="stSidebar"] .stSelectbox > div > div,
-    [data-testid="stSidebar"] .stSelectbox [data-baseweb="select"] > div {
-        background: rgba(255,255,255,0.1) !important;
-        border-color: rgba(255,255,255,0.2) !important;
-        color: #ffffff !important;
-    }
-    /* Selectbox SVG arrow icon */
-    [data-testid="stSidebar"] .stSelectbox svg,
-    [data-testid="stSidebar"] .stSelectbox path {
-        fill: #e2e8f0 !important;
-    }
-
-    /* Buttons inside sidebar */
-    [data-testid="stSidebar"] .stButton button {
-        color: #e2e8f0 !important;
-    }
-
-    /* Caption and small text */
-    [data-testid="stSidebar"] .stCaption,
-    [data-testid="stSidebar"] .stCaption *,
-    [data-testid="stSidebar"] [data-testid="stCaptionContainer"],
-    [data-testid="stSidebar"] [data-testid="stCaptionContainer"] *,
-    [data-testid="stSidebar"] [data-testid="stCaptionContainer"] p,
-    [data-testid="stSidebar"] [data-testid="stCaptionContainer"] span,
-    [data-testid="stSidebar"] small,
-    [data-testid="stSidebar"] .caption {
-        color: #cbd5e1 !important;
-    }
-
-    /* Metric values inside sidebar */
-    [data-testid="stSidebar"] [data-testid="stMetricValue"],
-    [data-testid="stSidebar"] [data-testid="stMetricValue"] *,
-    [data-testid="stSidebar"] [data-testid="stMetricLabel"],
-    [data-testid="stSidebar"] [data-testid="stMetricLabel"] *,
-    [data-testid="stSidebar"] [data-testid="stMetricDelta"],
-    [data-testid="stSidebar"] [data-testid="stMetricDelta"] * {
-        color: #e2e8f0 !important;
-    }
-
-    /* Streamlit emotion-cache overrides: target any class inside sidebar */
-    [data-testid="stSidebar"] [class*="st-emotion-cache"] {
-        color: #e2e8f0 !important;
     }
 
     /* Progress bar */
     [data-testid="stSidebar"] .stProgress > div > div {
-        background-color: rgba(255,255,255,0.2) !important;
+        background-color: #e2e8f0 !important;
     }
     [data-testid="stSidebar"] .stProgress > div > div > div {
         background-color: #3b82f6 !important;
@@ -250,13 +140,13 @@ _CSS = """
 
     /* Horizontal rule */
     [data-testid="stSidebar"] hr {
-        border-color: rgba(255,255,255,0.15) !important;
+        border-color: #e2e8f0 !important;
     }
 
     /* Markdown links */
     [data-testid="stSidebar"] .stMarkdown a,
     [data-testid="stSidebar"] a[href] {
-        color: #93c5fd !important;
+        color: #2563eb !important;
     }
     .footer { text-align: center; padding: 1.5rem; color: #9ca3af; font-size: 0.8rem; }
 
