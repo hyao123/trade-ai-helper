@@ -397,5 +397,64 @@ class TestTier2PageFiles(unittest.TestCase):
         self.assertFalse(old.exists())
 
 
+# ---------------------------------------------------------------------------
+# Cost calculator arithmetic tests
+# ---------------------------------------------------------------------------
+
+
+class TestCostCalculator(unittest.TestCase):
+    """Test the cost calculation formula used in page 17."""
+
+    @staticmethod
+    def _calc_suggested_price(total_cost: float, profit_margin: float) -> float:
+        """Replicates the formula from pages/17_💰_智能报价.py."""
+        if total_cost == 0:
+            return 0.0
+        if profit_margin < 100:
+            return total_cost / (1 - profit_margin / 100)
+        return 0.0
+
+    def test_normal_case(self):
+        # costs sum to $5.00, margin 20% -> suggested price $6.25, profit $1.25
+        total_cost = 5.00
+        margin = 20.0
+        suggested = self._calc_suggested_price(total_cost, margin)
+        self.assertAlmostEqual(suggested, 6.25, places=2)
+        profit = suggested - total_cost
+        self.assertAlmostEqual(profit, 1.25, places=2)
+
+    def test_zero_cost(self):
+        # All zeros -> suggested price $0.00
+        total_cost = 0.0
+        margin = 20.0
+        suggested = self._calc_suggested_price(total_cost, margin)
+        self.assertEqual(suggested, 0.0)
+
+    def test_high_margin_90(self):
+        # total_cost $1.00, margin 90% -> suggested price $10.00
+        total_cost = 1.00
+        margin = 90.0
+        suggested = self._calc_suggested_price(total_cost, margin)
+        self.assertAlmostEqual(suggested, 10.00, places=2)
+
+
+# ---------------------------------------------------------------------------
+# Page 20 integration test
+# ---------------------------------------------------------------------------
+
+
+class TestPage20Integration(unittest.TestCase):
+    """Verify page 20 file contains expected imports and structure markers."""
+
+    def test_page20_imports_and_structure(self):
+        p = pathlib.Path("pages/20_🔍_客户分析.py")
+        self.assertTrue(p.exists(), "Page 20 file does not exist")
+        content = p.read_text()
+        self.assertIn("from utils.ai_client import analyze_customer_profile", content)
+        self.assertIn("show_result", content)
+        self.assertIn("company_name", content)
+        self.assertIn("stream=True", content)
+
+
 if __name__ == "__main__":
     unittest.main()

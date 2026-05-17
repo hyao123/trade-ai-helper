@@ -36,16 +36,22 @@ with cc2:
     inspection_cost = st.number_input("检验/质检费用/件 (USD)", min_value=0.0, value=0.0, step=0.01, format="%.2f")
 with cc3:
     other_cost = st.number_input("其他费用/件 (USD)", min_value=0.0, value=0.0, step=0.01, format="%.2f")
-    profit_margin = st.number_input("目标利润率 %", min_value=0.0, max_value=99.9, value=20.0, step=1.0, format="%.1f")
+    profit_margin = st.number_input("目标利润率 %", min_value=0.0, max_value=95.0, value=20.0, step=1.0, format="%.1f")
 
 total_cost = unit_production_cost + packaging_cost + logistics_cost + inspection_cost + other_cost
-suggested_price = total_cost / (1 - profit_margin / 100) if profit_margin < 100 else 0.0
+if total_cost == 0:
+    suggested_price = 0.0
+else:
+    suggested_price = total_cost / (1 - profit_margin / 100) if profit_margin < 100 else 0.0
 profit_per_unit = suggested_price - total_cost
 
 mc1, mc2, mc3 = st.columns(3)
 mc1.metric("总成本/件", f"${total_cost:.2f}")
 mc2.metric("建议售价", f"${suggested_price:.2f}")
 mc3.metric("利润/件", f"${profit_per_unit:.2f}")
+
+if profit_margin > 80:
+    st.caption("⚠️ 利润率超过 80%，建议售价可能偏高，请确认市场可接受度。")
 
 st.markdown("</div>", unsafe_allow_html=True)
 
