@@ -116,63 +116,37 @@ _CSS = """
     .login-title { font-size: 1.4rem; font-weight: 700; color: #1e3a5f; margin-bottom: 0.5rem; }
     .login-sub   { color: #6b7280; font-size: 0.9rem; margin-bottom: 1.5rem; }
 
+    /* ── Sidebar light theme ── */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1e3a5f 0%, #0f172a 100%);
+        background: #f0f2f6 !important;
     }
-    [data-testid="stSidebar"],
-    [data-testid="stSidebar"] *,
-    [data-testid="stSidebar"] span,
-    [data-testid="stSidebar"] p,
-    [data-testid="stSidebar"] label,
-    [data-testid="stSidebar"] h1,
-    [data-testid="stSidebar"] h2,
-    [data-testid="stSidebar"] h3 {
-        color: #e2e8f0 !important;
-    }
-    /* Navigation page links */
-    [data-testid="stSidebar"] a,
-    [data-testid="stSidebar"] a span,
-    [data-testid="stSidebar"] [data-testid="stSidebarNavLink"],
-    [data-testid="stSidebar"] [data-testid="stSidebarNavLink"] span,
-    [data-testid="stSidebar"] li span,
-    [data-testid="stSidebar"] nav a,
-    [data-testid="stSidebar"] nav span {
-        color: #e2e8f0 !important;
-    }
-    [data-testid="stSidebar"] a:hover,
-    [data-testid="stSidebar"] a:hover span,
-    [data-testid="stSidebar"] [data-testid="stSidebarNavLink"]:hover span {
-        color: #ffffff !important;
-        background: rgba(255,255,255,0.08) !important;
-    }
+
     /* Active page highlight */
     [data-testid="stSidebar"] [aria-current="page"],
     [data-testid="stSidebar"] [aria-current="page"] span {
-        color: #ffffff !important;
+        color: #3b82f6 !important;
         font-weight: 700 !important;
-        background: rgba(59,130,246,0.2) !important;
+        background: rgba(59,130,246,0.08) !important;
         border-radius: 6px;
     }
-    [data-testid="stSidebar"] .stSelectbox label,
-    [data-testid="stSidebar"] .stButton button {
-        color: #e2e8f0 !important;
-    }
-    [data-testid="stSidebar"] .stSelectbox > div > div {
-        background: rgba(255,255,255,0.1) !important;
-        border-color: rgba(255,255,255,0.2) !important;
-        color: #ffffff !important;
-    }
+
+    /* Progress bar */
     [data-testid="stSidebar"] .stProgress > div > div {
-        background-color: rgba(255,255,255,0.2) !important;
+        background-color: #e2e8f0 !important;
     }
     [data-testid="stSidebar"] .stProgress > div > div > div {
         background-color: #3b82f6 !important;
     }
+
+    /* Horizontal rule */
     [data-testid="stSidebar"] hr {
-        border-color: rgba(255,255,255,0.15) !important;
+        border-color: #e2e8f0 !important;
     }
-    [data-testid="stSidebar"] .stMarkdown a {
-        color: #93c5fd !important;
+
+    /* Markdown links */
+    [data-testid="stSidebar"] .stMarkdown a,
+    [data-testid="stSidebar"] a[href] {
+        color: #2563eb !important;
     }
     .footer { text-align: center; padding: 1.5rem; color: #9ca3af; font-size: 0.8rem; }
 
