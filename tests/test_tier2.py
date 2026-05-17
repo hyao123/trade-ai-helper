@@ -356,7 +356,46 @@ class TestTier2Prompts(unittest.TestCase):
         self.assertNotIn("A" * 2000, prompt)
 
 
+import pathlib
 import unittest.mock
+
+
+class TestTier2PageFiles(unittest.TestCase):
+    """Verify Tier 2 page files exist with correct names and content markers."""
+
+    def test_page17_exists_with_cost_calc(self):
+        p = pathlib.Path("pages/17_💰_智能报价.py")
+        self.assertTrue(p.exists())
+        content = p.read_text()
+        self.assertIn("成本计算", content)
+        self.assertIn("generate_smart_quote", content)
+
+    def test_page18_renamed(self):
+        new = pathlib.Path("pages/18_📦_装箱计算.py")
+        old = pathlib.Path("pages/18_📦_装箱计算器.py")
+        self.assertTrue(new.exists())
+        self.assertFalse(old.exists())
+
+    def test_page19_renamed(self):
+        new = pathlib.Path("pages/19_▪_装箱发票.py")
+        old = pathlib.Path("pages/19_📋_装箱发票.py")
+        self.assertTrue(new.exists())
+        self.assertFalse(old.exists())
+
+    def test_page20_ai_customer_analysis(self):
+        new = pathlib.Path("pages/20_🔍_客户分析.py")
+        old = pathlib.Path("pages/20_📊_客户分析.py")
+        self.assertTrue(new.exists())
+        self.assertFalse(old.exists())
+        content = new.read_text()
+        self.assertIn("analyze_customer_profile", content)
+
+    def test_page21_renamed(self):
+        new = pathlib.Path("pages/21_▪_AB测试.py")
+        old = pathlib.Path("pages/21_🧪_AB测试.py")
+        self.assertTrue(new.exists())
+        self.assertFalse(old.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

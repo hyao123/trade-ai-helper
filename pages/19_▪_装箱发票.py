@@ -14,7 +14,7 @@ from utils.packing_invoice_pdf import (
 )
 from utils.ui_helpers import check_auth, inject_css
 
-st.set_page_config(page_title="装箱发票 | 外贸AI助手", page_icon="📋", layout="wide")
+st.set_page_config(page_title="装箱发票 | 外贸AI助手", page_icon="▪", layout="wide")
 inject_css()
 check_auth()
 

@@ -14,7 +14,7 @@ from utils.container_calc import (
 )
 from utils.ui_helpers import check_auth, inject_css
 
-st.set_page_config(page_title="装箱计算器 | 外贸AI助手", page_icon="📦", layout="wide")
+st.set_page_config(page_title="装箱计算 | 外贸AI助手", page_icon="📦", layout="wide")
 inject_css()
 check_auth()
 
@@ -148,4 +148,4 @@ if calculate_clicked:
                     cols[4].write(f"{opt['weight_utilization']:.1f}%")
 
 st.markdown("---")
-st.markdown('<div class="footer">💼 外贸AI助手 · 装箱计算器</div>', unsafe_allow_html=True)
+st.markdown('<div class="footer">💼 外贸AI助手 · 装箱计算</div>', unsafe_allow_html=True)

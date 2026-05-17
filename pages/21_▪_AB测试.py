@@ -1,5 +1,5 @@
 """
-pages/21_🧪_AB测试.py
+pages/21_▪_AB测试.py
 A/B 测试：生成邮件变体，模拟测试结果，对比转化率。
 """
 from __future__ import annotations
@@ -16,7 +16,7 @@ from utils.ab_testing import (
 )
 from utils.ui_helpers import check_auth, get_user_id, inject_css, show_result
 
-st.set_page_config(page_title="A/B测试 | 外贸AI助手", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="A/B测试 | 外贸AI助手", page_icon="▪", layout="wide")
 inject_css()
 check_auth()
 
@@ -27,7 +27,7 @@ if "results" not in st.session_state:
 st.markdown("""
 <div class="hero-section">
     <h1 class="hero-title">🧪 A/B 测试</h1>
-    <p class="hero-subtitle">AI 生成多版邮件变体，模拟发送数据，科学对比转化效果</p>
+    <p class="hero-subtitle">AI 生成多版邮件变体，支持 3 版本对比 + 效果追踪，科学优化转化率</p>
 </div>
 """, unsafe_allow_html=True)
 
