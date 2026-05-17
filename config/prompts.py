@@ -4,6 +4,8 @@ config/prompts.py
 所有 AI Prompt 模板统一管理。
 每个函数返回 (prompt: str, system_prompt: str | None) 元组。
 """
+from __future__ import annotations
+
 from utils.sanitize import sanitize_input, sanitize_prompt_param
 
 # ---------------------------------------------------------------------------
