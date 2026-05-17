@@ -854,3 +854,296 @@ Requirements:
 3. Output in English with Chinese intent label
 4. Plain text with section headers only."""
     return prompt, system
+
+
+
+# ---------------------------------------------------------------------------
+# 客户画像分析（Customer Profile Analysis）
+# ---------------------------------------------------------------------------
+def build_customer_profile_prompt(
+    company_name: str,
+    website: str = "",
+    industry: str = "",
+    additional_info: str = "",
+) -> tuple[str, str | None]:
+    """构建客户画像分析 Prompt。"""
+    company_name = sanitize_prompt_param(company_name, "company_name")
+    website = sanitize_prompt_param(website, "website")
+    industry = sanitize_prompt_param(industry, "industry")
+    additional_info = sanitize_input(additional_info, max_length=1500)
+
+    website_info = f"\nWebsite: {website}" if website else ""
+    industry_info = f"\nIndustry: {industry}" if industry else ""
+    extra_info = f"\nAdditional Context: {additional_info}" if additional_info else ""
+
+    system = (
+        "你是一位有20年经验的外贸市场研究专家，精通全球B2B企业分析，"
+        "擅长根据有限信息推断公司需求、决策链和合作机会。"
+    )
+    prompt = f"""Please provide a comprehensive customer profile analysis:
+
+Company Name: {company_name}{website_info}{industry_info}{extra_info}
+
+Please analyze and output:
+
+## Company Overview
+[Company size estimate, founding history, main business, market position]
+
+## Likely Product Needs
+[Based on industry and company type, what products/services they likely need]
+- Primary needs (3-5 items)
+- Potential cross-sell opportunities
+
+## Decision-Making Structure
+[Who typically makes purchasing decisions in this type of company]
+- Key decision maker role (e.g., Procurement Manager, Technical Director)
+- Influencers in the buying process
+- Estimated decision timeline
+
+## Communication Strategy
+[How to approach this customer effectively]
+- Best initial contact method
+- Recommended email tone and angle
+- Key pain points to address
+- Value propositions that resonate
+
+## Competitive Landscape
+[What alternatives they likely consider, how to differentiate]
+
+## Risk Assessment
+[Payment risk, relationship potential, deal size estimate]
+- Risk level: Low / Medium / High
+- Estimated annual purchase potential: $XXX
+
+Requirements:
+1. Be specific with actionable insights
+2. Base analysis on industry norms and company characteristics
+3. Output in English with clear section headers
+4. If information is limited, state assumptions clearly"""
+    return prompt, system
+
+
+# ---------------------------------------------------------------------------
+# 外贸合同模板生成（Trade Contract Template）
+# ---------------------------------------------------------------------------
+CONTRACT_TYPES: list[str] = [
+    "销售合同 (Sales Contract)",
+    "代理协议 (Agency Agreement)",
+    "保密协议 (NDA)",
+    "独家经销协议 (Exclusive Distribution)",
+    "采购订单确认 (Purchase Order Confirmation)",
+    "样品协议 (Sample Agreement)",
+]
+
+
+def build_contract_template_prompt(
+    contract_type: str,
+    seller_info: str,
+    buyer_info: str,
+    product: str,
+    terms: str = "",
+) -> tuple[str, str | None]:
+    """构建外贸合同模板 Prompt。"""
+    contract_type = sanitize_prompt_param(contract_type, "contract_type")
+    seller_info = sanitize_prompt_param(seller_info, "seller_info")
+    buyer_info = sanitize_prompt_param(buyer_info, "buyer_info")
+    product = sanitize_prompt_param(product, "product")
+    terms = sanitize_input(terms, max_length=1000)
+
+    terms_info = f"\nSpecific Terms: {terms}" if terms else ""
+
+    system = (
+        "你是一位精通国际贸易法律的外贸合同专家，熟悉 UCP600、INCOTERMS 2020、"
+        "CISG (联合国国际货物销售合同公约)。你帮助外贸企业起草专业的英文合同模板。"
+    )
+    prompt = f"""Please generate a professional international trade contract template:
+
+Contract Type: {contract_type}
+Seller: {seller_info}
+Buyer: {buyer_info}
+Product/Service: {product}{terms_info}
+
+Please output a complete contract template with:
+
+## Contract Header
+[Contract title, number placeholder, date]
+
+## Parties
+[Full legal names and addresses of both parties]
+
+## Article 1: Subject Matter
+[Description of goods/services]
+
+## Article 2: Price and Payment
+[Price terms, currency, payment method, payment schedule]
+
+## Article 3: Delivery
+[INCOTERMS, shipping terms, delivery schedule, port]
+
+## Article 4: Quality and Inspection
+[Quality standards, inspection rights, acceptance criteria]
+
+## Article 5: Packaging and Marking
+[Packaging requirements, shipping marks]
+
+## Article 6: Insurance
+[Insurance responsibility, coverage type]
+
+## Article 7: Force Majeure
+[Standard force majeure clause]
+
+## Article 8: Dispute Resolution
+[Arbitration clause, governing law]
+
+## Article 9: Confidentiality
+[If applicable]
+
+## Article 10: General Provisions
+[Amendment, severability, entire agreement, notices]
+
+## Signature Block
+[Signature lines for both parties with date and seal placeholders]
+
+Requirements:
+1. Use professional legal English
+2. Include standard international trade clauses
+3. Leave [PLACEHOLDER] for specific values (prices, dates, quantities)
+4. Reference relevant INCOTERMS and international conventions
+5. Output as plain text suitable for further editing"""
+    return prompt, system
+
+
+# ---------------------------------------------------------------------------
+# 提单解读（Bill of Lading Interpretation）
+# ---------------------------------------------------------------------------
+def build_bl_interpretation_prompt(
+    bl_content: str,
+) -> tuple[str, str | None]:
+    """构建提单解读 Prompt。"""
+    bl_content = sanitize_input(bl_content, max_length=5000)
+
+    system = (
+        "你是一位有15年经验的国际物流和航运专家，精通海运提单(B/L)的所有字段含义、"
+        "法律效力和实务操作注意事项。"
+    )
+    prompt = f"""Please analyze and interpret the following Bill of Lading content:
+
+B/L Content:
+---
+{bl_content}
+---
+
+Please provide:
+
+## Key Fields Extracted
+[Extract and list all identifiable fields in a structured format]
+- B/L Number:
+- Shipper:
+- Consignee:
+- Notify Party:
+- Vessel/Voyage:
+- Port of Loading:
+- Port of Discharge:
+- Container Number:
+- Seal Number:
+- Description of Goods:
+- Gross Weight:
+- Measurement:
+- Number of Packages:
+- Freight Terms (Prepaid/Collect):
+- Date of Issue:
+- Number of Originals:
+
+## Document Type Analysis
+[Type of B/L: Original/Copy, Negotiable/Non-negotiable, Clean/Claused]
+
+## Important Notes
+[Practical advice and warnings]
+- Any discrepancies or unusual terms
+- Customs clearance implications
+- Payment/L/C considerations
+- Risk factors to watch
+
+## Action Items
+[What the importer/exporter should do next]
+
+Requirements:
+1. Extract all identifiable information, mark unclear items as [UNCLEAR]
+2. Explain terms in plain language for non-experts
+3. Flag any potential issues or risks
+4. Output in English with clear section headers"""
+    return prompt, system
+
+
+# ---------------------------------------------------------------------------
+# 竞品分析（Competitor Analysis）
+# ---------------------------------------------------------------------------
+def build_competitor_analysis_prompt(
+    your_product: str,
+    competitor_info: str,
+    your_advantages: str = "",
+    target_market: str = "",
+) -> tuple[str, str | None]:
+    """构建竞品分析 Prompt。"""
+    your_product = sanitize_prompt_param(your_product, "your_product")
+    competitor_info = sanitize_input(competitor_info, max_length=2000)
+    your_advantages = sanitize_prompt_param(your_advantages, "your_advantages")
+    target_market = sanitize_prompt_param(target_market, "target_market")
+
+    advantages_info = f"\nYour Known Advantages: {your_advantages}" if your_advantages else ""
+    market_info = f"\nTarget Market: {target_market}" if target_market else ""
+
+    system = (
+        "你是一位精通B2B市场竞争分析的外贸策略专家，"
+        "擅长从有限信息中提炼竞品差异化策略和销售话术。"
+    )
+    prompt = f"""Please provide a competitive analysis and differentiation strategy:
+
+Your Product: {your_product}
+Competitor Information: {competitor_info}{advantages_info}{market_info}
+
+Please output:
+
+## Competitor Strengths
+[Identify 3-5 likely competitor advantages based on information provided]
+
+## Competitor Weaknesses
+[Identify 3-5 potential gaps or weaknesses to exploit]
+
+## Your Differentiation Points
+[5-7 specific ways to differentiate, ranked by impact]
+1. [Most impactful differentiator]
+2. ...
+
+## Battle Card
+[Quick-reference comparison table for sales conversations]
+| Dimension | You | Competitor |
+|-----------|-----|-----------|
+| ... | ... | ... |
+
+## Recommended Sales Angles
+[3 different approaches to position against this competitor]
+
+### Angle 1: [Name]
+- Opening statement
+- Key proof points
+- Closing question
+
+### Angle 2: [Name]
+...
+
+### Angle 3: [Name]
+...
+
+## Objection Handling
+[Common objections when competing against this rival, with responses]
+- "Their price is lower" → [Response]
+- "They have more experience" → [Response]
+- "We already work with them" → [Response]
+
+Requirements:
+1. Be specific and actionable
+2. Focus on B2B international trade context
+3. Provide ready-to-use sales language
+4. Output in English with section headers"""
+    return prompt, system
