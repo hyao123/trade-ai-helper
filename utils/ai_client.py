@@ -459,3 +459,55 @@ def recognize_email_intent(
     from config.prompts import build_intent_recognition_prompt
     prompt, system = build_intent_recognition_prompt(email_content, context)
     return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
+
+
+
+
+def analyze_customer_profile(
+    company_name: str,
+    website: str = "",
+    industry: str = "",
+    additional_info: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    from config.prompts import build_customer_profile_prompt
+    prompt, system = build_customer_profile_prompt(company_name, website, industry, additional_info)
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
+
+
+def generate_contract_template(
+    contract_type: str,
+    seller_info: str,
+    buyer_info: str,
+    product: str,
+    terms: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    from config.prompts import build_contract_template_prompt
+    prompt, system = build_contract_template_prompt(contract_type, seller_info, buyer_info, product, terms)
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
+
+
+def interpret_bill_of_lading(
+    bl_content: str,
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    from config.prompts import build_bl_interpretation_prompt
+    prompt, system = build_bl_interpretation_prompt(bl_content)
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
+
+
+def analyze_competitor(
+    your_product: str,
+    competitor_info: str,
+    your_advantages: str = "",
+    target_market: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    from config.prompts import build_competitor_analysis_prompt
+    prompt, system = build_competitor_analysis_prompt(your_product, competitor_info, your_advantages, target_market)
+    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
