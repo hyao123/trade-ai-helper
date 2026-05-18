@@ -1,0 +1,48 @@
+{
+  "name": "外贸AI助手 | TradeAI Pro",
+  "short_name": "TradeAI",
+  "description": "AI 赋能外贸全链路：开发信、询盘回复、智能报价、客户管理",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "/app/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/app/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "开发信",
+      "short_name": "开发信",
+      "url": "/📧_开发信",
+      "icons": [{"src": "/app/static/icon-192.png", "sizes": "192x192"}]
+    },
+    {
+      "name": "询盘回复",
+      "short_name": "询盘",
+      "url": "/📩_询盘回复",
+      "icons": [{"src": "/app/static/icon-192.png", "sizes": "192x192"}]
+    },
+    {
+      "name": "智能报价",
+      "short_name": "报价",
+      "url": "/💰_智能报价",
+      "icons": [{"src": "/app/static/icon-192.png", "sizes": "192x192"}]
+    }
+  ]
+}
