@@ -23,15 +23,28 @@ def is_email_configured() -> bool:
     return all(get_secret(var) for var in required_vars)
 
 
-def send_email(to_email: str, subject: str, body: str) -> tuple[bool, str]:
-    """
-    Send an email via SMTP.
+# ---------------------------------------------------------------------------
+# Core SMTP transport (shared by all send functions)
+# ---------------------------------------------------------------------------
 
-    Returns (success, message) tuple.
+def _send_via_smtp(
+    to_email: str,
+    subject: str,
+    body: str,
+    from_display: str = "",
+) -> tuple[bool, str]:
     """
-    if not is_email_configured():
-        return False, "SMTP is not configured"
+    Low-level SMTP send. All public send_* functions delegate here.
 
+    Args:
+        to_email: recipient address
+        subject: email subject
+        body: plain-text body
+        from_display: optional "Name <email>" override for From header
+
+    Returns:
+        (success, message) tuple
+    """
     smtp_host = get_secret("SMTP_HOST")
     smtp_port = get_secret("SMTP_PORT")
     smtp_user = get_secret("SMTP_USER")
@@ -43,8 +56,9 @@ def send_email(to_email: str, subject: str, body: str) -> tuple[bool, str]:
     except (ValueError, TypeError):
         return False, f"Invalid SMTP_PORT value: {smtp_port}"
 
+    # Build MIME message
     msg = MIMEMultipart()
-    msg["From"] = from_email
+    msg["From"] = from_display if from_display else from_email
     msg["To"] = to_email
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "plain", "utf-8"))
@@ -59,7 +73,7 @@ def send_email(to_email: str, subject: str, body: str) -> tuple[bool, str]:
         server.sendmail(from_email, [to_email], msg.as_string())
         server.quit()
         logger.info("Email sent to %s: %s", to_email, subject)
-        return True, "Email sent successfully"
+        return True, f"Email sent to {to_email}"
     except smtplib.SMTPAuthenticationError:
         logger.error("SMTP authentication failed for %s", smtp_user)
         return False, "SMTP authentication failed"
@@ -72,6 +86,21 @@ def send_email(to_email: str, subject: str, body: str) -> tuple[bool, str]:
     except OSError as e:
         logger.error("Network error sending email: %s", e)
         return False, f"Network error: {e}"
+
+
+# ---------------------------------------------------------------------------
+# Public send functions
+# ---------------------------------------------------------------------------
+
+def send_email(to_email: str, subject: str, body: str) -> tuple[bool, str]:
+    """
+    Send an email via SMTP.
+
+    Returns (success, message) tuple.
+    """
+    if not is_email_configured():
+        return False, "SMTP is not configured"
+    return _send_via_smtp(to_email, subject, body)
 
 
 def send_verification_email(to_email: str, token: str) -> tuple[bool, str]:
@@ -106,7 +135,6 @@ def send_password_reset_email(to_email: str, token: str) -> tuple[bool, str]:
         "If you did not request this, please ignore this email."
     )
     return send_email(to_email, subject, body)
-
 
 
 def send_followup_reminder(
@@ -161,38 +189,15 @@ def send_ai_generated_email(
     from_email = get_secret("SMTP_FROM_EMAIL")
     display_from = f"{from_name} <{from_email}>" if from_name else from_email
 
-    smtp_host = get_secret("SMTP_HOST")
-    smtp_port = get_secret("SMTP_PORT")
-    smtp_user = get_secret("SMTP_USER")
-    smtp_password = get_secret("SMTP_PASSWORD")
-
-    try:
-        port = int(smtp_port)
-    except (ValueError, TypeError):
-        return False, f"无效的 SMTP_PORT: {smtp_port}"
-
-    msg = MIMEMultipart()
-    msg["From"] = display_from
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain", "utf-8"))
-
-    try:
-        if port == 465:
-            server = smtplib.SMTP_SSL(smtp_host, port, timeout=30)
-        else:
-            server = smtplib.SMTP(smtp_host, port, timeout=30)
-            server.starttls()
-        server.login(smtp_user, smtp_password)
-        server.sendmail(from_email, [to_email], msg.as_string())
-        server.quit()
-        logger.info("AI email sent to %s: %s", to_email, subject)
+    success, msg = _send_via_smtp(to_email, subject, body, from_display=display_from)
+    if success:
         return True, f"邮件已发送到 {to_email}"
-    except smtplib.SMTPAuthenticationError:
-        return False, "SMTP 认证失败，请检查用户名和密码"
-    except smtplib.SMTPConnectError as e:
-        return False, f"SMTP 连接失败: {e}"
-    except smtplib.SMTPException as e:
-        return False, f"SMTP 错误: {e}"
-    except OSError as e:
-        return False, f"网络错误: {e}"
+    # Translate common errors to Chinese for user-facing context
+    error_map = {
+        "SMTP authentication failed": "SMTP 认证失败，请检查用户名和密码",
+        "SMTP connection failed": "SMTP 连接失败",
+    }
+    for en_prefix, zh_msg in error_map.items():
+        if msg.startswith(en_prefix):
+            return False, zh_msg
+    return False, msg

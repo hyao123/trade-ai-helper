@@ -6,6 +6,7 @@ import streamlit as st
 
 from utils.customers import find_customer, update_customer_stage
 from utils.email_service import is_email_configured
+from utils.sanitize import escape_html
 from utils.ui_helpers import check_auth, inject_css
 from utils.user_auth import get_current_user
 from utils.workflow import (
@@ -71,9 +72,9 @@ if due_items:
         with st.container():
             st.markdown(
                 f'<div class="tip-card">'
-                f'🔔 <b>{item["customer"]}</b>'
-                f'{"（" + item["company"] + "）" if item["company"] else ""} · '
-                f'{item["product"]} · 已发送 <b>{days}</b> 天 · 建议：{rule["hint"]}'
+                f'🔔 <b>{escape_html(item["customer"])}</b>'
+                f'{"（" + escape_html(item["company"]) + "）" if item["company"] else ""} · '
+                f'{escape_html(item["product"])} · 已发送 <b>{days}</b> 天 · 建议：{escape_html(rule["hint"])}'
                 f'</div>',
                 unsafe_allow_html=True,
             )

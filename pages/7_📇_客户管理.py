@@ -15,6 +15,7 @@ from utils.customers import (
     get_customers,
     remove_tag,
 )
+from utils.sanitize import escape_html
 from utils.ui_helpers import check_auth, inject_css
 from utils.workflow import create_workflow_from_customer
 
@@ -143,7 +144,7 @@ else:
             c1, c2, c3 = st.columns(3)
             c1.write(f"📧 {cust['email'] or '—'}")
             c2.write(f"🌍 {cust['country']}")
-            c3.markdown(f"📦 {cust['product'] or '—'}  {score_badge}", unsafe_allow_html=True)
+            c3.markdown(f"📦 {escape_html(cust['product'] or '—')}  {score_badge}", unsafe_allow_html=True)
 
             st.caption(f"添加日期: {cust['created_at']} | 最后联系: {cust['last_contact']}")
             if cust.get("notes"):

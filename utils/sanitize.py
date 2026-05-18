@@ -89,3 +89,20 @@ def sanitize_prompt_param(text: str, param_name: str = "", max_length: int = 500
     Same as sanitize_input but with stricter max_length default.
     """
     return sanitize_input(text, max_length=max_length)
+
+
+
+# ---------------------------------------------------------------------------
+# HTML output sanitization (for user data rendered in unsafe_allow_html contexts)
+# ---------------------------------------------------------------------------
+
+def escape_html(text: str) -> str:
+    """Escape user-provided text for safe rendering in HTML contexts.
+
+    Prevents XSS when user data (customer names, product names, etc.)
+    is interpolated into Streamlit markdown with unsafe_allow_html=True.
+    """
+    if not text:
+        return ""
+    import html as _html
+    return _html.escape(str(text), quote=True)

@@ -10,16 +10,17 @@ from __future__ import annotations
 import streamlit as st
 
 from utils.storage import load_json, load_user_json, save_json, save_user_json
+from utils.user_auth import get_current_username
 
 _FILENAME = "customers.json"
 
 
 def _get_current_username() -> str | None:
-    """Get current logged-in username, or None for shared/admin mode."""
-    user = st.session_state.get("current_user")
-    if user and user.get("username") and user["username"] != "admin":
-        return user["username"]
-    return None
+    """Get current logged-in username, or None for shared/admin mode.
+
+    Delegates to the canonical utils.user_auth.get_current_username().
+    """
+    return get_current_username()
 
 
 def _get_customers() -> list[dict]:

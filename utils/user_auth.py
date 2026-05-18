@@ -76,6 +76,31 @@ def _save_users_db(users: dict) -> None:
     save_json(_USERS_DB_FILENAME, users)
 
 
+def _validate_password(password: str) -> tuple[bool, str]:
+    """
+    Validate password strength.
+
+    Requirements:
+    - At least 8 characters
+    - At least one uppercase letter
+    - At least one lowercase letter
+    - At least one digit
+
+    Returns (is_valid, error_message).
+    """
+    if not password:
+        return False, "Password cannot be empty"
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters"
+    if not any(c.isupper() for c in password):
+        return False, "Password must contain at least one uppercase letter"
+    if not any(c.islower() for c in password):
+        return False, "Password must contain at least one lowercase letter"
+    if not any(c.isdigit() for c in password):
+        return False, "Password must contain at least one digit"
+    return True, ""
+
+
 def register_user(username: str, password: str, email: str = "") -> tuple[bool, str]:
     """
     Register a new user.
@@ -91,8 +116,9 @@ def register_user(username: str, password: str, email: str = "") -> tuple[bool, 
         return False, "Username must be at least 3 characters"
     if not username.isalnum():
         return False, "Username must contain only letters and numbers"
-    if not password or len(password) < 4:
-        return False, "Password must be at least 4 characters"
+    pw_valid, pw_err = _validate_password(password)
+    if not pw_valid:
+        return False, pw_err
 
     # Check uniqueness
     users = _load_users_db()
@@ -127,23 +153,82 @@ def register_user(username: str, password: str, email: str = "") -> tuple[bool, 
     return True, "Registration successful"
 
 
+# ---------------------------------------------------------------------------
+# Brute-force login protection
+# ---------------------------------------------------------------------------
+_MAX_LOGIN_ATTEMPTS = 5
+_LOCKOUT_DURATION_SECONDS = 900  # 15 minutes
+_login_attempts: dict[str, list[float]] = {}
+
+
+def _is_account_locked(username: str) -> bool:
+    """Check if the account is locked due to too many failed login attempts."""
+    import time
+
+    attempts = _login_attempts.get(username, [])
+    now = time.time()
+    # Keep only attempts within the lockout window
+    recent = [t for t in attempts if now - t < _LOCKOUT_DURATION_SECONDS]
+    _login_attempts[username] = recent
+    return len(recent) >= _MAX_LOGIN_ATTEMPTS
+
+
+def _record_failed_attempt(username: str) -> None:
+    """Record a failed login attempt."""
+    import time
+
+    if username not in _login_attempts:
+        _login_attempts[username] = []
+    _login_attempts[username].append(time.time())
+
+
+def _clear_login_attempts(username: str) -> None:
+    """Clear login attempts after successful authentication."""
+    _login_attempts.pop(username, None)
+
+
+def get_lockout_remaining(username: str) -> int:
+    """Return remaining lockout seconds, or 0 if not locked."""
+    import time
+
+    attempts = _login_attempts.get(username, [])
+    now = time.time()
+    recent = [t for t in attempts if now - t < _LOCKOUT_DURATION_SECONDS]
+    if len(recent) >= _MAX_LOGIN_ATTEMPTS:
+        earliest = min(recent)
+        return max(0, int(_LOCKOUT_DURATION_SECONDS - (now - earliest)))
+    return 0
+
+
 def authenticate_user(username: str, password: str) -> tuple[bool, dict | None]:
     """
     Authenticate a user by username and password.
 
     Returns (success, user_dict or None).
+    Includes brute-force protection: locks account after 5 failed attempts for 15 minutes.
     """
     if not username or not password:
         return False, None
 
     username = username.strip().lower()
+
+    # Check if account is locked
+    if _is_account_locked(username):
+        remaining = get_lockout_remaining(username)
+        logger.warning("Login attempt on locked account: %s (locked for %ds)", username, remaining)
+        return False, None
+
     users = _load_users_db()
 
     if username not in users:
+        # Record failed attempt even for non-existent users to prevent user enumeration timing
+        _record_failed_attempt(username)
         return False, None
 
     user = users[username]
     if _verify_password(password, user["password_hash"]):
+        # Successful login — clear failed attempts
+        _clear_login_attempts(username)
         # Return user info without password hash
         user_info = {
             "username": user["username"],
@@ -156,6 +241,15 @@ def authenticate_user(username: str, password: str) -> tuple[bool, dict | None]:
         logger.info("User authenticated: %s", username)
         return True, user_info
 
+    # Failed authentication — record attempt
+    _record_failed_attempt(username)
+    remaining_attempts = _MAX_LOGIN_ATTEMPTS - len(
+        [t for t in _login_attempts.get(username, []) if __import__("time").time() - t < _LOCKOUT_DURATION_SECONDS]
+    )
+    if remaining_attempts <= 0:
+        logger.warning("Account locked due to too many failed attempts: %s", username)
+    else:
+        logger.warning("Failed login attempt for %s (%d attempts remaining)", username, remaining_attempts)
     return False, None
 
 
@@ -164,14 +258,27 @@ def get_current_user() -> dict | None:
     return st.session_state.get("current_user", None)
 
 
+def get_current_username() -> str | None:
+    """Get current logged-in username, or None for shared/admin mode.
+
+    This is the single canonical helper used by all modules that need
+    per-user data isolation (history, workflow, customers, etc.).
+    """
+    user = st.session_state.get("current_user")
+    if user and user.get("username") and user["username"] != "admin":
+        return user["username"]
+    return None
+
+
 def change_password(username: str, old_password: str, new_password: str) -> tuple[bool, str]:
     """
     Change a user's password.
 
     Returns (success, message) tuple.
     """
-    if not new_password or len(new_password) < 4:
-        return False, "New password must be at least 4 characters"
+    pw_valid, pw_err = _validate_password(new_password)
+    if not pw_valid:
+        return False, pw_err
 
     username = username.strip().lower()
     users = _load_users_db()
@@ -365,8 +472,9 @@ def reset_password(username: str, token: str, new_password: str) -> tuple[bool, 
     Validates the token has not expired (1 hour) and matches stored token.
     Returns (success, message) tuple.
     """
-    if not new_password or len(new_password) < 4:
-        return False, "Password must be at least 4 characters"
+    pw_valid, pw_err = _validate_password(new_password)
+    if not pw_valid:
+        return False, pw_err
 
     if not username or not token:
         return False, "Username and token are required"

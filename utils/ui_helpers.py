@@ -23,6 +23,7 @@ from utils.secrets import get_secret
 from utils.user_auth import (
     authenticate_user,
     get_current_user,
+    get_lockout_remaining,
     register_user,
     request_password_reset,
     reset_password,
@@ -328,7 +329,14 @@ def check_auth() -> None:
                             st.session_state["language"] = saved_lang
                         st.rerun()
                     else:
-                        st.error(f"❌ {t('invalid_credentials')}")
+                        # Check if locked out
+                        locked_username = login_username.strip().lower()
+                        lockout_secs = get_lockout_remaining(locked_username)
+                        if lockout_secs > 0:
+                            mins = lockout_secs // 60
+                            st.error(f"🔒 账户已锁定，请 {mins + 1} 分钟后再试")
+                        else:
+                            st.error(f"❌ {t('invalid_credentials')}")
 
         # Forgot password button (outside form since forms can't nest)
         if st.button(f"🔑 {t('forgot_password')}", key="_forgot_pw_btn"):

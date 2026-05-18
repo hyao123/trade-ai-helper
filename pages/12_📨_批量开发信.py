@@ -101,7 +101,14 @@ if uploaded_file is not None:
                 progress_bar = st.progress(0)
                 status_text = st.empty()
 
-                for i, row in enumerate(rows):
+                # --- Parallel generation with ThreadPoolExecutor ---
+                import concurrent.futures
+
+                MAX_WORKERS = 3  # Balance between speed and API rate limits
+
+                def _generate_one(idx_row: tuple[int, dict]) -> tuple[int, dict | str]:
+                    """Generate a single email. Returns (index, result_dict or error_str)."""
+                    i, row = idx_row
                     company = row.get("company", "").strip()
                     contact_name = row.get("contact_name", "").strip()
                     product = row.get("product", "").strip()
@@ -109,15 +116,9 @@ if uploaded_file is not None:
                     country = row.get("country", "").strip()
                     email = row.get("email", "").strip()
 
-                    # 跳过缺少必填字段的行
                     if not company or not contact_name or not product:
-                        errors.append(f"第 {i+1} 行: 缺少必填字段 (company/contact_name/product)")
-                        progress_bar.progress((i + 1) / len(rows))
-                        continue
+                        return i, f"第 {i+1} 行: 缺少必填字段 (company/contact_name/product)"
 
-                    status_text.markdown(f"⏳ 正在生成第 {i+1}/{len(rows)} 封... ({contact_name} @ {company})")
-
-                    # 非流式调用（批量模式）
                     result_text = generate_bulk_email(
                         company=company,
                         contact_name=contact_name,
@@ -129,7 +130,6 @@ if uploaded_file is not None:
                     )
 
                     if result_text and not result_text.startswith("⚠️"):
-                        # 提取 Subject
                         subject = ""
                         body = result_text
                         for line in result_text.splitlines():
@@ -137,20 +137,34 @@ if uploaded_file is not None:
                                 subject = line.strip()[len("subject:"):].strip()
                                 body = result_text[result_text.index("\n", result_text.index(line)) + 1:].strip()
                                 break
-
-                        results_list.append({
+                        return i, {
                             "recipient": f"{contact_name} <{email}>" if email else contact_name,
                             "company": company,
                             "contact_name": contact_name,
                             "subject": subject,
                             "body": body,
                             "full_text": result_text,
-                        })
+                        }
                     else:
-                        errors.append(f"第 {i+1} 行 ({contact_name}): {result_text or '生成失败'}")
+                        return i, f"第 {i+1} 行 ({contact_name}): {result_text or '生成失败'}"
 
-                    progress_bar.progress((i + 1) / len(rows))
+                completed = 0
+                with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                    futures = {
+                        executor.submit(_generate_one, (i, row)): i
+                        for i, row in enumerate(rows)
+                    }
+                    for future in concurrent.futures.as_completed(futures):
+                        completed += 1
+                        progress_bar.progress(completed / len(rows))
+                        idx, result = future.result()
+                        if isinstance(result, dict):
+                            results_list.append(result)
+                        else:
+                            errors.append(result)
+                        status_text.markdown(f"⏳ 已完成 {completed}/{len(rows)} 封...")
 
+                # Sort results by original order (based on contact_name for stability)
                 status_text.empty()
                 progress_bar.empty()
 

@@ -14,6 +14,7 @@ import streamlit as st
 
 from utils.logger import get_logger
 from utils.storage import load_json, load_user_json, save_json, save_user_json
+from utils.user_auth import get_current_username
 
 logger = get_logger("workflow")
 
@@ -30,11 +31,11 @@ FOLLOWUP_RULES: list[dict] = [
 
 
 def _get_current_username() -> str | None:
-    """Get current logged-in username, or None for shared/admin mode."""
-    user = st.session_state.get("current_user")
-    if user and user.get("username") and user["username"] != "admin":
-        return user["username"]
-    return None
+    """Get current logged-in username, or None for shared/admin mode.
+
+    Delegates to the canonical utils.user_auth.get_current_username().
+    """
+    return get_current_username()
 
 
 def _get_workflows() -> list[dict]:
