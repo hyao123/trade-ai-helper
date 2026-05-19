@@ -204,6 +204,7 @@ def create_workflow_from_customer(customer_data: dict) -> bool:
 def send_due_reminders(user_email: str) -> tuple[int, int]:
     """
     Send email reminders for all due workflows to the salesperson.
+    Also triggers in-app notifications for each due workflow.
 
     Args:
         user_email: salesperson's email address
@@ -213,11 +214,30 @@ def send_due_reminders(user_email: str) -> tuple[int, int]:
     """
     from utils.email_service import is_email_configured, send_followup_reminder
 
+    due = get_due_workflows()
+    if not due:
+        return 0, 0
+
+    # ── Trigger in-app notifications for due items ──
+    try:
+        from utils.notifications import notify_followup_due
+        username = _get_current_username()
+        if username:
+            for item in due:
+                notify_followup_due(
+                    username=username,
+                    customer_name=f"{item.get('customer', '')} ({item.get('company', '')})",
+                    product=item.get("product", ""),
+                    days=item["_days_elapsed"],
+                )
+    except Exception as e:
+        logger.debug("Notification trigger failed (non-critical): %s", e)
+
+    # ── Send email reminders ──
     if not is_email_configured():
         logger.warning("Email not configured — cannot send follow-up reminders")
         return 0, 0
 
-    due = get_due_workflows()
     sent = failed = 0
     for item in due:
         rule = item["_rule"]

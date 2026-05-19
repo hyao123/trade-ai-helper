@@ -1,16 +1,21 @@
 """
 utils/ai_client.py
 ------------------
-NVIDIA NIM API 调用层（OpenAI 兼容接口）。
+AI 调用层 — 支持多模型路由（NVIDIA NIM / OpenAI / DeepSeek）。
 
-- 使用 openai SDK（NVIDIA NIM 完全兼容 OpenAI 接口）
+当 ai_gateway 检测到多个 API Key 时，自动使用智能路由和降级机制。
+仅配置 NVIDIA_API_KEY 时保持原有行为不变。
+
 - call_llm()       非流式，返回 str
 - stream_llm()     流式，返回 Generator[str]，供 st.write_stream() 消费
 - Rate Limiting 基于内存 sliding-window（注：多进程/重启后计数重置）
 - 所有 Prompt 模板从 config.prompts 导入
 - Rate-limit slot 仅在 API 成功时消耗（失败自动回滚）
 
-NVIDIA NIM API 文档：https://docs.api.nvidia.com/nim/docs/api-quickstart
+Multi-model routing:
+  - 配置 OPENAI_API_KEY 或 DEEPSEEK_API_KEY 后自动启用 AI Gateway
+  - 用户可通过 AI 偏好页选择模型
+  - 按用户套餐自动选择模型层级 (free=fast, pro=balanced, team=premium)
 """
 
 from __future__ import annotations
@@ -97,8 +102,14 @@ def get_rate_limit_reset_seconds(user_id: str = "default") -> int:
 
 def _check_preconditions(user_id: str = "default") -> str | None:
     """返回错误信息字符串；None 表示可以继续调用。不消耗 rate limit slot。"""
-    if not get_secret("NVIDIA_API_KEY"):
-        return "⚠️ 请先设置 NVIDIA_API_KEY（.env 文件或 Streamlit Cloud Secrets）"
+    # Check if ANY AI provider is configured (not just NVIDIA)
+    has_any_key = (
+        get_secret("NVIDIA_API_KEY")
+        or get_secret("OPENAI_API_KEY")
+        or get_secret("DEEPSEEK_API_KEY")
+    )
+    if not has_any_key:
+        return "⚠️ 请先设置 AI API Key（NVIDIA_API_KEY / OPENAI_API_KEY / DEEPSEEK_API_KEY）"
 
     # Tier-based daily limit check (only for logged-in non-admin users)
     from utils.user_auth import get_current_user
@@ -124,14 +135,45 @@ def _check_preconditions(user_id: str = "default") -> str | None:
 def _handle_api_error(e: Exception) -> str:
     logger.error("API error: %s: %s", type(e).__name__, e)
     if isinstance(e, AuthenticationError):
-        return "⚠️ NVIDIA API Key 无效，请检查 NVIDIA_API_KEY 是否正确。"
+        return "⚠️ API Key 无效，请检查 API Key 配置。"
     if isinstance(e, RateLimitError):
-        return "⚠️ API 调用超出 NVIDIA NIM 平台限额，请稍后重试或升级套餐。"
+        return "⚠️ API 调用超出平台限额，请稍后重试或升级套餐。"
     if isinstance(e, APITimeoutError):
         return "⚠️ 请求超时，请检查网络连接后重试。"
     if isinstance(e, APIStatusError):
-        return f"⚠️ NVIDIA NIM 服务器错误 ({e.status_code})，请稍后重试。"
+        return f"⚠️ AI 服务器错误 ({e.status_code})，请稍后重试。"
     return f"⚠️ 调用失败: {e}"
+
+
+def _should_use_gateway() -> bool:
+    """Determine if multi-model gateway should be used.
+
+    Returns True if:
+    - Multiple AI providers are configured (NVIDIA + OpenAI/DeepSeek), OR
+    - User has explicitly selected a non-default model via preferences
+
+    When only NVIDIA_API_KEY is set, we use the direct path (original behavior).
+    """
+    providers_configured = sum(1 for key in ("NVIDIA_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY")
+                               if get_secret(key))
+    return providers_configured >= 2
+
+
+def _get_user_model_tier(user_id: str) -> str:
+    """Get the AI model tier for a user based on their plan.
+
+    Returns: 'fast', 'balanced', or 'premium'
+    """
+    try:
+        from utils.user_auth import get_current_user
+        current_user = get_current_user()
+        if current_user:
+            tier = current_user.get("tier", "free")
+            from utils.ai_gateway import PLAN_DEFAULTS
+            return PLAN_DEFAULTS.get(tier, "balanced")
+    except Exception:
+        pass
+    return "balanced"
 
 
 # ---------------------------------------------------------------------------
@@ -144,13 +186,32 @@ def call_llm(
     temperature: float = 0.7,
     max_tokens: int | None = None,
 ) -> str:
-    """非流式调用，返回完整文本字符串。失败时自动回滚 rate-limit slot。"""
+    """非流式调用，返回完整文本字符串。支持多模型路由，失败时自动回滚 rate-limit slot。"""
     err = _check_preconditions(user_id)
     if err:
         return err
 
+    # ── Multi-model gateway路由 ──
+    if _should_use_gateway():
+        try:
+            from utils.ai_gateway import get_gateway
+            gw = get_gateway()
+            tier = _get_user_model_tier(user_id)
+            logger.info("API call via gateway: tier=%s, user=%s", tier, user_id)
+            _rate_limit_consume(user_id)
+            result = gw.generate(prompt, system_prompt, tier=tier,
+                                 temperature=temperature, max_tokens=max_tokens)
+            if result.startswith("⚠️"):
+                _rate_limit_rollback(user_id)
+                _rollback_tier_usage()
+            return result
+        except Exception as e:
+            logger.warning("Gateway call failed, falling back to direct: %s", e)
+            _rate_limit_rollback(user_id)
+            # Fall through to direct NVIDIA call below
+
+    # ── Direct NVIDIA NIM call (original path) ──
     logger.info("API call: model=%s, user=%s", _MODEL, user_id)
-    # 先消耗 slot，失败则回滚
     _rate_limit_consume(user_id)
 
     messages = []
@@ -173,14 +234,18 @@ def call_llm(
         return resp.choices[0].message.content or ""
     except Exception as e:
         logger.error("API call failed: model=%s, user=%s", _MODEL, user_id)
-        _rate_limit_rollback(user_id)  # 失败回滚
-        # Rollback tier-based daily usage if applicable
-        from utils.user_auth import get_current_user
-        current_user = get_current_user()
-        if current_user and current_user.get("username") not in (None, "admin"):
-            from utils.pricing import decrement_usage
-            decrement_usage(current_user["username"])
+        _rate_limit_rollback(user_id)
+        _rollback_tier_usage()
         return _handle_api_error(e)
+
+
+def _rollback_tier_usage() -> None:
+    """Rollback tier-based daily usage if applicable."""
+    from utils.user_auth import get_current_user
+    current_user = get_current_user()
+    if current_user and current_user.get("username") not in (None, "admin"):
+        from utils.pricing import decrement_usage
+        decrement_usage(current_user["username"])
 
 
 # 向后兼容别名
@@ -198,7 +263,7 @@ def stream_llm(
     max_tokens: int | None = None,
 ) -> Generator[str, None, None]:
     """
-    流式调用，返回文本 token 的生成器。
+    流式调用，返回文本 token 的生成器。支持多模型路由。
     仅在收到第一个 token 后才消耗 rate-limit slot。
     """
     err = _check_preconditions(user_id)
@@ -206,6 +271,28 @@ def stream_llm(
         yield err
         return
 
+    # ── Multi-model gateway路由 ──
+    if _should_use_gateway():
+        try:
+            from utils.ai_gateway import get_gateway
+            gw = get_gateway()
+            tier = _get_user_model_tier(user_id)
+            logger.info("Stream API call via gateway: tier=%s, user=%s", tier, user_id)
+            slot_consumed = False
+            for token in gw.stream(prompt, system_prompt, tier=tier,
+                                   temperature=temperature, max_tokens=max_tokens):
+                if not slot_consumed and not token.startswith("⚠️"):
+                    _rate_limit_consume(user_id)
+                    slot_consumed = True
+                yield token
+            if not slot_consumed:
+                _rollback_tier_usage()
+            return
+        except Exception as e:
+            logger.warning("Gateway stream failed, falling back to direct: %s", e)
+            # Fall through to direct NVIDIA call below
+
+    # ── Direct NVIDIA NIM call (original path) ──
     logger.info("Stream API call: model=%s, user=%s", _MODEL, user_id)
     messages = []
     if system_prompt:
@@ -229,20 +316,15 @@ def stream_llm(
             delta = chunk.choices[0].delta.content
             if delta:
                 if not slot_consumed:
-                    _rate_limit_consume(user_id)  # 第一个 token 到达才消耗
+                    _rate_limit_consume(user_id)
                     slot_consumed = True
                 yield delta
-        # 如果流完全没产出 token（空响应），不消耗 slot
-    except Exception as e:
-        # 流式失败不消耗 slot（slot_consumed 为 False 时已不消耗）
-        logger.error("Stream API call failed: model=%s, user=%s", _MODEL, user_id)
-        # Rollback tier-based daily usage if no token was produced
         if not slot_consumed:
-            from utils.user_auth import get_current_user
-            current_user = get_current_user()
-            if current_user and current_user.get("username") not in (None, "admin"):
-                from utils.pricing import decrement_usage
-                decrement_usage(current_user["username"])
+            _rollback_tier_usage()
+    except Exception as e:
+        logger.error("Stream API call failed: model=%s, user=%s", _MODEL, user_id)
+        if not slot_consumed:
+            _rollback_tier_usage()
         yield _handle_api_error(e)
 
 

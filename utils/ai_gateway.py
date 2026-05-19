@@ -23,7 +23,10 @@ from __future__ import annotations
 
 from typing import Generator
 
-from openai import OpenAI
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None  # type: ignore[assignment, misc]
 
 from utils.analytics import track_event
 from utils.logger import get_logger

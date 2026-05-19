@@ -341,6 +341,14 @@ def check_auth() -> None:
             reg_email = st.text_input(t("email_optional"), placeholder=t("email_placeholder"), key="reg_email")
             reg_password = st.text_input(t("password"), type="password", placeholder=t("choose_password_placeholder"), key="reg_password")
             reg_confirm = st.text_input(t("confirm"), type="password", placeholder=t("confirm_password_placeholder"), key="reg_confirm")
+            # Referral code field (pre-filled from URL ?ref=xxx)
+            _ref_default = st.query_params.get("ref", "") if hasattr(st, "query_params") else ""
+            reg_referral = st.text_input(
+                "🎁 邀请码（选填）",
+                placeholder="朋友的邀请码，双方各得额度奖励",
+                value=_ref_default,
+                key="reg_referral",
+            )
             if st.form_submit_button(t("register_button"), use_container_width=True, type="primary"):
                 if reg_password != reg_confirm:
                     st.error(f"❌ {t('passwords_not_match')}")
@@ -348,6 +356,20 @@ def check_auth() -> None:
                     success, msg = register_user(reg_username, reg_password, reg_email)
                     if success:
                         st.success(f"✅ {t('registration_successful')}")
+                        # Apply referral code if provided
+                        if reg_referral and reg_referral.strip():
+                            try:
+                                from utils.referral import apply_referral
+                                ref_ok, ref_msg = apply_referral(
+                                    reg_referral.strip(),
+                                    reg_username.strip().lower(),
+                                )
+                                if ref_ok:
+                                    st.success(f"🎁 {ref_msg}")
+                                else:
+                                    st.caption(f"邀请码未生效: {ref_msg}")
+                            except Exception as e:
+                                st.caption(f"邀请码处理失败: {e}")
                     else:
                         st.error(f"❌ {msg}")
 

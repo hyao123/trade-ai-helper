@@ -142,57 +142,74 @@ def send_ai_generated_email(
     subject: str,
     body: str,
     from_name: str = "",
+    customer_id: str = "",
+    campaign: str = "",
 ) -> tuple[bool, str]:
     """
     Send an AI-generated email directly to a customer.
+
+    Automatically creates an email tracking record and uses SendGrid
+    (with open/click tracking) when configured, falling back to SMTP.
 
     Args:
         to_email: recipient email address
         subject: email subject line
         body: email body (plain text)
         from_name: optional display name for sender
+        customer_id: optional CRM customer ID for linking tracking
+        campaign: optional campaign name for grouping stats
 
     Returns:
         (success, message) tuple
     """
+    # ── Create tracking record ──
+    tracking_id = ""
+    try:
+        from utils.email_tracking import create_tracking_record
+        from utils.user_auth import get_current_user
+        user = get_current_user()
+        user_id = user.get("username", "anonymous") if user else "anonymous"
+        tracking_id = create_tracking_record(
+            user_id=user_id,
+            to_email=to_email,
+            subject=subject,
+            customer_id=customer_id,
+            campaign=campaign,
+        )
+    except Exception as e:
+        logger.debug("Email tracking record creation failed (non-critical): %s", e)
+
+    # ── Try SendGrid first (has built-in open/click tracking) ──
+    try:
+        from utils.email_sendgrid import is_sendgrid_configured, send_tracked_email
+        if is_sendgrid_configured():
+            ok, msg, _tid = send_tracked_email(
+                to_email=to_email,
+                subject=subject,
+                body=body,
+                from_name=from_name,
+                tracking_id=tracking_id,
+            )
+            return ok, msg
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.warning("SendGrid send failed, falling back to SMTP: %s", e)
+
+    # ── Fallback: SMTP send ──
     if not is_email_configured():
         return False, "SMTP 未配置，请在设置中填写 SMTP 参数"
 
-    from_email = get_secret("SMTP_FROM_EMAIL")
-    display_from = f"{from_name} <{from_email}>" if from_name else from_email
+    success, msg = send_email(to_email, subject, body)
 
-    smtp_host = get_secret("SMTP_HOST")
-    smtp_port = get_secret("SMTP_PORT")
-    smtp_user = get_secret("SMTP_USER")
-    smtp_password = get_secret("SMTP_PASSWORD")
-
-    try:
-        port = int(smtp_port)
-    except (ValueError, TypeError):
-        return False, f"无效的 SMTP_PORT: {smtp_port}"
-
-    msg = MIMEMultipart()
-    msg["From"] = display_from
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain", "utf-8"))
-
-    try:
-        if port == 465:
-            server = smtplib.SMTP_SSL(smtp_host, port, timeout=30)
-        else:
-            server = smtplib.SMTP(smtp_host, port, timeout=30)
-            server.starttls()
-        server.login(smtp_user, smtp_password)
-        server.sendmail(from_email, [to_email], msg.as_string())
-        server.quit()
-        logger.info("AI email sent to %s: %s", to_email, subject)
+    if success:
         return True, f"邮件已发送到 {to_email}"
-    except smtplib.SMTPAuthenticationError:
-        return False, "SMTP 认证失败，请检查用户名和密码"
-    except smtplib.SMTPConnectError as e:
-        return False, f"SMTP 连接失败: {e}"
-    except smtplib.SMTPException as e:
-        return False, f"SMTP 错误: {e}"
-    except OSError as e:
-        return False, f"网络错误: {e}"
+    # Translate common errors to Chinese
+    error_map = {
+        "SMTP authentication failed": "SMTP 认证失败，请检查用户名和密码",
+        "SMTP connection failed": "SMTP 连接失败",
+    }
+    for en_prefix, zh_msg in error_map.items():
+        if msg.startswith(en_prefix):
+            return False, zh_msg
+    return False, msg

@@ -145,29 +145,29 @@ class TestAnalytics(unittest.TestCase):
 
     def test_total_customers_count(self):
         report = generate_full_report(self._sample_customers())
-        self.assertEqual(report.total_customers, 5)
+        self.assertEqual(report["total_customers"], 5)
 
     def test_conversion_rate_correct(self):
         # 已下单 + 长期合作 = 2 out of 5 = 40%
         report = generate_full_report(self._sample_customers())
-        self.assertAlmostEqual(report.conversion_rate, 40.0, places=1)
+        self.assertAlmostEqual(report["conversion_rate"], 40.0, places=1)
 
     def test_empty_customers_report(self):
         report = generate_full_report([])
-        self.assertEqual(report.total_customers, 0)
-        self.assertEqual(report.conversion_rate, 0.0)
-        self.assertEqual(report.funnel, [])
+        self.assertEqual(report["total_customers"], 0)
+        self.assertEqual(report["conversion_rate"], 0.0)
+        self.assertEqual(report["funnel"], [])
 
     def test_funnel_includes_all_present_stages(self):
         funnel = compute_funnel(self._sample_customers())
-        stages_in_funnel = [f.stage for f in funnel]
+        stages_in_funnel = [f["stage"] for f in funnel]
         self.assertIn("新客户", stages_in_funnel)
         self.assertIn("已报价", stages_in_funnel)
         self.assertIn("已下单", stages_in_funnel)
 
     def test_funnel_percentages_sum_to_100(self):
         funnel = compute_funnel(self._sample_customers())
-        total_pct = sum(f.percentage for f in funnel)
+        total_pct = sum(f["percentage"] for f in funnel)
         self.assertAlmostEqual(total_pct, 100.0, delta=1.0)
 
     def test_segmentation_top_countries(self):
@@ -190,8 +190,10 @@ class TestAnalytics(unittest.TestCase):
 
     def test_stage_distribution_counts(self):
         report = generate_full_report(self._sample_customers())
-        self.assertEqual(report.stage_distribution.get("新客户", 0), 2)
-        self.assertEqual(report.stage_distribution.get("已下单", 0), 1)
+        funnel = report["funnel"]
+        stage_dist = {f["stage"]: f["count"] for f in funnel}
+        self.assertEqual(stage_dist.get("新客户", 0), 2)
+        self.assertEqual(stage_dist.get("已下单", 0), 1)
 
 
 # ---------------------------------------------------------------------------

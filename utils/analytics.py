@@ -156,3 +156,17 @@ def _forward_external(event: dict) -> None:
             urllib.request.urlopen(req, timeout=5)
         except Exception as e:
             logger.debug("PostHog forward failed: %s", e)
+
+
+
+# ---------------------------------------------------------------------------
+# Backward compatibility: re-export CRM analytics functions
+# (formerly in this file, now in utils/crm_analytics.py)
+# ---------------------------------------------------------------------------
+from utils.crm_analytics import (  # noqa: F401, E402
+    compute_activity_metrics,
+    compute_funnel,
+    compute_monthly_activity,
+    compute_segmentation,
+    generate_full_report,
+)

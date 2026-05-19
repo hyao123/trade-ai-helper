@@ -220,6 +220,7 @@ def record_open(tracking_id: str) -> bool:
     Record an email open event.
 
     Called when the tracking pixel is loaded by the email client.
+    Also triggers an in-app notification to the sender.
 
     Returns:
         True if the record was found and updated
@@ -234,6 +235,19 @@ def record_open(tracking_id: str) -> bool:
                 record["status"] = "opened"
             save_json(_TRACKING_FILE, records)
             logger.info("Open recorded: %s (count=%d)", tracking_id, record["open_count"])
+
+            # Trigger notification on first open only
+            if record["open_count"] == 1:
+                try:
+                    from utils.notifications import notify_email_opened
+                    notify_email_opened(
+                        username=record.get("user_id", ""),
+                        customer_email=record.get("to_email", ""),
+                        subject=record.get("subject", ""),
+                    )
+                except Exception as e:
+                    logger.debug("Open notification failed (non-critical): %s", e)
+
             return True
     logger.warning("Open event for unknown tracking_id: %s", tracking_id)
     return False
