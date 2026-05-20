@@ -43,6 +43,12 @@ _DEFAULTS: dict[str, str] = {
     "ai_response_length": "中等",    # 简短 / 中等 / 详细
     "ai_custom_instructions": "",   # Appended to every prompt
     "ai_forbidden_words": "",       # Comma-separated
+    # Custom AI provider (user-supplied)
+    "custom_provider_enabled": "false",  # "true" / "false"
+    "custom_provider_name": "",          # Display name, e.g. "Ollama" / "SiliconFlow"
+    "custom_provider_base_url": "",      # e.g. https://api.siliconflow.cn/v1
+    "custom_provider_api_key": "",       # SK / Bearer token
+    "custom_provider_model": "",         # Model ID, e.g. Qwen/Qwen2.5-72B-Instruct
 }
 
 

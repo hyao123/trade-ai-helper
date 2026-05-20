@@ -33,8 +33,8 @@ prefs = get_prefs()
 # Tab 2: AI 写作风格
 # Tab 3: 高级 Prompt 控制
 # ══════════════════════════════════════════════════════
-tab_identity, tab_style, tab_advanced = st.tabs(
-    ["👤 身份信息（自动预填）", "✍️ AI 写作风格", "🔧 高级 Prompt 控制"]
+tab_identity, tab_style, tab_advanced, tab_custom_model = st.tabs(
+    ["👤 身份信息（自动预填）", "✍️ AI 写作风格", "🔧 高级 Prompt 控制", "🔑 自定义模型"]
 )
 
 # ──────────────────────────────────────────────────────
@@ -231,7 +231,183 @@ with tab_advanced:
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ── 状态摘要 ──────────────────────────────────────────
+# ──────────────────────────────────────────────────────
+# Tab 4: Custom Model Provider
+# ──────────────────────────────────────────────────────
+with tab_custom_model:
+    st.markdown('<div class="main-form">', unsafe_allow_html=True)
+    st.markdown("""
+    <div class="tip-card">
+    🔑 配置任意兼容 OpenAI 接口的模型服务（SiliconFlow、Ollama、月之暗面、零一万物等）。
+    启用后将<strong>优先</strong>于内置 NVIDIA / OpenAI / DeepSeek 调用。
+    </div>
+    """, unsafe_allow_html=True)
+
+    custom_enabled = st.toggle(
+        "启用自定义模型",
+        value=prefs.get("custom_provider_enabled", "false").lower() == "true",
+        help="开启后，所有 AI 生成将优先使用下方配置的自定义模型",
+    )
+
+    # ── Preset shortcuts ──────────────────────────────
+    PRESETS: dict[str, dict] = {
+        "（手动填写）": {"base_url": "", "model": ""},
+        "SiliconFlow": {
+            "base_url": "https://api.siliconflow.cn/v1",
+            "model": "Qwen/Qwen2.5-72B-Instruct",
+        },
+        "月之暗面 (Moonshot)": {
+            "base_url": "https://api.moonshot.cn/v1",
+            "model": "moonshot-v1-8k",
+        },
+        "零一万物 (Yi)": {
+            "base_url": "https://api.lingyiwanwu.com/v1",
+            "model": "yi-large",
+        },
+        "DeepSeek (官方)": {
+            "base_url": "https://api.deepseek.com/v1",
+            "model": "deepseek-chat",
+        },
+        "Groq": {
+            "base_url": "https://api.groq.com/openai/v1",
+            "model": "llama-3.3-70b-versatile",
+        },
+        "Together AI": {
+            "base_url": "https://api.together.xyz/v1",
+            "model": "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
+        },
+        "Ollama (本地)": {
+            "base_url": "http://localhost:11434/v1",
+            "model": "qwen2.5:72b",
+        },
+    }
+
+    preset_names = list(PRESETS.keys())
+    # Detect which preset matches current prefs (by base_url)
+    current_base = prefs.get("custom_provider_base_url", "")
+    default_preset_idx = 0
+    for i, (pname, pcfg) in enumerate(PRESETS.items()):
+        if pcfg.get("base_url") and pcfg["base_url"] == current_base:
+            default_preset_idx = i
+            break
+
+    selected_preset = st.selectbox(
+        "快速选择服务商",
+        preset_names,
+        index=default_preset_idx,
+        help="选择后自动填入 Base URL 和推荐模型，也可手动修改",
+        disabled=not custom_enabled,
+    )
+    preset_cfg = PRESETS[selected_preset]
+
+    st.markdown("---")
+    col_c1, col_c2 = st.columns(2)
+
+    with col_c1:
+        custom_name = st.text_input(
+            "服务商名称（备注用）",
+            value=prefs.get("custom_provider_name", "") or selected_preset.split(" ")[0],
+            placeholder="例如: SiliconFlow",
+            disabled=not custom_enabled,
+        )
+        custom_base_url = st.text_input(
+            "Base URL *",
+            value=prefs.get("custom_provider_base_url", "") if default_preset_idx == 0
+                  else preset_cfg.get("base_url", prefs.get("custom_provider_base_url", "")),
+            placeholder="https://api.siliconflow.cn/v1",
+            help="以 /v1 结尾的 OpenAI 兼容接口地址",
+            disabled=not custom_enabled,
+        )
+
+    with col_c2:
+        custom_model = st.text_input(
+            "模型 ID *",
+            value=prefs.get("custom_provider_model", "") if default_preset_idx == 0
+                  else preset_cfg.get("model", prefs.get("custom_provider_model", "")),
+            placeholder="例如: Qwen/Qwen2.5-72B-Instruct",
+            help="传入 API 的 model 字段，需与服务商文档一致",
+            disabled=not custom_enabled,
+        )
+        custom_api_key = st.text_input(
+            "API Key (SK) *",
+            value=prefs.get("custom_provider_api_key", ""),
+            placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx",
+            type="password",
+            help="Bearer token / Secret Key，不会上传到任何第三方",
+            disabled=not custom_enabled,
+        )
+
+    # ── Connection test ───────────────────────────────
+    col_save, col_test = st.columns([2, 1])
+
+    with col_save:
+        if st.button("💾 保存自定义模型配置", type="primary",
+                     use_container_width=True, key="save_custom_model"):
+            if custom_enabled and (not custom_base_url.strip() or
+                                   not custom_api_key.strip() or
+                                   not custom_model.strip()):
+                st.error("❌ 启用自定义模型时，Base URL、模型 ID 和 API Key 均为必填项。")
+            else:
+                update_prefs({
+                    "custom_provider_enabled": "true" if custom_enabled else "false",
+                    "custom_provider_name": custom_name.strip(),
+                    "custom_provider_base_url": custom_base_url.strip().rstrip("/"),
+                    "custom_provider_model": custom_model.strip(),
+                    "custom_provider_api_key": custom_api_key.strip(),
+                })
+                if custom_enabled:
+                    st.success(f"✅ 已保存！后续所有 AI 调用将优先使用 **{custom_name or custom_model}**。")
+                else:
+                    st.success("✅ 已保存（自定义模型已禁用，恢复使用内置服务商）。")
+
+    with col_test:
+        if st.button("🔗 测试连接", use_container_width=True, key="test_custom_model",
+                     disabled=not custom_enabled):
+            if not custom_base_url.strip() or not custom_api_key.strip() or not custom_model.strip():
+                st.warning("请先填写 Base URL、模型 ID 和 API Key")
+            else:
+                with st.spinner("连接测试中…"):
+                    try:
+                        from openai import OpenAI as _OAI
+                        _test_client = _OAI(
+                            api_key=custom_api_key.strip(),
+                            base_url=custom_base_url.strip().rstrip("/"),
+                        )
+                        _resp = _test_client.chat.completions.create(
+                            model=custom_model.strip(),
+                            messages=[{"role": "user", "content": "Say OK"}],
+                            max_tokens=5,
+                            timeout=15,
+                        )
+                        _reply = (_resp.choices[0].message.content or "").strip()
+                        st.success(f"✅ 连接成功！模型回复: {_reply}")
+                    except Exception as _e:
+                        st.error(f"❌ 连接失败: {_e}")
+
+    # ── Current status card ───────────────────────────
+    st.markdown("---")
+    _cp = get_prefs()
+    _cp_enabled = _cp.get("custom_provider_enabled", "false").lower() == "true"
+    _cp_url = _cp.get("custom_provider_base_url", "")
+    _cp_model = _cp.get("custom_provider_model", "")
+    _cp_has_key = bool(_cp.get("custom_provider_api_key", "").strip())
+
+    if _cp_enabled and _cp_url and _cp_model and _cp_has_key:
+        st.info(
+            f"🟢 **自定义模型已启用**  \n"
+            f"服务商: `{_cp.get('custom_provider_name', '自定义') or '自定义'}`  \n"
+            f"Base URL: `{_cp_url}`  \n"
+            f"模型: `{_cp_model}`  \n"
+            f"API Key: `{'*' * 8}{_cp.get('custom_provider_api_key','')[-4:]}`"
+        )
+    elif _cp_enabled:
+        st.warning("⚠️ 自定义模型已开启但配置不完整，请检查 Base URL / 模型 ID / API Key。")
+    else:
+        st.info("⚪ 自定义模型未启用，使用内置服务商（NVIDIA / OpenAI / DeepSeek）。")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 st.markdown("---")
 st.markdown("### 📋 当前设置摘要")
 
@@ -261,6 +437,19 @@ with summary_cols[3]:
     has_forbidden = bool(current_prefs.get("ai_forbidden_words", "").strip())
     st.caption(f"自定义指令: {'✅ 已设置' if has_custom else '未设置'}")
     st.caption(f"禁用词: {'✅ 已设置' if has_forbidden else '未设置'}")
+
+_cm_enabled = current_prefs.get("custom_provider_enabled", "false").lower() == "true"
+_cm_ok = all([
+    _cm_enabled,
+    current_prefs.get("custom_provider_base_url", "").strip(),
+    current_prefs.get("custom_provider_model", "").strip(),
+    current_prefs.get("custom_provider_api_key", "").strip(),
+])
+if _cm_ok:
+    _cm_label = current_prefs.get("custom_provider_name", "") or current_prefs.get("custom_provider_model", "")
+    st.info(f"🔑 **自定义模型已启用：** `{_cm_label}` · 所有 AI 调用将优先使用此模型")
+elif _cm_enabled:
+    st.warning("🔑 自定义模型已开启但配置不完整，请前往「🔑 自定义模型」Tab 补全设置。")
 
 st.markdown("---")
 st.markdown('<div class="footer">💼 外贸AI助手 · AI偏好设置</div>', unsafe_allow_html=True)
