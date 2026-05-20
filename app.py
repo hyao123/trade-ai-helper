@@ -89,25 +89,32 @@ st.markdown("""
 
 /* ── (nav-item styles removed — buttons are now the rows) ── */
 
-/* ── Nav → button: 整行可点击列表样式 ── */
+/* ── Nav → button: Apple-style 长条按钮 ── */
 .nav-section .stButton > button {
-    background: #ffffff !important;
-    color: #1e293b !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 10px !important;
-    font-weight: 600 !important;
+    background: #f8f8fa !important;
+    color: #1d1d1f !important;
+    border: none !important;
+    border-radius: 12px !important;
+    font-weight: 500 !important;
     font-size: 0.92rem !important;
-    padding: 12px 16px !important;
+    padding: 14px 20px !important;
     text-align: left !important;
     box-shadow: none !important;
-    transition: all .15s !important;
-    margin-bottom: 4px !important;
+    transition: all .2s cubic-bezier(.4,0,.2,1) !important;
+    margin-bottom: 6px !important;
+    letter-spacing: -0.01em !important;
+    -webkit-font-smoothing: antialiased !important;
 }
 .nav-section .stButton > button:hover {
-    background: #f5f3ff !important;
-    border-color: #a5b4fc !important;
-    color: #4338ca !important;
-    box-shadow: 0 2px 8px rgba(99,102,241,0.1) !important;
+    background: #f0eef5 !important;
+    color: #1d1d1f !important;
+    box-shadow: none !important;
+    transform: scale(0.985) !important;
+}
+.nav-section .stButton > button:active {
+    background: #e8e6ef !important;
+    transform: scale(0.975) !important;
+    transition: all .08s !important;
 }
 
 /* ── Tips row ── */
