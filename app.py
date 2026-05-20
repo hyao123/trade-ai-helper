@@ -101,6 +101,24 @@ st.markdown("""
 .nav-item-title { font-size: 0.95rem; font-weight: 600; color: #1e293b; }
 .nav-item-desc  { font-size: 0.84rem; color: #64748b; }
 
+/* ── Nav → button: 醒目样式 ── */
+.nav-section .stButton > button {
+    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 700 !important;
+    font-size: 0.9rem !important;
+    padding: 6px 16px !important;
+    box-shadow: 0 2px 6px rgba(99,102,241,0.25) !important;
+    transition: all .2s !important;
+}
+.nav-section .stButton > button:hover {
+    box-shadow: 0 4px 12px rgba(99,102,241,0.35) !important;
+    transform: translateY(-1px) !important;
+    background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%) !important;
+}
+
 /* ── Tips row ── */
 .tips-grid {
     display: grid;
@@ -231,6 +249,7 @@ st.markdown('</div>', unsafe_allow_html=True)
 # 全功能分类导航
 # ══════════════════════════════════════════════════════════════════════
 st.markdown('<div class="section-label">全功能导航</div>', unsafe_allow_html=True)
+st.markdown('<div class="nav-section">', unsafe_allow_html=True)
 
 tab_email, tab_doc, tab_crm, tab_tools, tab_platform = st.tabs([
     "📧 邮件", "📝 文案", "👥 CRM", "🔧 工具", "⚙️ 设置",
@@ -308,6 +327,8 @@ with tab_platform:
         ("💳", "套餐升级",  "Free/Pro/Enterprise",          "pages/23_💳_套餐升级.py"),
         ("👤", "账户管理",  "资料+密码+套餐",               "pages/11_👤_账户管理.py"),
     ])
+
+st.markdown('</div>', unsafe_allow_html=True)  # close nav-section
 
 # ══════════════════════════════════════════════════════════════════════
 # 使用技巧
