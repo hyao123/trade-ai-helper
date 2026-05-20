@@ -12,7 +12,7 @@ from utils.ui_helpers import check_auth, inject_css
 configure_logging()
 
 st.set_page_config(
-    page_title="外贸AI助手 | TradeAI Pro",
+    page_title="外贸AI助手 | AI-Trade Pro",
     page_icon="💼",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -340,7 +340,7 @@ st.markdown("""
 st.markdown("---")
 st.markdown(
     '<div class="footer">'
-    '💼 <strong>TradeAI Pro</strong> &nbsp;·&nbsp; '
+    '💼 <strong>AI-Trade Pro</strong> &nbsp;·&nbsp; '
     '外贸全流程 AI 助手 &nbsp;·&nbsp; '
     'Powered by NVIDIA NIM · OpenAI · DeepSeek'
     '</div>',

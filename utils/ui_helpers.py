@@ -391,9 +391,14 @@ def show_sidebar_info() -> None:
         # ── Logo / Brand ──
         st.markdown(
             '<div style="text-align:center;padding:0.8rem 0 0.6rem;">'
-            '<div style="font-size:2rem;line-height:1;">💼</div>'
-            '<div style="font-size:1.05rem;font-weight:800;color:#1e293b;margin-top:4px;letter-spacing:-0.02em;">TradeAI Pro</div>'
-            '<div style="font-size:0.68rem;color:#64748b;margin-top:2px;">外贸全流程 AI 助手</div>'
+            '<div style="display:inline-flex;align-items:center;justify-content:center;'
+            'width:44px;height:44px;border-radius:12px;'
+            'background:linear-gradient(135deg,#4f46e5 0%,#6366f1 100%);'
+            'box-shadow:0 2px 8px rgba(99,102,241,0.3);margin-bottom:6px;">'
+            '<span style="font-size:1.4rem;filter:brightness(10);">🌐</span>'
+            '</div>'
+            '<div style="font-size:1.1rem;font-weight:800;color:#1e293b;letter-spacing:-0.02em;">AI-Trade Pro</div>'
+            '<div style="font-size:0.66rem;color:#64748b;margin-top:2px;">外贸全流程 AI 助手</div>'
             '</div>',
             unsafe_allow_html=True,
         )
