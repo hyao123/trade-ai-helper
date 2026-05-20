@@ -323,6 +323,15 @@ _CSS = """
     .footer { text-align: center; padding: 1.8rem; color: var(--text-3); font-size: 0.78rem; }
     .footer a { color: var(--primary) !important; text-decoration: none; }
 
+    /* ── Hide Streamlit default chrome for cleaner look ── */
+    #MainMenu { visibility: hidden; }
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+        backdrop-filter: none !important;
+    }
+    footer { visibility: hidden; }
+    [data-testid="stDecoration"] { display: none !important; }
+
     /* ── Misc ── */
     .price-tag {
         background: rgba(255,255,255,0.18); padding: 0.4rem 1rem;
@@ -369,7 +378,7 @@ def _get_session_user_id() -> str:
 
 
 def show_sidebar_info() -> None:
-    """在侧栏显示用户信息、剩余 API 调用次数和重置倒计时。"""
+    """在侧栏显示 Logo、用户信息、剩余 API 调用次数和重置倒计时。"""
     from utils.ai_client import (
         RATE_LIMIT_MAX_CALLS,
         get_rate_limit_remaining,
@@ -379,6 +388,17 @@ def show_sidebar_info() -> None:
     uid = _get_session_user_id()
 
     with st.sidebar:
+        # ── Logo / Brand ──
+        st.markdown(
+            '<div style="text-align:center;padding:0.8rem 0 0.6rem;">'
+            '<div style="font-size:2rem;line-height:1;">💼</div>'
+            '<div style="font-size:1.05rem;font-weight:800;color:#1e293b;margin-top:4px;letter-spacing:-0.02em;">TradeAI Pro</div>'
+            '<div style="font-size:0.68rem;color:#64748b;margin-top:2px;">外贸全流程 AI 助手</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown("---")
+
         # Language selector at top
         lang_options = list(LANGUAGES.keys())
         current_lang = st.session_state.get("language", "zh")
