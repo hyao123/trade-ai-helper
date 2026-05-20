@@ -6,18 +6,9 @@ from __future__ import annotations
 
 import streamlit as st
 
-from utils.ui_helpers import check_auth, inject_css
+from utils.ui_helpers import check_auth, inject_css, page_setup
 
-st.set_page_config(page_title="汇率计算 | 外贸AI助手", page_icon="💱", layout="wide")
-inject_css()
-check_auth()
-
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">💱 汇率计算器</h1>
-    <p class="hero-subtitle">多币种快速换算 · 报价金额批量转换 · 支持自定义汇率</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("汇率计算", "💱", "💱 汇率计算器", "多币种快速换算 · 报价金额批量转换 · 支持自定义汇率")
 
 # 参考汇率（1 USD = X）
 RATES: dict[str, float] = {

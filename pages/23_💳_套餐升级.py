@@ -14,20 +14,10 @@ from utils.payment import (
     is_payment_configured,
 )
 from utils.pricing import TIER_CONFIG, get_daily_usage
-from utils.ui_helpers import check_auth, inject_css
+from utils.ui_helpers import check_auth, inject_css, page_setup
 from utils.user_auth import get_current_user
 
-st.set_page_config(page_title="套餐升级 | 外贸AI助手", page_icon="💳", layout="wide")
-inject_css()
-check_auth()
-
-# ── 页头 ──────────────────────────────────────────────
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">💳 套餐升级</h1>
-    <p class="hero-subtitle">解锁 Pro / Enterprise 功能 · Logo 上传 · 无限导出 · 优先支持</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("套餐升级", "💳", "💳 套餐升级", "解锁 Pro / Enterprise 功能 · Logo 上传 · 无限导出 · 优先支持")
 
 current_user = get_current_user()
 if not current_user:

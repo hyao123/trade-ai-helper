@@ -14,21 +14,11 @@ from utils.customers import get_customers, import_customers
 from utils.history import _get_history, get_history_count, import_history
 from utils.pricing import check_feature_access
 from utils.templates import _get_store, import_templates
-from utils.ui_helpers import check_auth, inject_css
+from utils.ui_helpers import check_auth, inject_css, page_setup
 from utils.user_auth import get_current_user
 from utils.workflow import get_all_workflows, import_workflows
 
-st.set_page_config(page_title="数据导出 | 外贸AI助手", page_icon="📈", layout="wide")
-inject_css()
-check_auth()
-
-# ── 页头 ──────────────────────────────────────────────
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">📈 数据导出 / 导入</h1>
-    <p class="hero-subtitle">备份所有数据、迁移账户、导出 CSV 分析报表</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("数据导出", "📈", "📈 数据导出 / 导入", "备份所有数据、迁移账户、导出 CSV 分析报表")
 
 # ── 功能门控 ──────────────────────────────────────────
 current_user = get_current_user()

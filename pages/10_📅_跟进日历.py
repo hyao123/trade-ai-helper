@@ -6,6 +6,7 @@ import streamlit as st
 
 from utils.customers import find_customer, update_customer_stage
 from utils.email_service import is_email_configured
+from utils.sanitize import escape_html
 from utils.ui_helpers import check_auth, inject_css
 from utils.user_auth import get_current_user
 from utils.workflow import (
@@ -69,11 +70,14 @@ if due_items:
         rule = item["_rule"]
         days = item["_days_elapsed"]
         with st.container():
+            safe_customer = escape_html(item["customer"])
+            safe_company = escape_html(item["company"]) if item["company"] else ""
+            safe_product = escape_html(item["product"])
+            company_part = f"（{safe_company}）" if safe_company else ""
             st.markdown(
                 f'<div class="tip-card">'
-                f'🔔 <b>{item["customer"]}</b>'
-                f'{"（" + item["company"] + "）" if item["company"] else ""} · '
-                f'{item["product"]} · 已发送 <b>{days}</b> 天 · 建议：{rule["hint"]}'
+                f'🔔 <b>{safe_customer}</b>{company_part} · '
+                f'{safe_product} · 已发送 <b>{days}</b> 天 · 建议：{rule["hint"]}'
                 f'</div>',
                 unsafe_allow_html=True,
             )

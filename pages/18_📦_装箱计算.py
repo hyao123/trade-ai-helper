@@ -12,19 +12,9 @@ from utils.container_calc import (
     calculate_all_containers,
     recommend_container,
 )
-from utils.ui_helpers import check_auth, inject_css
+from utils.ui_helpers import check_auth, inject_css, page_setup
 
-st.set_page_config(page_title="装箱计算 | 外贸AI助手", page_icon="📦", layout="wide")
-inject_css()
-check_auth()
-
-# ── 页头 ──────────────────────────────────────────────
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">📦 装箱计算器</h1>
-    <p class="hero-subtitle">输入外箱尺寸与重量，一键计算 20GP / 40GP / 40HQ 装载方案</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("装箱计算", "📦", "📦 装箱计算器", "输入外箱尺寸与重量，一键计算 20GP / 40GP / 40HQ 装载方案")
 
 # ── 表单 ──────────────────────────────────────────────
 st.markdown('<div class="main-form">', unsafe_allow_html=True)

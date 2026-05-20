@@ -1,41 +1,27 @@
 """
 pages/12_📨_批量开发信.py
 批量开发信生成：上传CSV，逐行生成个性化开发信，支持预览和批量下载。
+并发生成（ThreadPoolExecutor, max_workers=3），速度提升约 3x。
 """
+from __future__ import annotations
+
 import csv
 import io
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import streamlit as st
 
 from utils.ai_client import generate_bulk_email
 from utils.history import add_to_history
-from utils.ui_helpers import (
-    check_auth,
-    copy_button,
-    get_user_id,
-    inject_css,
-)
+from utils.ui_helpers import copy_button, get_user_id, page_setup
 
-st.set_page_config(page_title="批量开发信 | 外贸AI助手", page_icon="📨", layout="wide")
-inject_css()
-check_auth()
-
-if "results" not in st.session_state:
-    st.session_state.results = {}
-
-# ── 页头 ──────────────────────────────────────────────
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">📨 批量开发信生成</h1>
-    <p class="hero-subtitle">上传 CSV 客户名单，一键批量生成个性化开发信</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("批量开发信", "📨", "📨 批量开发信生成", "上传 CSV 客户名单，AI 并发批量生成个性化开发信（3x 提速）")
 
 # ── 说明 ──────────────────────────────────────────────
 st.markdown('<div class="main-form">', unsafe_allow_html=True)
 st.markdown(
     '<div class="tip-card">💡 CSV 文件需包含列：company, contact_name, product（必填）；'
-    '可选列：email, industry, country。每行生成一封个性化开发信。</div>',
+    '可选列：email, industry, country。每行生成一封个性化开发信（并发 3 路，约 3x 提速）。</div>',
     unsafe_allow_html=True,
 )
 
@@ -45,8 +31,32 @@ uploaded_file = st.file_uploader(
     type=["csv"],
     help="必填列: company, contact_name, product；可选列: email, industry, country",
 )
-
 st.markdown("</div>", unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
+# Helper: parse one email result text
+# ---------------------------------------------------------------------------
+def _parse_email(result_text: str, contact_name: str, company: str, email: str) -> dict:
+    subject = ""
+    body = result_text
+    for line in result_text.splitlines():
+        if line.strip().lower().startswith("subject:"):
+            subject = line.strip()[len("subject:"):].strip()
+            idx = result_text.find(line)
+            try:
+                body = result_text[result_text.index("\n", idx) + 1:].strip()
+            except ValueError:
+                body = result_text
+            break
+    return {
+        "recipient": f"{contact_name} <{email}>" if email else contact_name,
+        "company": company,
+        "contact_name": contact_name,
+        "subject": subject,
+        "body": body,
+        "full_text": result_text,
+    }
+
 
 # ── CSV 解析与预览 ────────────────────────────────────
 if uploaded_file is not None:
@@ -59,7 +69,6 @@ if uploaded_file is not None:
         rows = []
 
     if rows:
-        # 检查必填列
         required_cols = {"company", "contact_name", "product"}
         actual_cols = set(rows[0].keys()) if rows else set()
         missing_cols = required_cols - actual_cols
@@ -68,97 +77,103 @@ if uploaded_file is not None:
             st.error(f"⚠️ CSV 缺少必填列: {', '.join(missing_cols)}")
             st.info("需要的列: company, contact_name, product（可选: email, industry, country）")
         else:
-            # 预览步骤
+            # ── 预览 ──────────────────────────────────────
             st.markdown("### 📋 CSV 预览")
             st.caption(f"共 {len(rows)} 条记录")
-
-            # 构建预览表格
-            preview_data = []
-            for row in rows[:20]:  # 最多预览20行
-                preview_data.append({
-                    "公司": row.get("company", ""),
-                    "联系人": row.get("contact_name", ""),
-                    "产品": row.get("product", ""),
-                    "邮箱": row.get("email", ""),
-                    "行业": row.get("industry", ""),
-                    "国家": row.get("country", ""),
-                })
+            preview_data = [
+                {
+                    "公司": r.get("company", ""),
+                    "联系人": r.get("contact_name", ""),
+                    "产品": r.get("product", ""),
+                    "邮箱": r.get("email", ""),
+                    "行业": r.get("industry", ""),
+                    "国家": r.get("country", ""),
+                }
+                for r in rows[:20]
+            ]
             st.dataframe(preview_data, use_container_width=True)
             if len(rows) > 20:
                 st.caption(f"（仅显示前 20 条，共 {len(rows)} 条）")
 
-            # 生成按钮
             generate_clicked = st.button(
-                f"🚀 批量生成 {len(rows)} 封开发信",
+                f"🚀 批量生成 {len(rows)} 封开发信（并发加速）",
                 type="primary",
                 use_container_width=True,
             )
 
             if generate_clicked:
                 user_id = get_user_id()
-                results_list = []
-                errors = []
-                progress_bar = st.progress(0)
-                status_text = st.empty()
+                results_list: list[dict] = []
+                errors: list[str] = []
 
+                # ── 过滤掉缺失必填字段的行 ──────────────────
+                valid_rows = []
                 for i, row in enumerate(rows):
-                    company = row.get("company", "").strip()
-                    contact_name = row.get("contact_name", "").strip()
-                    product = row.get("product", "").strip()
-                    industry = row.get("industry", "").strip()
-                    country = row.get("country", "").strip()
-                    email = row.get("email", "").strip()
-
-                    # 跳过缺少必填字段的行
-                    if not company or not contact_name or not product:
-                        errors.append(f"第 {i+1} 行: 缺少必填字段 (company/contact_name/product)")
-                        progress_bar.progress((i + 1) / len(rows))
-                        continue
-
-                    status_text.markdown(f"⏳ 正在生成第 {i+1}/{len(rows)} 封... ({contact_name} @ {company})")
-
-                    # 非流式调用（批量模式）
-                    result_text = generate_bulk_email(
-                        company=company,
-                        contact_name=contact_name,
-                        product=product,
-                        industry=industry,
-                        country=country,
-                        stream=False,
-                        user_id=user_id,
-                    )
-
-                    if result_text and not result_text.startswith("⚠️"):
-                        # 提取 Subject
-                        subject = ""
-                        body = result_text
-                        for line in result_text.splitlines():
-                            if line.strip().lower().startswith("subject:"):
-                                subject = line.strip()[len("subject:"):].strip()
-                                body = result_text[result_text.index("\n", result_text.index(line)) + 1:].strip()
-                                break
-
-                        results_list.append({
-                            "recipient": f"{contact_name} <{email}>" if email else contact_name,
-                            "company": company,
-                            "contact_name": contact_name,
-                            "subject": subject,
-                            "body": body,
-                            "full_text": result_text,
-                        })
+                    if not row.get("company", "").strip() or \
+                       not row.get("contact_name", "").strip() or \
+                       not row.get("product", "").strip():
+                        errors.append(f"第 {i+1} 行: 缺少必填字段")
                     else:
-                        errors.append(f"第 {i+1} 行 ({contact_name}): {result_text or '生成失败'}")
+                        valid_rows.append((i, row))
 
-                    progress_bar.progress((i + 1) / len(rows))
+                if valid_rows:
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    completed_count = 0
 
-                status_text.empty()
-                progress_bar.empty()
+                    # ── 并发生成（max_workers=3）────────────────
+                    def _generate_one(args: tuple) -> tuple[int, str | None, dict]:
+                        """Generate a single email. Returns (row_idx, error_msg, result_dict)."""
+                        idx, row = args
+                        company = row.get("company", "").strip()
+                        contact_name = row.get("contact_name", "").strip()
+                        product = row.get("product", "").strip()
+                        industry = row.get("industry", "").strip()
+                        country = row.get("country", "").strip()
+                        email_addr = row.get("email", "").strip()
+                        try:
+                            result_text = generate_bulk_email(
+                                company=company,
+                                contact_name=contact_name,
+                                product=product,
+                                industry=industry,
+                                country=country,
+                                stream=False,
+                                user_id=user_id,
+                            )
+                        except Exception as ex:
+                            return idx, f"生成异常: {ex}", {}
+                        if result_text and not result_text.startswith("⚠️"):
+                            return idx, None, _parse_email(result_text, contact_name, company, email_addr)
+                        return idx, result_text or "生成失败", {}
 
-                # 保存到 session_state
+                    # Collect futures indexed by future object
+                    with ThreadPoolExecutor(max_workers=3) as executor:
+                        future_to_idx = {
+                            executor.submit(_generate_one, args): args[0]
+                            for args in valid_rows
+                        }
+                        for future in as_completed(future_to_idx):
+                            row_idx, err_msg, result = future.result()
+                            completed_count += 1
+                            if err_msg:
+                                errors.append(f"第 {row_idx + 1} 行: {err_msg}")
+                            else:
+                                results_list.append(result)
+
+                            # Streamlit UI updates from background threads aren't safe;
+                            # update progress based on completed count
+                            progress_bar.progress(completed_count / len(valid_rows))
+                            status_text.markdown(
+                                f"⏳ 已完成 {completed_count}/{len(valid_rows)} 封..."
+                            )
+
+                    status_text.empty()
+                    progress_bar.empty()
+
                 st.session_state["bulk_email_results"] = results_list
                 st.session_state["bulk_email_errors"] = errors
 
-                # 保存第一条成功结果到历史
                 if results_list:
                     add_to_history(
                         "批量开发信",
@@ -179,18 +194,14 @@ if uploaded_file is not None:
                     unsafe_allow_html=True,
                 )
 
-                # 展开列表显示每封邮件
                 for idx, item in enumerate(results_list):
                     with st.expander(
-                        f"📧 {item['contact_name']} @ {item['company']} | Subject: {item['subject'][:40]}...",
+                        f"📧 {item['contact_name']} @ {item['company']}"
+                        + (f" | {item['subject'][:40]}" if item["subject"] else ""),
                         expanded=(idx == 0),
                     ):
-                        st.text_area(
-                            "邮件内容",
-                            item["full_text"],
-                            height=180,
-                            key=f"bulk_result_{idx}",
-                        )
+                        st.text_area("邮件内容", item["full_text"], height=180,
+                                     key=f"bulk_result_{idx}")
                         copy_button(item["full_text"], f"bulk_copy_{idx}")
 
                 # 批量下载 CSV
@@ -200,11 +211,10 @@ if uploaded_file is not None:
                 writer.writerow(["recipient", "subject", "body"])
                 for item in results_list:
                     writer.writerow([item["recipient"], item["subject"], item["body"]])
-                csv_content = output.getvalue()
 
                 st.download_button(
                     "📥 批量下载 CSV（recipient, subject, body）",
-                    csv_content,
+                    output.getvalue(),
                     file_name="批量开发信_结果.csv",
                     mime="text/csv",
                     use_container_width=True,

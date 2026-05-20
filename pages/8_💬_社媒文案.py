@@ -6,27 +6,13 @@ import streamlit as st
 
 from utils.ai_client import generate_social_post
 from utils.ui_helpers import (
-    check_auth,
     get_user_id,
-    inject_css,
+    page_setup,
     show_regenerate_buttons,
     show_result,
 )
 
-st.set_page_config(page_title="社媒文案 | 外贸AI助手", page_icon="💬", layout="wide")
-inject_css()
-check_auth()
-
-if "results" not in st.session_state:
-    st.session_state.results = {}
-
-# ── 页头 ──────────────────────────────────────────────
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">💬 社媒文案生成</h1>
-    <p class="hero-subtitle">一键生成 LinkedIn / Instagram / Facebook 营销文案</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("社媒文案", "💬", "💬 社媒文案生成", "一键生成 LinkedIn / Instagram / Facebook 营销文案")
 
 # ── 表单 ──────────────────────────────────────────────
 st.markdown('<div class="main-form">', unsafe_allow_html=True)

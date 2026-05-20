@@ -9,22 +9,10 @@ import uuid
 import streamlit as st
 
 from utils.packing_invoice_pdf import generate_proforma_invoice_pdf
-from utils.ui_helpers import check_auth, inject_css
+from utils.ui_helpers import check_auth, inject_css, page_setup
 from utils.user_prefs import get_pref, save_seller_identity
 
-st.set_page_config(page_title="形式发票 | 外贸AI助手", page_icon="📜", layout="wide")
-inject_css()
-check_auth()
-
-if "results" not in st.session_state:
-    st.session_state.results = {}
-
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">📜 形式发票生成</h1>
-    <p class="hero-subtitle">Proforma Invoice — 价格确认 · L/C 申请 · 海关预清关 · 一键 PDF</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("形式发票", "📜", "📜 形式发票生成", "Proforma Invoice — 价格确认 · L/C 申请 · 海关预清关 · 一键 PDF")
 
 st.markdown("""
 <div class="tip-card">

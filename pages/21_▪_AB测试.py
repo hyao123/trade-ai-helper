@@ -14,22 +14,9 @@ from utils.ab_testing import (
     load_ab_tests,
     simulate_results,
 )
-from utils.ui_helpers import check_auth, get_user_id, inject_css, show_result
+from utils.ui_helpers import check_auth, get_user_id, inject_css, page_setup, show_result
 
-st.set_page_config(page_title="A/B测试 | 外贸AI助手", page_icon="▪", layout="wide")
-inject_css()
-check_auth()
-
-if "results" not in st.session_state:
-    st.session_state.results = {}
-
-# ── 页头 ──────────────────────────────────────────────
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">🧪 A/B 测试</h1>
-    <p class="hero-subtitle">AI 生成多版邮件变体，支持 3 版本对比 + 效果追踪，科学优化转化率</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("A/B测试", "▪", "🧪 A/B 测试", "AI 生成多版邮件变体，支持 3 版本对比 + 效果追踪，科学优化转化率")
 
 # ── 标签页 ──────────────────────────────────────────
 tab_create, tab_history = st.tabs(["🆕 创建新测试", "📋 历史测试"])
