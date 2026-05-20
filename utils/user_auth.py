@@ -3,6 +3,12 @@ utils/user_auth.py
 ------------------
 Multi-user authentication system with registration, login, session management,
 and per-user data isolation.
+
+Security features:
+  - PBKDF2-HMAC-SHA256 (100k iterations) password hashing
+  - Password strength policy: min 8 chars, 1 uppercase, 1 digit
+  - Brute-force protection: 5 failed attempts → 15-minute account lockout
+  - Per-user data directory isolation
 """
 
 from __future__ import annotations
@@ -22,6 +28,12 @@ logger = get_logger("user_auth")
 
 _PBKDF2_ITERATIONS = 100_000
 _USERS_DB_FILENAME = "users_db.json"
+
+# ---------------------------------------------------------------------------
+# Brute-force protection constants
+# ---------------------------------------------------------------------------
+_MAX_FAILED_ATTEMPTS = 5
+_LOCKOUT_MINUTES = 15
 
 
 def _get_users_db_path() -> Path:
@@ -76,6 +88,73 @@ def _save_users_db(users: dict) -> None:
     save_json(_USERS_DB_FILENAME, users)
 
 
+# ---------------------------------------------------------------------------
+# Password strength policy
+# ---------------------------------------------------------------------------
+
+def validate_password_strength(password: str) -> tuple[bool, str]:
+    """
+    Enforce password strength policy:
+      - Minimum 8 characters
+      - At least 1 uppercase letter
+      - At least 1 digit
+
+    Returns (is_valid, error_message). On success, error_message is "".
+    """
+    if not password or len(password) < 8:
+        return False, "Password must be at least 8 characters"
+    if not any(c.isupper() for c in password):
+        return False, "Password must contain at least 1 uppercase letter"
+    if not any(c.isdigit() for c in password):
+        return False, "Password must contain at least 1 digit"
+    return True, ""
+
+
+# ---------------------------------------------------------------------------
+# Brute-force protection helpers
+# ---------------------------------------------------------------------------
+
+def _is_account_locked(user: dict) -> bool:
+    """Return True if the account is currently locked due to too many failed attempts."""
+    lockout_until = user.get("lockout_until")
+    if not lockout_until:
+        return False
+    try:
+        lockout_dt = datetime.fromisoformat(lockout_until)
+        if lockout_dt.tzinfo is None:
+            lockout_dt = lockout_dt.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) < lockout_dt
+    except (ValueError, TypeError):
+        return False
+
+
+def _record_failed_login(users: dict, username: str) -> str | None:
+    """
+    Increment failed login counter. If threshold reached, apply lockout.
+
+    Returns a user-facing error message string if locked out, else None.
+    Caller must save users_db after calling this.
+    """
+    user = users[username]
+    attempts = user.get("failed_attempts", 0) + 1
+    user["failed_attempts"] = attempts
+
+    if attempts >= _MAX_FAILED_ATTEMPTS:
+        lockout_until = (datetime.now(timezone.utc) + timedelta(minutes=_LOCKOUT_MINUTES)).isoformat()
+        user["lockout_until"] = lockout_until
+        user["failed_attempts"] = 0  # Reset so next window starts fresh
+        logger.warning("Account locked for user=%s after %d failed attempts", username, attempts)
+        return f"账户已被锁定 {_LOCKOUT_MINUTES} 分钟（连续 {_MAX_FAILED_ATTEMPTS} 次错误），请稍后再试"
+    return None
+
+
+def _clear_failed_login(users: dict, username: str) -> None:
+    """Reset failed login counter after a successful authentication."""
+    user = users[username]
+    user["failed_attempts"] = 0
+    user.pop("lockout_until", None)
+
+
 def register_user(username: str, password: str, email: str = "") -> tuple[bool, str]:
     """
     Register a new user.
@@ -91,8 +170,11 @@ def register_user(username: str, password: str, email: str = "") -> tuple[bool, 
         return False, "Username must be at least 3 characters"
     if not username.isalnum():
         return False, "Username must contain only letters and numbers"
-    if not password or len(password) < 4:
-        return False, "Password must be at least 4 characters"
+
+    # Password strength policy
+    ok, pw_msg = validate_password_strength(password)
+    if not ok:
+        return False, pw_msg
 
     # Check uniqueness
     users = _load_users_db()
@@ -127,11 +209,18 @@ def register_user(username: str, password: str, email: str = "") -> tuple[bool, 
     return True, "Registration successful"
 
 
-def authenticate_user(username: str, password: str) -> tuple[bool, dict | None]:
+def authenticate_user(username: str, password: str) -> tuple[bool, dict | str | None]:
     """
     Authenticate a user by username and password.
 
-    Returns (success, user_dict or None).
+    Includes brute-force protection:
+    - Tracks failed attempts per account
+    - Locks account for 15 minutes after 5 consecutive failures
+
+    Returns:
+      (True, user_dict) on success
+      (False, error_message_str) on lockout
+      (False, None) on wrong credentials or user not found
     """
     if not username or not password:
         return False, None
@@ -143,8 +232,27 @@ def authenticate_user(username: str, password: str) -> tuple[bool, dict | None]:
         return False, None
 
     user = users[username]
+
+    # Check lockout before verifying password (avoids timing oracle)
+    if _is_account_locked(user):
+        lockout_until = user.get("lockout_until", "")
+        try:
+            lockout_dt = datetime.fromisoformat(lockout_until)
+            if lockout_dt.tzinfo is None:
+                lockout_dt = lockout_dt.replace(tzinfo=timezone.utc)
+            remaining = int((lockout_dt - datetime.now(timezone.utc)).total_seconds() / 60) + 1
+            remaining = max(1, remaining)
+        except (ValueError, TypeError):
+            remaining = _LOCKOUT_MINUTES
+        msg = f"账户已锁定，请 {remaining} 分钟后再试（连续密码错误次数过多）"
+        logger.warning("Blocked locked account login attempt: %s", username)
+        return False, msg
+
     if _verify_password(password, user["password_hash"]):
-        # Return user info without password hash
+        # Successful login — clear failure counter
+        _clear_failed_login(users, username)
+        _save_users_db(users)
+
         user_info = {
             "username": user["username"],
             "email": user.get("email", ""),
@@ -156,6 +264,11 @@ def authenticate_user(username: str, password: str) -> tuple[bool, dict | None]:
         logger.info("User authenticated: %s", username)
         return True, user_info
 
+    # Failed login — record attempt
+    lockout_msg = _record_failed_login(users, username)
+    _save_users_db(users)
+    if lockout_msg:
+        return False, lockout_msg
     return False, None
 
 
@@ -170,8 +283,9 @@ def change_password(username: str, old_password: str, new_password: str) -> tupl
 
     Returns (success, message) tuple.
     """
-    if not new_password or len(new_password) < 4:
-        return False, "New password must be at least 4 characters"
+    ok, pw_msg = validate_password_strength(new_password)
+    if not ok:
+        return False, pw_msg
 
     username = username.strip().lower()
     users = _load_users_db()
@@ -365,8 +479,9 @@ def reset_password(username: str, token: str, new_password: str) -> tuple[bool, 
     Validates the token has not expired (1 hour) and matches stored token.
     Returns (success, message) tuple.
     """
-    if not new_password or len(new_password) < 4:
-        return False, "Password must be at least 4 characters"
+    ok, pw_msg = validate_password_strength(new_password)
+    if not ok:
+        return False, pw_msg
 
     if not username or not token:
         return False, "Username and token are required"

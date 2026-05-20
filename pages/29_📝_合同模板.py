@@ -8,22 +8,10 @@ import streamlit as st
 
 from config.prompts import CONTRACT_TYPES
 from utils.ai_client import generate_contract_template
-from utils.ui_helpers import check_auth, get_user_id, inject_css, show_result
+from utils.ui_helpers import get_user_id, page_setup, show_result
 from utils.user_prefs import get_pref
 
-st.set_page_config(page_title="合同模板 | 外贸AI助手", page_icon="📝", layout="wide")
-inject_css()
-check_auth()
-
-if "results" not in st.session_state:
-    st.session_state.results = {}
-
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">📝 外贸合同模板</h1>
-    <p class="hero-subtitle">AI 生成专业英文合同模板 · 销售合同 · 代理协议 · NDA · 独家经销</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("合同模板", "📝", "📝 外贸合同模板", "AI 生成专业英文合同模板 · 销售合同 · 代理协议 · NDA · 独家经销")
 
 st.markdown('<div class="main-form">', unsafe_allow_html=True)
 st.markdown(

@@ -40,7 +40,7 @@ class TestUserAuth:
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.user_auth import _load_users_db, register_user
-                success, msg = register_user("testuser", "pass1234")
+                success, msg = register_user("testuser", "Test1234")
                 assert success is True
                 assert "successful" in msg.lower()
                 users = _load_users_db()
@@ -57,7 +57,7 @@ class TestUserAuth:
                  patch("utils.storage.get_data_dir", return_value=tmp_dir), \
                  patch("utils.user_auth.get_data_dir", return_value=tmp_dir):
                 from utils.user_auth import register_user
-                register_user("diruser", "pass1234")
+                register_user("diruser", "Test1234")
                 user_dir = tmp_dir / "users" / "diruser"
                 assert user_dir.exists()
                 assert user_dir.is_dir()
@@ -69,7 +69,7 @@ class TestUserAuth:
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.user_auth import _load_users_db, register_user
-                register_user("emailuser", "pass1234", email="test@example.com")
+                register_user("emailuser", "Test1234", email="test@example.com")
                 users = _load_users_db()
                 assert users["emailuser"]["email"] == "test@example.com"
 
@@ -80,8 +80,8 @@ class TestUserAuth:
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.user_auth import register_user
-                register_user("dupuser", "pass1234")
-                success, msg = register_user("dupuser", "otherpass")
+                register_user("dupuser", "Test1234")
+                success, msg = register_user("dupuser", "Other1234")
                 assert success is False
                 assert "already exists" in msg.lower()
 
@@ -92,8 +92,8 @@ class TestUserAuth:
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.user_auth import register_user
-                register_user("TestUser", "pass1234")
-                success, msg = register_user("testuser", "otherpass")
+                register_user("TestUser", "Test1234")
+                success, msg = register_user("testuser", "Other1234")
                 assert success is False
                 assert "already exists" in msg.lower()
 
@@ -119,7 +119,7 @@ class TestUserAuth:
                 assert "at least 3" in msg.lower()
 
     def test_register_short_password_rejected(self):
-        """register_user rejects password shorter than 4 characters."""
+        """register_user rejects password shorter than 8 characters."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
@@ -127,7 +127,29 @@ class TestUserAuth:
                 from utils.user_auth import register_user
                 success, msg = register_user("validuser", "ab")
                 assert success is False
-                assert "at least 4" in msg.lower()
+                assert "at least 8" in msg.lower()
+
+    def test_register_password_no_uppercase_rejected(self):
+        """register_user rejects password without uppercase letter."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import register_user
+                success, msg = register_user("validuser", "alllower1")
+                assert success is False
+                assert "uppercase" in msg.lower()
+
+    def test_register_password_no_digit_rejected(self):
+        """register_user rejects password without a digit."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import register_user
+                success, msg = register_user("validuser", "NoDigitPass")
+                assert success is False
+                assert "digit" in msg.lower()
 
     def test_register_non_alphanumeric_rejected(self):
         """register_user rejects username with special characters."""
@@ -136,7 +158,7 @@ class TestUserAuth:
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.user_auth import register_user
-                success, msg = register_user("user@name", "pass1234")
+                success, msg = register_user("user@name", "Test1234")
                 assert success is False
                 assert "letters and numbers" in msg.lower()
 
@@ -147,8 +169,8 @@ class TestUserAuth:
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.user_auth import authenticate_user, register_user
-                register_user("authuser", "mypassword")
-                success, user_info = authenticate_user("authuser", "mypassword")
+                register_user("authuser", "MyPass123")
+                success, user_info = authenticate_user("authuser", "MyPass123")
                 assert success is True
                 assert user_info is not None
                 assert user_info["username"] == "authuser"
@@ -156,15 +178,16 @@ class TestUserAuth:
                 assert "password_hash" not in user_info
 
     def test_authenticate_user_wrong_password(self):
-        """authenticate_user fails with wrong password."""
+        """authenticate_user fails with wrong password (returns None info, not lockout str)."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.user_auth import authenticate_user, register_user
-                register_user("authuser2", "correct")
-                success, user_info = authenticate_user("authuser2", "wrong")
+                register_user("authuser2", "Correct9")
+                success, user_info = authenticate_user("authuser2", "WrongPass1")
                 assert success is False
+                # First wrong attempt should return None (not lockout string)
                 assert user_info is None
 
     def test_authenticate_user_nonexistent(self):
@@ -185,8 +208,8 @@ class TestUserAuth:
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.user_auth import authenticate_user, register_user
-                register_user("CaseUser", "pass1234")
-                success, user_info = authenticate_user("caseuser", "pass1234")
+                register_user("CaseUser", "Test1234")
+                success, user_info = authenticate_user("caseuser", "Test1234")
                 assert success is True
 
     def test_password_hashing_consistent(self):
@@ -251,15 +274,15 @@ class TestUserAuth:
                     change_password,
                     register_user,
                 )
-                register_user("chguser", "oldpass1")
-                success, msg = change_password("chguser", "oldpass1", "newpass1")
+                register_user("chguser", "OldPass1")
+                success, msg = change_password("chguser", "OldPass1", "NewPass2")
                 assert success is True
                 assert "successfully" in msg.lower()
                 # Verify new password works
-                auth_ok, _ = authenticate_user("chguser", "newpass1")
+                auth_ok, _ = authenticate_user("chguser", "NewPass2")
                 assert auth_ok is True
                 # Verify old password no longer works
-                auth_old, _ = authenticate_user("chguser", "oldpass1")
+                auth_old, _ = authenticate_user("chguser", "OldPass1")
                 assert auth_old is False
 
     def test_change_password_wrong_old(self):
@@ -269,22 +292,22 @@ class TestUserAuth:
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.user_auth import change_password, register_user
-                register_user("chguser2", "realpass")
-                success, msg = change_password("chguser2", "wrongpass", "newpass1")
+                register_user("chguser2", "RealPass1")
+                success, msg = change_password("chguser2", "WrongPass1", "NewPass2")
                 assert success is False
                 assert "incorrect" in msg.lower()
 
     def test_change_password_short_new(self):
-        """change_password rejects new password shorter than 4 characters."""
+        """change_password rejects new password that fails strength policy."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.user_auth import change_password, register_user
-                register_user("chguser3", "realpass")
-                success, msg = change_password("chguser3", "realpass", "ab")
+                register_user("chguser3", "RealPass1")
+                success, msg = change_password("chguser3", "RealPass1", "ab")
                 assert success is False
-                assert "at least 4" in msg.lower()
+                assert "at least 8" in msg.lower()
 
     def test_get_user_data_dir_creates_directory(self):
         """get_user_data_dir creates the user directory if needed."""
@@ -327,7 +350,7 @@ class TestUserAuth:
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.user_auth import _load_users_db, register_user
-                register_user("verifyuser", "pass1234", email="test@example.com")
+                register_user("verifyuser", "Test1234", email="test@example.com")
                 users = _load_users_db()
                 assert users["verifyuser"]["email_verified"] is False
                 assert "verification_token" in users["verifyuser"]
@@ -344,7 +367,7 @@ class TestUserAuth:
                     register_user,
                     verify_email_token,
                 )
-                register_user("tokenuser", "pass1234", email="t@example.com")
+                register_user("tokenuser", "Test1234", email="t@example.com")
                 users = _load_users_db()
                 token_data = users["tokenuser"]["verification_token"]
                 token = token_data["token"] if isinstance(token_data, dict) else token_data
@@ -363,7 +386,7 @@ class TestUserAuth:
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.user_auth import register_user, verify_email_token
-                register_user("wrongtokenuser", "pass1234", email="t@example.com")
+                register_user("wrongtokenuser", "Test1234", email="t@example.com")
                 success, msg = verify_email_token("wrongtokenuser", "wrong-token-value")
                 assert success is False
                 assert "invalid" in msg.lower()
@@ -386,7 +409,7 @@ class TestUserAuth:
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.user_auth import find_user_by_email, register_user
-                register_user("emailfinder", "pass1234", email="finder@example.com")
+                register_user("emailfinder", "Test1234", email="finder@example.com")
                 result = find_user_by_email("finder@example.com")
                 assert result == "emailfinder"
 
@@ -407,7 +430,7 @@ class TestUserAuth:
             with patch("utils.user_auth.st", _mock_st), \
                  patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.user_auth import find_user_by_email, register_user
-                register_user("casemail", "pass1234", email="CaseTest@Example.COM")
+                register_user("casemail", "Test1234", email="CaseTest@Example.COM")
                 result = find_user_by_email("casetest@example.com")
                 assert result == "casemail"
 
@@ -422,7 +445,7 @@ class TestUserAuth:
                     register_user,
                     request_password_reset,
                 )
-                register_user("resetuser", "pass1234", email="reset@example.com")
+                register_user("resetuser", "Test1234", email="reset@example.com")
                 success, msg = request_password_reset("reset@example.com")
                 assert success is True
                 users = _load_users_db()
@@ -454,17 +477,17 @@ class TestUserAuth:
                     request_password_reset,
                     reset_password,
                 )
-                register_user("resetok", "oldpass1", email="resetok@example.com")
+                register_user("resetok", "OldPass1", email="resetok@example.com")
                 request_password_reset("resetok@example.com")
                 users = _load_users_db()
                 token = users["resetok"]["reset_token"]["token"]
-                success, msg = reset_password("resetok", token, "newpass1")
+                success, msg = reset_password("resetok", token, "NewPass2")
                 assert success is True
                 # Verify new password works
-                auth_ok, _ = authenticate_user("resetok", "newpass1")
+                auth_ok, _ = authenticate_user("resetok", "NewPass2")
                 assert auth_ok is True
                 # Verify old password no longer works
-                auth_old, _ = authenticate_user("resetok", "oldpass1")
+                auth_old, _ = authenticate_user("resetok", "OldPass1")
                 assert auth_old is False
 
     def test_reset_password_wrong_token(self):
@@ -478,9 +501,9 @@ class TestUserAuth:
                     request_password_reset,
                     reset_password,
                 )
-                register_user("resetwrong", "pass1234", email="wrong@example.com")
+                register_user("resetwrong", "Test1234", email="wrong@example.com")
                 request_password_reset("wrong@example.com")
-                success, msg = reset_password("resetwrong", "wrong-token-value", "newpass1")
+                success, msg = reset_password("resetwrong", "wrong-token-value", "NewPass2")
                 assert success is False
 
     def test_reset_password_expired_token(self):
@@ -498,7 +521,7 @@ class TestUserAuth:
                     request_password_reset,
                     reset_password,
                 )
-                register_user("resetexp", "pass1234", email="exp@example.com")
+                register_user("resetexp", "Test1234", email="exp@example.com")
                 request_password_reset("exp@example.com")
                 # Manually set expired timestamp
                 users = _load_users_db()
@@ -506,12 +529,12 @@ class TestUserAuth:
                 expired_time = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
                 users["resetexp"]["reset_token"]["expires"] = expired_time
                 _save_users_db(users)
-                success, msg = reset_password("resetexp", token, "newpass1")
+                success, msg = reset_password("resetexp", token, "NewPass2")
                 assert success is False
                 assert "expired" in msg.lower()
 
     def test_reset_password_short_password(self):
-        """reset_password fails for password shorter than 4 characters."""
+        """reset_password fails for password that violates strength policy."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             with patch("utils.user_auth.st", _mock_st), \
@@ -522,18 +545,128 @@ class TestUserAuth:
                     request_password_reset,
                     reset_password,
                 )
-                register_user("resetshort", "pass1234", email="short@example.com")
+                register_user("resetshort", "Test1234", email="short@example.com")
                 request_password_reset("short@example.com")
                 users = _load_users_db()
                 token = users["resetshort"]["reset_token"]["token"]
                 success, msg = reset_password("resetshort", token, "ab")
                 assert success is False
-                assert "at least 4" in msg.lower()
+                assert "at least 8" in msg.lower()
 
 
-# ---------------------------------------------------------------------------
-# Simple runner for sandbox validation (pytest not available)
-# ---------------------------------------------------------------------------
+    def test_validate_password_strength_valid(self):
+        """validate_password_strength accepts passwords meeting all criteria."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import validate_password_strength
+                ok, msg = validate_password_strength("Test1234")
+                assert ok is True
+                assert msg == ""
+
+    def test_validate_password_strength_too_short(self):
+        """validate_password_strength rejects passwords under 8 characters."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import validate_password_strength
+                ok, msg = validate_password_strength("Ab1")
+                assert ok is False
+                assert "at least 8" in msg.lower()
+
+    def test_validate_password_strength_no_uppercase(self):
+        """validate_password_strength rejects passwords without uppercase."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import validate_password_strength
+                ok, msg = validate_password_strength("nouppercase1")
+                assert ok is False
+                assert "uppercase" in msg.lower()
+
+    def test_validate_password_strength_no_digit(self):
+        """validate_password_strength rejects passwords without a digit."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import validate_password_strength
+                ok, msg = validate_password_strength("NoDigitHere")
+                assert ok is False
+                assert "digit" in msg.lower()
+
+    def test_validate_password_strength_empty(self):
+        """validate_password_strength rejects empty/None password."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import validate_password_strength
+                ok, msg = validate_password_strength("")
+                assert ok is False
+                ok2, _ = validate_password_strength(None)
+                assert ok2 is False
+
+    def test_brute_force_lockout_after_5_failures(self):
+        """Account is locked after 5 consecutive wrong password attempts."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import authenticate_user, register_user
+                register_user("locktest", "LockMe99")
+                # 5 wrong attempts
+                for _ in range(5):
+                    ok, info = authenticate_user("locktest", "WrongPass1")
+                    assert ok is False
+                # 6th attempt: account should now be locked
+                ok, info = authenticate_user("locktest", "LockMe99")  # even correct pw
+                assert ok is False
+                assert isinstance(info, str)  # lockout message, not None
+                assert "锁" in info or "locked" in info.lower() or "分钟" in info
+
+    def test_brute_force_no_lockout_below_threshold(self):
+        """Account stays unlocked after 4 wrong attempts (below threshold of 5)."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import authenticate_user, register_user
+                register_user("nolocktest", "NoLock99")
+                # 4 wrong attempts (one below threshold)
+                for _ in range(4):
+                    ok, _ = authenticate_user("nolocktest", "WrongPass1")
+                    assert ok is False
+                # Correct password should still work
+                ok, info = authenticate_user("nolocktest", "NoLock99")
+                assert ok is True
+                assert info is not None
+                assert info["username"] == "nolocktest"
+
+    def test_successful_login_clears_failed_attempts(self):
+        """Successful login resets the failed attempt counter."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.user_auth import (
+                    _load_users_db,
+                    authenticate_user,
+                    register_user,
+                )
+                register_user("cleartest", "ClearMe9")
+                # 3 wrong attempts
+                for _ in range(3):
+                    authenticate_user("cleartest", "WrongPass1")
+                # Correct login
+                ok, _ = authenticate_user("cleartest", "ClearMe9")
+                assert ok is True
+                # Counter should be reset to 0
+                users = _load_users_db()
+                assert users["cleartest"].get("failed_attempts", 0) == 0
 if __name__ == "__main__":
     import traceback
     cls = TestUserAuth()

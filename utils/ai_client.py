@@ -132,7 +132,9 @@ def _check_preconditions(user_id: str = "default") -> str | None:
     return None
 
 
-def _handle_api_error(e: Exception) -> str:
+def _handle_api_error(e: Exception | None) -> str:
+    if e is None:
+        return "⚠️ AI 调用失败（未知错误）"
     logger.error("API error: %s: %s", type(e).__name__, e)
     if isinstance(e, AuthenticationError):
         return "⚠️ API Key 无效，请检查 API Key 配置。"

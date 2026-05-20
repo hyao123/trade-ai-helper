@@ -89,3 +89,26 @@ def sanitize_prompt_param(text: str, param_name: str = "", max_length: int = 500
     Same as sanitize_input but with stricter max_length default.
     """
     return sanitize_input(text, max_length=max_length)
+
+
+def escape_html(text: str) -> str:
+    """
+    Escape HTML special characters to prevent XSS when rendering user-supplied
+    content inside unsafe_allow_html=True contexts.
+
+    Escapes: & < > " '
+
+    Usage:
+        safe = escape_html(user_supplied_company_name)
+        st.markdown(f"<div>{safe}</div>", unsafe_allow_html=True)
+    """
+    if not text:
+        return ""
+    return (
+        text
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&#x27;")
+    )

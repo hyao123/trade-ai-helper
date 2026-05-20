@@ -16,7 +16,7 @@ from utils.pricing import (
     get_daily_usage,
     get_usage_history,
 )
-from utils.ui_helpers import check_auth, inject_css
+from utils.ui_helpers import inject_css, check_auth, page_setup
 from utils.user_auth import (
     change_password,
     get_current_user,
@@ -24,9 +24,7 @@ from utils.user_auth import (
     verify_email_token,
 )
 
-st.set_page_config(page_title="账户管理 | 外贸AI助手", page_icon="👤", layout="wide")
-inject_css()
-check_auth()
+page_setup("账户管理", "👤")
 
 # ── 页头 ──────────────────────────────────────────────
 st.markdown(f"""
@@ -35,8 +33,6 @@ st.markdown(f"""
     <p class="hero-subtitle">{t('account_subtitle')}</p>
 </div>
 """, unsafe_allow_html=True)
-
-# ── 获取当前用户信息 ──────────────────────────────────
 current_user = get_current_user()
 if not current_user:
     st.warning(t("please_login"))

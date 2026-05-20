@@ -9,27 +9,14 @@ import streamlit as st
 from config.prompts import FOLLOWUP_STAGES
 from utils.ai_client import generate_followup
 from utils.ui_helpers import (
-    check_auth,
     get_user_id,
-    inject_css,
+    page_setup,
     show_regenerate_buttons,
     show_result,
 )
 from utils.user_prefs import get_pref
 
-st.set_page_config(page_title="跟进邮件 | 外贸AI助手", page_icon="📬", layout="wide")
-inject_css()
-check_auth()
-
-if "results" not in st.session_state:
-    st.session_state.results = {}
-
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">📬 跟进邮件生成</h1>
-    <p class="hero-subtitle">根据跟进阶段智能生成专业英文跟进邮件，不再烦恼怎么开口</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("跟进邮件", "📬", "📬 跟进邮件生成", "根据跟进阶段智能生成专业英文跟进邮件，不再烦恼怎么开口")
 
 with st.expander("📖 各跟进阶段说明", expanded=False):
     for stage, desc in FOLLOWUP_STAGES.items():

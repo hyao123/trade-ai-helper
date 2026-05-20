@@ -7,21 +7,9 @@ from __future__ import annotations
 import streamlit as st
 
 from utils.ai_client import interpret_bill_of_lading
-from utils.ui_helpers import check_auth, get_user_id, inject_css, show_result
+from utils.ui_helpers import get_user_id, page_setup, show_result
 
-st.set_page_config(page_title="提单解读 | 外贸AI助手", page_icon="🚢", layout="wide")
-inject_css()
-check_auth()
-
-if "results" not in st.session_state:
-    st.session_state.results = {}
-
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">🚢 提单解读</h1>
-    <p class="hero-subtitle">粘贴 Bill of Lading 内容，AI 提取关键字段、解释术语、提示风险</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("提单解读", "🚢", "🚢 提单解读", "粘贴 Bill of Lading 内容，AI 提取关键字段、解释术语、提示风险")
 
 st.markdown('<div class="main-form">', unsafe_allow_html=True)
 st.markdown(

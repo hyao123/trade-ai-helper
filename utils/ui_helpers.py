@@ -328,7 +328,11 @@ def check_auth() -> None:
                             st.session_state["language"] = saved_lang
                         st.rerun()
                     else:
-                        st.error(f"❌ {t('invalid_credentials')}")
+                        # user_info may be a lockout message string or None
+                        if isinstance(user_info, str):
+                            st.error(f"🔒 {user_info}")
+                        else:
+                            st.error(f"❌ {t('invalid_credentials')}")
 
         # Forgot password button (outside form since forms can't nest)
         if st.button(f"🔑 {t('forgot_password')}", key="_forgot_pw_btn"):

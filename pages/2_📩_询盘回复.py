@@ -9,28 +9,14 @@ import streamlit as st
 from utils.ai_client import reply_inquiry
 from utils.conversation import Conversation, stream_with_context
 from utils.ui_helpers import (
-    check_auth,
     get_user_id,
-    inject_css,
+    page_setup,
     show_regenerate_buttons,
     show_result,
 )
 from utils.user_prefs import get_pref
 
-st.set_page_config(page_title="询盘回复 | 外贸AI助手", page_icon="📩", layout="wide")
-inject_css()
-check_auth()
-
-if "results" not in st.session_state:
-    st.session_state.results = {}
-
-# ── 页头 ──────────────────────────────────────────────
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">📩 询盘回复</h1>
-    <p class="hero-subtitle">粘贴客户询盘，AI 生成专业回复草稿 · 支持多轮对话优化</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("询盘回复", "📩", "📩 询盘回复", "粘贴客户询盘，AI 生成专业回复草稿 · 支持多轮对话优化")
 
 # ── 表单 ──────────────────────────────────────────────
 st.markdown('<div class="main-form">', unsafe_allow_html=True)
@@ -140,6 +126,8 @@ elif st.session_state.results.get("inquiry"):
         label="📝 回复草稿（上次结果）",
         file_name="询盘回复.txt",
         balloons=False,
+        history_feature="询盘回复",
+        history_title=f"回复 {st.session_state.get('inquiry_customer_val', '客户')}",
     )
     show_regenerate_buttons("inquiry", show_style_button=False)
 

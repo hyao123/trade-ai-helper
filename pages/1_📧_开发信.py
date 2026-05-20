@@ -16,29 +16,15 @@ from utils.templates import (
     save_template,
 )
 from utils.ui_helpers import (
-    check_auth,
     extract_subject,
     get_user_id,
-    inject_css,
+    page_setup,
     show_regenerate_buttons,
     show_result,
 )
 from utils.user_prefs import get_pref
 
-st.set_page_config(page_title="开发信生成 | 外贸AI助手", page_icon="📧", layout="wide")
-inject_css()
-check_auth()
-
-if "results" not in st.session_state:
-    st.session_state.results = {}
-
-# ── 页头 ──────────────────────────────────────────────
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">📧 开发信生成</h1>
-    <p class="hero-subtitle">AI 撰写高转化率开发信 + 邮件主题行 · 支持 7 种语言 · 多轮对话优化</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("开发信生成", "📧", "📧 开发信生成", "AI 撰写高转化率开发信 + 邮件主题行 · 支持 7 种语言 · 多轮对话优化")
 
 # ── 模板加载 ──────────────────────────────────────────
 template_names = get_template_names("email")
@@ -225,7 +211,6 @@ if last_email_result and not last_email_result.startswith("⚠️"):
         st.caption("💡 在 Secrets 中配置 SMTP_HOST / SMTP_USER / SMTP_PASSWORD 等参数后可直接发送邮件。")
     else:
         with st.expander("📨 发送此邮件给客户", expanded=False):
-            from utils.ui_helpers import extract_subject
             subject_val, body_val = extract_subject(last_email_result)
             send_to = st.text_input(
                 "收件人邮箱 *",

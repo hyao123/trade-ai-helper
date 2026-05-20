@@ -7,22 +7,10 @@ from __future__ import annotations
 import streamlit as st
 
 from utils.ai_client import analyze_competitor
-from utils.ui_helpers import check_auth, get_user_id, inject_css, show_result
+from utils.ui_helpers import get_user_id, page_setup, show_result
 from utils.user_prefs import get_pref
 
-st.set_page_config(page_title="竞品分析 | 外贸AI助手", page_icon="🏆", layout="wide")
-inject_css()
-check_auth()
-
-if "results" not in st.session_state:
-    st.session_state.results = {}
-
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">🏆 竞品分析</h1>
-    <p class="hero-subtitle">输入竞品信息，AI 生成差异化策略 · Battle Card · 销售话术 · 异议处理</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("竞品分析", "🏆", "🏆 竞品分析", "输入竞品信息，AI 生成差异化策略 · Battle Card · 销售话术 · 异议处理")
 
 st.markdown('<div class="main-form">', unsafe_allow_html=True)
 st.markdown(

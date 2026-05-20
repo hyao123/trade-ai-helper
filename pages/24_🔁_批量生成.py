@@ -11,25 +11,13 @@ import streamlit as st
 from config.prompts import EMAIL_LANGUAGES
 from utils.ai_client import call_llm
 from utils.history import add_to_history
-from utils.ui_helpers import check_auth, copy_button, get_user_id, inject_css
+from utils.ui_helpers import check_auth, copy_button, get_user_id, inject_css, page_setup
 from utils.user_prefs import get_ai_style_suffix, get_pref
 
-st.set_page_config(page_title="批量生成 | 外贸AI助手", page_icon="🔁", layout="wide")
-inject_css()
-check_auth()
+page_setup("批量生成", "🔁", "🔁 批量生成", "同一产品一键生成多封风格各异的开发信，找出最高转化率的版本")
 
-if "results" not in st.session_state:
-    st.session_state.results = {}
 if "batch_results" not in st.session_state:
     st.session_state.batch_results = []
-
-# ── 页头 ──────────────────────────────────────────────
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">🔁 批量生成</h1>
-    <p class="hero-subtitle">同一产品一键生成多封风格各异的开发信，找出最高转化率的版本</p>
-</div>
-""", unsafe_allow_html=True)
 
 # ── 表单 ──────────────────────────────────────────────
 st.markdown('<div class="main-form">', unsafe_allow_html=True)

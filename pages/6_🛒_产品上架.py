@@ -6,27 +6,13 @@ import streamlit as st
 
 from utils.ai_client import generate_listing
 from utils.ui_helpers import (
-    check_auth,
     get_user_id,
-    inject_css,
+    page_setup,
     show_regenerate_buttons,
     show_result,
 )
 
-st.set_page_config(page_title="产品上架 | 外贸AI助手", page_icon="🛒", layout="wide")
-inject_css()
-check_auth()
-
-if "results" not in st.session_state:
-    st.session_state.results = {}
-
-# ── 页头 ──────────────────────────────────────────────
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">🛒 产品上架文案</h1>
-    <p class="hero-subtitle">一键生成 Amazon / Shopify 产品 Listing，含标题、卖点、描述、搜索词</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("产品上架", "🛒", "🛒 产品上架文案", "一键生成 Amazon / Shopify 产品 Listing，含标题、卖点、描述、搜索词")
 
 # ── 表单 ──────────────────────────────────────────────
 st.markdown('<div class="main-form">', unsafe_allow_html=True)

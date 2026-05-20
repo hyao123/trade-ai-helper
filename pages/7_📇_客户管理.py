@@ -15,6 +15,7 @@ from utils.customers import (
     get_customers,
     remove_tag,
 )
+from utils.sanitize import escape_html
 from utils.ui_helpers import check_auth, inject_css
 from utils.workflow import create_workflow_from_customer
 
@@ -130,7 +131,7 @@ else:
     for i, cust in enumerate(filtered):
         score = compute_customer_score(cust)
         tags = cust.get("tags", [])
-        tags_str = " ".join(f"#{t}" for t in tags) if tags else ""
+        tags_str = " ".join(f"#{escape_html(t)}" for t in tags) if tags else ""
         score_color = "#22c55e" if score >= 70 else "#f59e0b" if score >= 40 else "#6b7280"
         score_badge = (
             f'<span style="background:{score_color};color:white;padding:0.15rem 0.5rem;'
@@ -143,7 +144,9 @@ else:
             c1, c2, c3 = st.columns(3)
             c1.write(f"📧 {cust['email'] or '—'}")
             c2.write(f"🌍 {cust['country']}")
-            c3.markdown(f"📦 {cust['product'] or '—'}  {score_badge}", unsafe_allow_html=True)
+            # Escape user-supplied product text before injecting into HTML
+            safe_product = escape_html(cust.get("product") or "—")
+            c3.markdown(f"📦 {safe_product}  {score_badge}", unsafe_allow_html=True)
 
             st.caption(f"添加日期: {cust['created_at']} | 最后联系: {cust['last_contact']}")
             if cust.get("notes"):

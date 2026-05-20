@@ -12,22 +12,9 @@ from utils.packing_invoice_pdf import (
     generate_commercial_invoice_pdf,
     generate_packing_list_pdf,
 )
-from utils.ui_helpers import check_auth, inject_css
+from utils.ui_helpers import check_auth, inject_css, page_setup
 
-st.set_page_config(page_title="装箱发票 | 外贸AI助手", page_icon="▪", layout="wide")
-inject_css()
-check_auth()
-
-if "results" not in st.session_state:
-    st.session_state.results = {}
-
-# ── 页头 ──────────────────────────────────────────────
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">📋 装箱单 & 商业发票</h1>
-    <p class="hero-subtitle">一键生成专业的 Packing List 和 Commercial Invoice PDF</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("装箱发票", "▪", "📋 装箱单 & 商业发票", "一键生成专业的 Packing List 和 Commercial Invoice PDF")
 
 # ── 文档类型选择 ──────────────────────────────────────
 doc_type = st.radio(

@@ -5,43 +5,29 @@ pages/3_📄_报价单.py
 from __future__ import annotations
 
 import os
+import uuid
 
 import streamlit as st
 
 from utils.pdf_gen import generate_quote_pdf
 from utils.pricing import check_feature_access
-from utils.ui_helpers import check_auth, inject_css
+from utils.ui_helpers import check_auth, inject_css, page_setup
 from utils.user_auth import get_current_user
 from utils.user_prefs import get_pref, save_seller_identity
 
-st.set_page_config(page_title="报价单 | 外贸AI助手", page_icon="📄", layout="wide")
-inject_css()
-check_auth()
+page_setup("报价单", "📄", "📄 报价单生成", "支持多产品 SKU，一键生成专业 PDF 报价单")
 
 # Single-tenant: one logo per deployment (shared across all sessions)
 LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "company_logo.png")
 
-if "results" not in st.session_state:
-    st.session_state.results = {}
-
-# ── 页头 ──────────────────────────────────────────────
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">📄 报价单生成</h1>
-    <p class="hero-subtitle">支持多产品 SKU，一键生成专业 PDF 报价单</p>
-</div>
-""", unsafe_allow_html=True)
-
 # ── SKU 列表管理 ──────────────────────────────────────
 if "sku_list" not in st.session_state:
-    import uuid
     st.session_state.sku_list = [
         {"id": str(uuid.uuid4())[:6], "product": "", "model": "", "price": 0.0, "quantity": 100, "unit": "PCS"}
     ]
 
 
 def add_sku():
-    import uuid
     st.session_state.sku_list.append(
         {"id": str(uuid.uuid4())[:6], "product": "", "model": "", "price": 0.0, "quantity": 100, "unit": "PCS"}
     )
@@ -66,7 +52,6 @@ subtotal = 0.0
 for i, sku in enumerate(sku_list):
     # Ensure each SKU has a stable ID for widget keys
     if "id" not in sku:
-        import uuid
         sku["id"] = str(uuid.uuid4())[:6]
     sid = sku["id"]
     cols = st.columns([3, 2, 1.5, 1.5, 1.5, 0.7])

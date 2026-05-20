@@ -5,6 +5,8 @@ pages/99_🌐_Landing.py
 """
 from __future__ import annotations
 
+from datetime import datetime
+
 import streamlit as st
 
 from utils.analytics import track_event
@@ -243,7 +245,7 @@ with st.form("waitlist_form", clear_on_submit=True):
                 waitlist.append({
                     "email": waitlist_email.strip(),
                     "source": "landing_page",
-                    "timestamp": __import__("datetime").datetime.now().isoformat(),
+                    "timestamp": datetime.now().isoformat(),
                 })
                 save_json("waitlist.json", waitlist)
                 track_event("waitlist_signup", {"email": waitlist_email})

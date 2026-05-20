@@ -9,21 +9,11 @@ from __future__ import annotations
 
 import streamlit as st
 
-from utils.ui_helpers import check_auth, inject_css
+from utils.ui_helpers import page_setup
 from utils.user_auth import get_current_user
 from utils.user_prefs import get_prefs, update_prefs
 
-st.set_page_config(page_title="AI偏好设置 | 外贸AI助手", page_icon="⚙️", layout="wide")
-inject_css()
-check_auth()
-
-# ── 页头 ──────────────────────────────────────────────
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">⚙️ AI 偏好设置</h1>
-    <p class="hero-subtitle">设置一次，全站生效 · 公司信息自动预填 · AI 写作风格个性化</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("AI偏好设置", "⚙️", "⚙️ AI 偏好设置", "设置一次，全站生效 · 公司信息自动预填 · AI 写作风格个性化")
 
 current_user = get_current_user()
 prefs = get_prefs()

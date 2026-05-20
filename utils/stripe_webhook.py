@@ -159,14 +159,40 @@ def _handle_subscription_deleted(subscription: dict) -> tuple[bool, str]:
 
 
 def _handle_payment_failed(invoice: dict) -> tuple[bool, str]:
-    """Handle failed payment - log and optionally notify user."""
+    """Handle failed payment — log event and notify user via email if configured."""
     customer_id = invoice.get("customer")
     username = _find_username_by_customer_id(customer_id)
 
     if username:
         track_event("payment_failed", {"username": username})
         logger.warning("Payment failed for user %s", username)
-        # TODO: Send notification email to user
+
+        # Notify user via email if their account has an email on file
+        try:
+            from utils.storage import load_user_json
+            sub_info = load_user_json(username, "subscription.json", default={})
+            users = load_json("users_db.json", default={})
+            user_email = users.get(username, {}).get("email", "")
+            if user_email:
+                from utils.email_service import is_email_configured, send_email
+                if is_email_configured():
+                    tier = sub_info.get("tier", "pro")
+                    subject = "⚠️ TradeAI Pro — Payment Failed"
+                    body = (
+                        f"Hi {username},\n\n"
+                        f"We were unable to process your payment for your {tier.title()} subscription.\n\n"
+                        f"Please update your payment method to continue using TradeAI Pro uninterrupted:\n"
+                        f"  → Log in and visit the Account Management page to retry payment.\n\n"
+                        f"If you believe this is an error, please contact support@tradeai.pro.\n\n"
+                        f"Best regards,\nTradeAI Pro Team"
+                    )
+                    success, msg = send_email(user_email, subject, body)
+                    if success:
+                        logger.info("Payment failure notification sent to %s", user_email)
+                    else:
+                        logger.warning("Failed to send payment notification to %s: %s", user_email, msg)
+        except Exception as e:
+            logger.error("Error sending payment failure notification: %s", e)
 
     return True, "Payment failure recorded"
 

@@ -6,20 +6,10 @@ import streamlit as st
 
 from utils.history import clear_history, get_history, get_history_count
 from utils.pricing import check_feature_access
-from utils.ui_helpers import check_auth, copy_button, inject_css
+from utils.ui_helpers import copy_button, get_user_id, page_setup
 from utils.user_auth import get_current_user
 
-st.set_page_config(page_title="历史记录 | 外贸AI助手", page_icon="📋", layout="wide")
-inject_css()
-check_auth()
-
-# ── 页头 ──────────────────────────────────────────────
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">📋 生成历史记录</h1>
-    <p class="hero-subtitle">所有 AI 生成结果自动保存，随时回看复用</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("历史记录", "📋", "📋 生成历史记录", "所有 AI 生成结果自动保存，随时回看复用")
 
 # ── 筛选 + 统计 ──────────────────────────────────────
 total = get_history_count()
