@@ -179,12 +179,7 @@ st.markdown("""
     <span class="hero-tag">📊 CRM</span>
     <span class="hero-tag">🔒 数据安全</span>
   </div>
-  <div class="hero-stats">
-    <div><div class="hero-stat-num">30+</div><div class="hero-stat-lbl">功能模块</div></div>
-    <div><div class="hero-stat-num">7</div><div class="hero-stat-lbl">输出语言</div></div>
-    <div><div class="hero-stat-num">4</div><div class="hero-stat-lbl">PDF 文档</div></div>
-    <div><div class="hero-stat-num">∞</div><div class="hero-stat-lbl">自定义模型</div></div>
-  </div>
+
 </div>
 """, unsafe_allow_html=True)
 
