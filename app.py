@@ -87,36 +87,27 @@ st.markdown("""
     box-shadow: 0 1px 4px rgba(99,102,241,0.1) !important;
 }
 
-/* ── Nav list ── */
-.nav-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 11px 14px;
-    border-radius: 10px;
-    border: 1px solid transparent;
-    transition: all .15s;
-    margin-bottom: 4px;
-}
-.nav-item:hover { background: #f1f5f9; border-color: #cbd5e1; }
-.nav-item-icon { font-size: 1.15rem; flex-shrink: 0; }
-.nav-item-title { font-size: 0.95rem; font-weight: 600; color: #1e293b; }
-.nav-item-desc  { font-size: 0.84rem; color: #64748b; }
+/* ── (nav-item styles removed — buttons are now the rows) ── */
 
-/* ── Nav → button: 醒目样式 ── */
+/* ── Nav → button: 整行可点击列表样式 ── */
 .nav-section .stButton > button {
-    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%) !important;
-    color: #ffffff !important;
-    border: none !important;
-    border-radius: 8px !important;
-    font-weight: 700 !important;
-    font-size: 0.9rem !important;
-    padding: 6px 16px !important;
-    box-shadow: 0 2px 6px rgba(99,102,241,0.25) !important;
-    transition: all .2s !important;
+    background: #ffffff !important;
+    color: #1e293b !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    font-size: 0.92rem !important;
+    padding: 12px 16px !important;
+    text-align: left !important;
+    box-shadow: none !important;
+    transition: all .15s !important;
+    margin-bottom: 4px !important;
 }
 .nav-section .stButton > button:hover {
-    box-shadow: 0 4px 12px rgba(99,102,241,0.35) !important;
-    transform: translateY(-1px) !important;
-    background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%) !important;
+    background: #f5f3ff !important;
+    border-color: #a5b4fc !important;
+    color: #4338ca !important;
+    box-shadow: 0 2px 8px rgba(99,102,241,0.1) !important;
 }
 
 /* ── Tips row ── */
@@ -257,21 +248,14 @@ tab_email, tab_doc, tab_crm, tab_tools, tab_platform = st.tabs([
 
 
 def _nav_section(items):
-    """每行: HTML 描述 + → 按钮跳转"""
+    """每行是一个可点击按钮，整行跳转，无需单独箭头"""
     for icon, title, desc, page in items:
-        col_main, col_btn = st.columns([5, 1])
-        with col_main:
-            st.markdown(
-                f'<div class="nav-item">'
-                f'<span class="nav-item-icon">{icon}</span>'
-                f'<span class="nav-item-title">{title}</span>'
-                f'<span class="nav-item-desc">{desc}</span>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-        with col_btn:
-            if st.button("→", key=f"nav_{icon}_{title}", use_container_width=True):
-                st.switch_page(page)
+        if st.button(
+            f"{icon}  {title}  —  {desc}",
+            key=f"nav_{icon}_{title}",
+            use_container_width=True,
+        ):
+            st.switch_page(page)
 
 
 with tab_email:
