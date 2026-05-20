@@ -89,17 +89,17 @@ st.markdown("""
 
 /* ── Nav list ── */
 .nav-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 12px;
-    border-radius: 8px;
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 14px;
+    border-radius: 10px;
     border: 1px solid transparent;
     transition: all .15s;
-    margin-bottom: 2px;
+    margin-bottom: 4px;
 }
 .nav-item:hover { background: #f1f5f9; border-color: #cbd5e1; }
-.nav-item-icon { font-size: 1rem; flex-shrink: 0; }
-.nav-item-title { font-size: 0.84rem; font-weight: 600; color: #1e293b; }
-.nav-item-desc  { font-size: 0.74rem; color: #64748b; }
+.nav-item-icon { font-size: 1.15rem; flex-shrink: 0; }
+.nav-item-title { font-size: 0.95rem; font-weight: 600; color: #1e293b; }
+.nav-item-desc  { font-size: 0.84rem; color: #64748b; }
 
 /* ── Tips row ── */
 .tips-grid {
@@ -114,11 +114,11 @@ st.markdown("""
     border: 1px solid #e2e8f0;
     border-radius: 12px;
     padding: 16px 18px;
-    font-size: 0.8rem; line-height: 1.55;
+    font-size: 0.88rem; line-height: 1.55;
     color: #64748b;
     border-top: 3px solid #6366f1;
 }
-.tip-pill strong { color: #1e293b; display: block; margin-bottom: 5px; font-size: 0.85rem; }
+.tip-pill strong { color: #1e293b; display: block; margin-bottom: 5px; font-size: 0.92rem; }
 
 /* ── Hero: 改为深蓝紫渐变，白色文字高对比 ── */
 .hero-section {
