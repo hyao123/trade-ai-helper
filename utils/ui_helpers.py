@@ -165,6 +165,45 @@ def inject_css() -> None:
 
 
 # ---------------------------------------------------------------------------
+# page_setup() — 统一页面初始化（DRY 各页面重复样板代码）
+# ---------------------------------------------------------------------------
+def page_setup(
+    title: str,
+    icon: str,
+    hero_title: str = "",
+    hero_subtitle: str = "",
+) -> None:
+    """
+    统一页面初始化，替代每个页面重复的 4 行样板：
+      st.set_page_config(...)
+      inject_css()
+      check_auth()
+      if "results" not in st.session_state: st.session_state.results = {}
+
+    可选渲染 hero section（如果提供了 hero_title）。
+
+    用法:
+        from utils.ui_helpers import page_setup
+        page_setup("开发信生成", "📧", "📧 开发信生成", "AI 撰写高转化率开发信")
+    """
+    st.set_page_config(page_title=f"{title} | 外贸AI助手", page_icon=icon, layout="wide")
+    inject_css()
+    check_auth()
+
+    if "results" not in st.session_state:
+        st.session_state.results = {}
+
+    if hero_title:
+        st.markdown(
+            f'<div class="hero-section">'
+            f'<h1 class="hero-title">{hero_title}</h1>'
+            f'<p class="hero-subtitle">{hero_subtitle}</p>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+
+# ---------------------------------------------------------------------------
 # 侧栏信息（Rate Limit 剩余次数）
 # ---------------------------------------------------------------------------
 def _get_session_user_id() -> str:

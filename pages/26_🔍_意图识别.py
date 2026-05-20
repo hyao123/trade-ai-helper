@@ -7,21 +7,9 @@ from __future__ import annotations
 import streamlit as st
 
 from utils.ai_client import recognize_email_intent
-from utils.ui_helpers import check_auth, get_user_id, inject_css, show_result
+from utils.ui_helpers import get_user_id, page_setup, show_result
 
-st.set_page_config(page_title="意图识别 | 外贸AI助手", page_icon="🔍", layout="wide")
-inject_css()
-check_auth()
-
-if "results" not in st.session_state:
-    st.session_state.results = {}
-
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">🔍 邮件回复意图识别</h1>
-    <p class="hero-subtitle">粘贴客户回复邮件，AI 秒判意图 · 给出优先级 · 建议回复模板</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("意图识别", "🔍", "🔍 邮件回复意图识别", "粘贴客户回复邮件，AI 秒判意图 · 给出优先级 · 建议回复模板")
 
 # ── 快速示例 ──────────────────────────────────────────
 with st.expander("📖 支持识别的意图类型", expanded=False):

@@ -20,6 +20,7 @@ Multi-model routing:
 
 from __future__ import annotations
 
+import hashlib
 import time
 from collections import defaultdict
 from typing import Generator
@@ -61,6 +62,51 @@ def _get_client() -> OpenAI:
         _API_KEY = current_key
         _client = OpenAI(api_key=_API_KEY, base_url=_API_BASE)
     return _client
+
+
+# ---------------------------------------------------------------------------
+# Response cache — 同一 session 内相同 prompt 直接返回缓存结果
+# ---------------------------------------------------------------------------
+_RESPONSE_CACHE: dict[str, str] = {}
+_CACHE_MAX_SIZE = 50
+
+
+def _cache_key(prompt: str, system_prompt: str | None, temperature: float) -> str:
+    """生成稳定的缓存 key（基于 prompt 内容的 hash）。"""
+    content = f"{system_prompt or ''}|{prompt}|{temperature}"
+    return hashlib.sha256(content.encode()).hexdigest()[:16]
+
+
+def _cache_get(key: str) -> str | None:
+    """从响应缓存获取结果。"""
+    return _RESPONSE_CACHE.get(key)
+
+
+def _cache_put(key: str, value: str) -> None:
+    """将结果存入响应缓存，LRU 淘汰超限条目。"""
+    if len(_RESPONSE_CACHE) >= _CACHE_MAX_SIZE:
+        # 简单 FIFO 淘汰最早的条目
+        oldest_key = next(iter(_RESPONSE_CACHE))
+        del _RESPONSE_CACHE[oldest_key]
+    _RESPONSE_CACHE[key] = value
+
+
+# ---------------------------------------------------------------------------
+# Retry with exponential backoff — 仅重试瞬态故障(timeout, 5xx)
+# ---------------------------------------------------------------------------
+_MAX_RETRIES = 2
+_RETRY_BASE_DELAY = 1.0  # 秒
+
+
+def _is_retryable(e: Exception) -> bool:
+    """判断是否为可重试的瞬态错误。"""
+    if isinstance(e, APITimeoutError):
+        return True
+    if isinstance(e, APIStatusError) and e.status_code >= 500:
+        return True
+    if isinstance(e, RateLimitError):
+        return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -185,11 +231,28 @@ def call_llm(
     user_id: str = "default",
     temperature: float = 0.7,
     max_tokens: int | None = None,
+    use_cache: bool = True,
 ) -> str:
-    """非流式调用，返回完整文本字符串。支持多模型路由，失败时自动回滚 rate-limit slot。"""
+    """
+    非流式调用，返回完整文本字符串。
+
+    优化特性：
+    - 响应缓存: 同一 prompt+system+temperature 直接返回缓存（跳过 API 调用）
+    - 自动重试: timeout/5xx 瞬态错误最多重试 2 次（指数退避）
+    - 多模型路由: 多 provider 时自动走 AI Gateway
+    - 失败回滚: API 失败自动回滚 rate-limit slot
+    """
     err = _check_preconditions(user_id)
     if err:
         return err
+
+    # ── 响应缓存检查 ──
+    ck = _cache_key(prompt, system_prompt, temperature)
+    if use_cache:
+        cached = _cache_get(ck)
+        if cached is not None:
+            logger.debug("Cache hit: key=%s, user=%s", ck, user_id)
+            return cached
 
     # ── Multi-model gateway路由 ──
     if _should_use_gateway():
@@ -204,13 +267,15 @@ def call_llm(
             if result.startswith("⚠️"):
                 _rate_limit_rollback(user_id)
                 _rollback_tier_usage()
+            else:
+                _cache_put(ck, result)
             return result
         except Exception as e:
             logger.warning("Gateway call failed, falling back to direct: %s", e)
             _rate_limit_rollback(user_id)
             # Fall through to direct NVIDIA call below
 
-    # ── Direct NVIDIA NIM call (original path) ──
+    # ── Direct NVIDIA NIM call with retry ──
     logger.info("API call: model=%s, user=%s", _MODEL, user_id)
     _rate_limit_consume(user_id)
 
@@ -228,15 +293,30 @@ def call_llm(
     if max_tokens:
         kwargs["max_tokens"] = max_tokens
 
-    try:
-        resp = _get_client().chat.completions.create(**kwargs)
-        logger.info("API call success: model=%s, user=%s", _MODEL, user_id)
-        return resp.choices[0].message.content or ""
-    except Exception as e:
-        logger.error("API call failed: model=%s, user=%s", _MODEL, user_id)
-        _rate_limit_rollback(user_id)
-        _rollback_tier_usage()
-        return _handle_api_error(e)
+    last_error: Exception | None = None
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            resp = _get_client().chat.completions.create(**kwargs)
+            result = resp.choices[0].message.content or ""
+            logger.info("API call success: model=%s, user=%s, attempt=%d", _MODEL, user_id, attempt + 1)
+            _cache_put(ck, result)
+            return result
+        except Exception as e:
+            last_error = e
+            if attempt < _MAX_RETRIES and _is_retryable(e):
+                delay = _RETRY_BASE_DELAY * (2 ** attempt)
+                logger.warning(
+                    "Retryable error (attempt %d/%d), retrying in %.1fs: %s",
+                    attempt + 1, _MAX_RETRIES + 1, delay, e,
+                )
+                time.sleep(delay)
+            else:
+                break
+
+    logger.error("API call failed after %d attempts: model=%s, user=%s", _MAX_RETRIES + 1, _MODEL, user_id)
+    _rate_limit_rollback(user_id)
+    _rollback_tier_usage()
+    return _handle_api_error(last_error)
 
 
 def _rollback_tier_usage() -> None:
@@ -264,7 +344,10 @@ def stream_llm(
 ) -> Generator[str, None, None]:
     """
     流式调用，返回文本 token 的生成器。支持多模型路由。
-    仅在收到第一个 token 后才消耗 rate-limit slot。
+
+    优化特性：
+    - 自动重试: 连接层 timeout/5xx 错误在首个 token 前最多重试 2 次
+    - 仅在收到第一个 token 后才消耗 rate-limit slot
     """
     err = _check_preconditions(user_id)
     if err:
@@ -292,7 +375,7 @@ def stream_llm(
             logger.warning("Gateway stream failed, falling back to direct: %s", e)
             # Fall through to direct NVIDIA call below
 
-    # ── Direct NVIDIA NIM call (original path) ──
+    # ── Direct NVIDIA NIM call with retry ──
     logger.info("Stream API call: model=%s, user=%s", _MODEL, user_id)
     messages = []
     if system_prompt:
@@ -309,23 +392,36 @@ def stream_llm(
     if max_tokens:
         kwargs["max_tokens"] = max_tokens
 
-    try:
-        stream = _get_client().chat.completions.create(**kwargs)
-        slot_consumed = False
-        for chunk in stream:
-            delta = chunk.choices[0].delta.content
-            if delta:
-                if not slot_consumed:
-                    _rate_limit_consume(user_id)
-                    slot_consumed = True
-                yield delta
-        if not slot_consumed:
-            _rollback_tier_usage()
-    except Exception as e:
-        logger.error("Stream API call failed: model=%s, user=%s", _MODEL, user_id)
-        if not slot_consumed:
-            _rollback_tier_usage()
-        yield _handle_api_error(e)
+    last_error: Exception | None = None
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            stream = _get_client().chat.completions.create(**kwargs)
+            slot_consumed = False
+            for chunk in stream:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    if not slot_consumed:
+                        _rate_limit_consume(user_id)
+                        slot_consumed = True
+                    yield delta
+            if not slot_consumed:
+                _rollback_tier_usage()
+            return  # Success — exit retry loop
+        except Exception as e:
+            last_error = e
+            if attempt < _MAX_RETRIES and _is_retryable(e):
+                delay = _RETRY_BASE_DELAY * (2 ** attempt)
+                logger.warning(
+                    "Stream retryable error (attempt %d/%d), retrying in %.1fs: %s",
+                    attempt + 1, _MAX_RETRIES + 1, delay, e,
+                )
+                time.sleep(delay)
+            else:
+                break
+
+    logger.error("Stream API call failed after %d attempts: model=%s, user=%s", _MAX_RETRIES + 1, _MODEL, user_id)
+    _rollback_tier_usage()
+    yield _handle_api_error(last_error)
 
 
 # 向后兼容别名

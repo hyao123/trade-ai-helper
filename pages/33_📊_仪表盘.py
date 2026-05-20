@@ -7,19 +7,9 @@ from __future__ import annotations
 
 import streamlit as st
 
-from utils.ui_helpers import check_auth, get_user_id, inject_css
+from utils.ui_helpers import get_user_id, page_setup
 
-st.set_page_config(page_title="仪表盘 | 外贸AI助手", page_icon="📊", layout="wide")
-inject_css()
-check_auth()
-
-# ── 页头 ──────────────────────────────────────────────
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">📊 智能仪表盘</h1>
-    <p class="hero-subtitle">邮件追踪 · 客户评分 · 通知中心 · 邀请奖励 — 一站掌握全局</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("仪表盘", "📊", "📊 智能仪表盘", "邮件追踪 · 客户评分 · 通知中心 · 邀请奖励 — 一站掌握全局")
 
 uid = get_user_id()
 

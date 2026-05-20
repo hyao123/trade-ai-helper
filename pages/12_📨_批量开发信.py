@@ -2,26 +2,17 @@
 pages/12_📨_批量开发信.py
 批量开发信生成：上传CSV，逐行生成个性化开发信，支持预览和批量下载。
 """
-import csv
-import io
-
 import streamlit as st
 
 from utils.ai_client import generate_bulk_email
 from utils.history import add_to_history
 from utils.ui_helpers import (
-    check_auth,
     copy_button,
     get_user_id,
-    inject_css,
+    page_setup,
 )
 
-st.set_page_config(page_title="批量开发信 | 外贸AI助手", page_icon="📨", layout="wide")
-inject_css()
-check_auth()
-
-if "results" not in st.session_state:
-    st.session_state.results = {}
+page_setup("批量开发信", "📨", "📨 批量开发信生成", "上传 CSV 客户名单，AI 逐行生成个性化开发信")
 
 # ── 页头 ──────────────────────────────────────────────
 st.markdown("""

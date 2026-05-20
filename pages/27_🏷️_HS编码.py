@@ -7,22 +7,10 @@ from __future__ import annotations
 import streamlit as st
 
 from utils.ai_client import lookup_hs_code
-from utils.ui_helpers import check_auth, get_user_id, inject_css, show_result
+from utils.ui_helpers import get_user_id, page_setup, show_result
 from utils.user_prefs import get_pref
 
-st.set_page_config(page_title="HS编码查询 | 外贸AI助手", page_icon="🏷️", layout="wide")
-inject_css()
-check_auth()
-
-if "results" not in st.session_state:
-    st.session_state.results = {}
-
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">🏷️ HS 编码查询</h1>
-    <p class="hero-subtitle">输入产品名称，AI 建议 HS Code · 分析分类依据 · 提示注意事项</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("HS编码查询", "🏷️", "🏷️ HS 编码查询", "输入产品名称，AI 建议 HS Code · 分析分类依据 · 提示注意事项")
 
 with st.expander("💡 什么是 HS 编码？", expanded=False):
     st.markdown("""

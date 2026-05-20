@@ -6,27 +6,13 @@ import streamlit as st
 
 from utils.ai_client import generate_email_polish
 from utils.ui_helpers import (
-    check_auth,
     get_user_id,
-    inject_css,
+    page_setup,
     show_regenerate_buttons,
     show_result,
 )
 
-st.set_page_config(page_title="邮件润色 | 外贸AI助手", page_icon="🌐", layout="wide")
-inject_css()
-check_auth()
-
-if "results" not in st.session_state:
-    st.session_state.results = {}
-
-# ── 页头 ──────────────────────────────────────────────
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">🌐 邮件翻译 & 润色</h1>
-    <p class="hero-subtitle">AI 翻译/润色商务邮件，让表达更专业地道</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("邮件润色", "🌐", "🌐 邮件翻译 & 润色", "AI 翻译/润色商务邮件，让表达更专业地道")
 
 # ── 侧栏输入 ─────────────────────────────────────────
 with st.sidebar:

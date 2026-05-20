@@ -6,27 +6,13 @@ import streamlit as st
 
 from utils.ai_client import generate_complaint_response
 from utils.ui_helpers import (
-    check_auth,
     get_user_id,
-    inject_css,
+    page_setup,
     show_regenerate_buttons,
     show_result,
 )
 
-st.set_page_config(page_title="投诉处理 | 外贸AI助手", page_icon="😟", layout="wide")
-inject_css()
-check_auth()
-
-if "results" not in st.session_state:
-    st.session_state.results = {}
-
-# ── 页头 ──────────────────────────────────────────────
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">😟 投诉处理邮件</h1>
-    <p class="hero-subtitle">AI 生成专业客诉回复，化解矛盾维护关系</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("投诉处理", "😟", "😟 投诉处理邮件", "AI 生成专业客诉回复，化解矛盾维护关系")
 
 # ── 侧栏输入 ─────────────────────────────────────────
 with st.sidebar:

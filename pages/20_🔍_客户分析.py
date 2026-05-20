@@ -6,22 +6,9 @@ from __future__ import annotations
 
 import streamlit as st
 
-from utils.ui_helpers import check_auth, get_user_id, inject_css, show_result
+from utils.ui_helpers import get_user_id, page_setup, show_result
 
-st.set_page_config(page_title="客户分析 | 外贸AI助手", page_icon="🔍", layout="wide")
-inject_css()
-check_auth()
-
-if "results" not in st.session_state:
-    st.session_state.results = {}
-
-# ── 页头 ──────────────────────────────────────────────
-st.markdown("""
-<div class="hero-section">
-    <h1 class="hero-title">🔍 客户分析</h1>
-    <p class="hero-subtitle">AI 智能客户画像分析，深度洞察客户需求与合作潜力</p>
-</div>
-""", unsafe_allow_html=True)
+page_setup("客户分析", "🔍", "🔍 客户分析", "AI 智能客户画像分析，深度洞察客户需求与合作潜力")
 
 # ── 表单 ──────────────────────────────────────────────
 st.markdown('<div class="main-form">', unsafe_allow_html=True)
