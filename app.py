@@ -1,6 +1,7 @@
 """
-app.py — 首页（精致紧凑专业化设计）
-使用纯 HTML/CSS Grid 渲染快捷卡片和指标区，避免 Streamlit 默认列间距。
+app.py — 首页（精致紧凑专业化设计 v3）
+快捷入口：卡片即按钮，点击直接跳转。
+指标区域：浅色柔和配色，高可读性。
 """
 import streamlit as st
 
@@ -20,91 +21,85 @@ inject_css()
 check_auth()
 
 # ══════════════════════════════════════════════════════════════════════
-# 首页专属额外样式（紧凑 grid、微交互）
+# 首页专属样式
 # ══════════════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
-/* ── Quick Grid ── */
-.q-grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 12px;
-    margin: 0.6rem 0 1.2rem;
-}
-@media (max-width: 992px) { .q-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 600px) { .q-grid { grid-template-columns: repeat(2, 1fr); } }
-
-.q-card {
-    background: var(--surface);
-    border: 1.5px solid var(--border);
-    border-radius: 12px;
-    padding: 14px 10px 12px;
-    text-align: center;
-    cursor: default;
-    transition: all .2s ease;
-    position: relative;
-    overflow: hidden;
-}
-.q-card::before {
-    content: '';
-    position: absolute; inset: 0;
-    background: linear-gradient(135deg, rgba(37,99,235,0.04) 0%, rgba(124,58,237,0.04) 100%);
-    opacity: 0; transition: opacity .2s;
-}
-.q-card:hover::before { opacity: 1; }
-.q-card:hover {
-    border-color: var(--primary);
-    box-shadow: 0 4px 14px rgba(37,99,235,0.12);
-    transform: translateY(-2px);
-}
-.q-card-icon { font-size: 1.6rem; line-height: 1; }
-.q-card-title {
-    font-size: 0.82rem; font-weight: 700; color: var(--text-1);
-    margin-top: 6px; line-height: 1.2;
-}
-.q-card-desc {
-    font-size: 0.68rem; color: var(--text-3); margin-top: 3px;
-    line-height: 1.3;
-}
-
-/* ── Stat Bar ── */
+/* ── Stat Bar: 浅色优雅配色 ── */
 .stat-bar {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: 10px;
-    margin: 0.4rem 0 1.4rem;
+    margin: 0.5rem 0 1.6rem;
 }
 @media (max-width: 768px) { .stat-bar { grid-template-columns: repeat(3, 1fr); } }
 .stat-pill {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 14px;
-    display: flex; align-items: center; gap: 10px;
+    background: #ffffff;
+    border: 1px solid #e8ecf0;
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 12px;
+    transition: border-color .2s, box-shadow .2s;
 }
-.stat-pill:hover { border-color: #93c5fd; }
+.stat-pill:hover {
+    border-color: #a5b4fc;
+    box-shadow: 0 2px 10px rgba(99,102,241,0.08);
+}
 .stat-pill-icon {
-    width: 36px; height: 36px; border-radius: 8px;
+    width: 40px; height: 40px; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.1rem; flex-shrink: 0;
+    font-size: 1.15rem; flex-shrink: 0;
 }
-.stat-pill-val { font-size: 1.2rem; font-weight: 800; color: var(--text-1); line-height: 1; }
-.stat-pill-lbl { font-size: 0.7rem; color: var(--text-2); margin-top: 1px; }
+.stat-pill-val {
+    font-size: 1.3rem; font-weight: 800; line-height: 1;
+    color: #1e293b;
+}
+.stat-pill-lbl {
+    font-size: 0.72rem; margin-top: 2px;
+    color: #64748b;
+    font-weight: 500;
+}
 
-/* ── Nav list compact ── */
+/* ── Quick Access: 卡片=按钮，紧凑美观 ── */
+.qa-section .stButton > button {
+    background: #ffffff !important;
+    border: 1.5px solid #e2e8f0 !important;
+    border-radius: 14px !important;
+    padding: 18px 8px 14px !important;
+    min-height: 100px !important;
+    white-space: pre-line !important;
+    line-height: 1.5 !important;
+    font-size: 0.78rem !important;
+    color: #475569 !important;
+    font-weight: 500 !important;
+    transition: all .2s ease !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+}
+.qa-section .stButton > button:hover {
+    border-color: #6366f1 !important;
+    box-shadow: 0 4px 16px rgba(99,102,241,0.12) !important;
+    transform: translateY(-2px) !important;
+    color: #312e81 !important;
+    background: linear-gradient(180deg, #ffffff 0%, #f5f3ff 100%) !important;
+}
+.qa-section .stButton > button:active {
+    transform: translateY(0px) !important;
+    box-shadow: 0 1px 4px rgba(99,102,241,0.1) !important;
+}
+
+/* ── Nav list ── */
 .nav-item {
     display: flex; align-items: center; gap: 10px;
-    padding: 8px 12px;
+    padding: 9px 12px;
     border-radius: 8px;
     border: 1px solid transparent;
     transition: all .15s;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
 }
-.nav-item:hover { background: var(--primary-light); border-color: #bfdbfe; }
+.nav-item:hover { background: #f1f5f9; border-color: #cbd5e1; }
 .nav-item-icon { font-size: 1rem; flex-shrink: 0; }
-.nav-item-title { font-size: 0.84rem; font-weight: 600; color: var(--text-1); }
-.nav-item-desc  { font-size: 0.75rem; color: var(--text-3); }
-.nav-item-arr   { margin-left: auto; color: var(--text-3); font-size: 0.8rem; }
+.nav-item-title { font-size: 0.84rem; font-weight: 600; color: #1e293b; }
+.nav-item-desc  { font-size: 0.74rem; color: #64748b; }
 
 /* ── Tips row ── */
 .tips-grid {
@@ -115,24 +110,53 @@ st.markdown("""
 }
 @media (max-width: 768px) { .tips-grid { grid-template-columns: repeat(2, 1fr); } }
 .tip-pill {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 16px;
-    font-size: 0.8rem; line-height: 1.5;
-    color: var(--text-2);
-    border-top: 3px solid var(--primary);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px 18px;
+    font-size: 0.8rem; line-height: 1.55;
+    color: #64748b;
+    border-top: 3px solid #6366f1;
 }
-.tip-pill strong { color: var(--text-1); display: block; margin-bottom: 4px; font-size: 0.84rem; }
+.tip-pill strong { color: #1e293b; display: block; margin-bottom: 5px; font-size: 0.85rem; }
 
-/* ── Compact hero override ── */
-.hero-section { padding: 2.2rem 2rem 1.8rem !important; margin-bottom: 1.2rem !important; }
-.hero-title { font-size: 2rem !important; }
-.hero-subtitle { font-size: 0.9rem !important; }
-.hero-stats { gap: 1.4rem !important; margin-top: 1.2rem !important; padding-top: 1rem !important; }
-.hero-stat-num { font-size: 1.3rem !important; }
+/* ── Hero: 改为深蓝紫渐变，白色文字高对比 ── */
+.hero-section {
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 30%, #4338ca 65%, #6366f1 100%) !important;
+    padding: 2.4rem 2.2rem 2rem !important;
+    margin-bottom: 1.4rem !important;
+    border-radius: 20px !important;
+}
+.hero-badge {
+    background: rgba(255,255,255,0.1) !important;
+    border: 1px solid rgba(255,255,255,0.2) !important;
+    color: #e0e7ff !important;
+}
+.hero-title {
+    font-size: 2.1rem !important;
+    color: #ffffff !important;
+}
+.hero-title span { color: #a5b4fc !important; }
+.hero-subtitle {
+    font-size: 0.92rem !important;
+    color: #c7d2fe !important;
+    opacity: 1 !important;
+}
 .hero-tags { margin-top: 1rem !important; gap: 6px !important; }
-.hero-tag { font-size: 0.72rem !important; padding: 3px 10px !important; }
+.hero-tag {
+    font-size: 0.72rem !important;
+    padding: 4px 11px !important;
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: #e0e7ff !important;
+}
+.hero-stats {
+    gap: 1.6rem !important; margin-top: 1.3rem !important;
+    padding-top: 1.1rem !important;
+    border-top: 1px solid rgba(255,255,255,0.12) !important;
+}
+.hero-stat-num { font-size: 1.35rem !important; color: #ffffff !important; }
+.hero-stat-lbl { color: #a5b4fc !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -141,7 +165,7 @@ st.markdown("""
 # ══════════════════════════════════════════════════════════════════════
 st.markdown("""
 <div class="hero-section">
-  <div class="hero-badge">✦ AI-Powered &nbsp;·&nbsp; 外贸全流程 &nbsp;·&nbsp; 7 种语言</div>
+  <div class="hero-badge">✦ AI-Powered · 外贸全流程 · 7 种语言</div>
   <h1 class="hero-title">让 AI 替你写每一封<span>外贸邮件</span></h1>
   <p class="hero-subtitle">
     开发信 · 询盘回复 · 报价单 · 合同 · 节日问候 · 谈判话术 —
@@ -153,7 +177,7 @@ st.markdown("""
     <span class="hero-tag">📄 PDF</span>
     <span class="hero-tag">🤖 自定义模型</span>
     <span class="hero-tag">📊 CRM</span>
-    <span class="hero-tag">🔒 安全</span>
+    <span class="hero-tag">🔒 数据安全</span>
   </div>
   <div class="hero-stats">
     <div><div class="hero-stat-num">30+</div><div class="hero-stat-lbl">功能模块</div></div>
@@ -165,20 +189,20 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════
-# 平台概览指标（纯 HTML Grid，无 st.columns）
+# 平台概览指标（浅色柔和配色）
 # ══════════════════════════════════════════════════════════════════════
 st.markdown("""
 <div class="stat-bar">
-  <div class="stat-pill"><div class="stat-pill-icon" style="background:#eff6ff;">🧩</div><div><div class="stat-pill-val">30+</div><div class="stat-pill-lbl">功能页面</div></div></div>
-  <div class="stat-pill"><div class="stat-pill-icon" style="background:#f0fdf4;">🌍</div><div><div class="stat-pill-val">7</div><div class="stat-pill-lbl">输出语言</div></div></div>
-  <div class="stat-pill"><div class="stat-pill-icon" style="background:#fdf4ff;">📄</div><div><div class="stat-pill-val">4</div><div class="stat-pill-lbl">PDF 文档类型</div></div></div>
-  <div class="stat-pill"><div class="stat-pill-icon" style="background:#fff7ed;">🤖</div><div><div class="stat-pill-val">16+</div><div class="stat-pill-lbl">AI 场景</div></div></div>
+  <div class="stat-pill"><div class="stat-pill-icon" style="background:#eef2ff;">🧩</div><div><div class="stat-pill-val">30+</div><div class="stat-pill-lbl">功能页面</div></div></div>
+  <div class="stat-pill"><div class="stat-pill-icon" style="background:#ecfdf5;">🌍</div><div><div class="stat-pill-val">7</div><div class="stat-pill-lbl">输出语言</div></div></div>
+  <div class="stat-pill"><div class="stat-pill-icon" style="background:#faf5ff;">📄</div><div><div class="stat-pill-val">4</div><div class="stat-pill-lbl">PDF 文档</div></div></div>
+  <div class="stat-pill"><div class="stat-pill-icon" style="background:#fffbeb;">🤖</div><div><div class="stat-pill-val">16+</div><div class="stat-pill-lbl">AI 场景</div></div></div>
   <div class="stat-pill"><div class="stat-pill-icon" style="background:#f0f9ff;">📊</div><div><div class="stat-pill-val">CRM</div><div class="stat-pill-lbl">客户管理</div></div></div>
 </div>
 """, unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════
-# 快捷入口 — 纯 HTML 5 列 Grid（精巧紧凑）
+# 快捷入口 — 卡片即按钮，合二为一（每个按钮就是卡片）
 # ══════════════════════════════════════════════════════════════════════
 st.markdown('<div class="section-label">快捷入口</div>', unsafe_allow_html=True)
 
@@ -195,24 +219,18 @@ QUICK_ACCESS = [
     ("🌐", "邮件润色",  "翻译+润色+对比",     "pages/15_🌐_邮件润色.py"),
 ]
 
-# 用纯 HTML Grid 渲染（不用 st.columns）
-_cards_html = '<div class="q-grid">'
-for icon, title, desc, _ in QUICK_ACCESS:
-    _cards_html += f"""
-    <div class="q-card">
-      <div class="q-card-icon">{icon}</div>
-      <div class="q-card-title">{title}</div>
-      <div class="q-card-desc">{desc}</div>
-    </div>"""
-_cards_html += "</div>"
-st.markdown(_cards_html, unsafe_allow_html=True)
-
-# 仍需 streamlit 按钮来做路由跳转（但用紧凑的 5 列）
-cols = st.columns(5)
-for i, (_, title, _, page) in enumerate(QUICK_ACCESS):
-    with cols[i % 5]:
-        if st.button(title, key=f"qa_{i}", use_container_width=True):
-            st.switch_page(page)
+# 用 CSS class 包裹 → 让按钮继承卡片样式
+st.markdown('<div class="qa-section">', unsafe_allow_html=True)
+for row_start in range(0, len(QUICK_ACCESS), 5):
+    row_items = QUICK_ACCESS[row_start:row_start + 5]
+    cols = st.columns(len(row_items))
+    for col, (icon, title, desc, page) in zip(cols, row_items):
+        with col:
+            # 按钮文本用换行分隔 icon / title / desc
+            btn_label = f"{icon}\n{title}\n{desc}"
+            if st.button(btn_label, key=f"qa_{row_start}_{title}", use_container_width=True):
+                st.switch_page(page)
+st.markdown('</div>', unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════
 # 全功能分类导航
@@ -225,23 +243,20 @@ tab_email, tab_doc, tab_crm, tab_tools, tab_platform = st.tabs([
 
 
 def _nav_section(items):
-    """渲染紧凑导航列表，纯 HTML 行 + 小按钮"""
-    html_parts = []
-    for icon, title, desc, _ in items:
-        html_parts.append(
-            f'<div class="nav-item">'
-            f'<span class="nav-item-icon">{icon}</span>'
-            f'<span class="nav-item-title">{title}</span>'
-            f'<span class="nav-item-desc">{desc}</span>'
-            f'<span class="nav-item-arr">→</span>'
-            f'</div>'
-        )
-    st.markdown("".join(html_parts), unsafe_allow_html=True)
-    # 按钮行（紧凑）
-    btn_cols = st.columns(min(len(items), 5))
-    for idx, (_, title, _, page) in enumerate(items):
-        with btn_cols[idx % min(len(items), 5)]:
-            if st.button(title, key=f"nav2_{title}", use_container_width=True):
+    """每行: HTML 描述 + → 按钮跳转"""
+    for icon, title, desc, page in items:
+        col_main, col_btn = st.columns([5, 1])
+        with col_main:
+            st.markdown(
+                f'<div class="nav-item">'
+                f'<span class="nav-item-icon">{icon}</span>'
+                f'<span class="nav-item-title">{title}</span>'
+                f'<span class="nav-item-desc">{desc}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        with col_btn:
+            if st.button("→", key=f"nav_{icon}_{title}", use_container_width=True):
                 st.switch_page(page)
 
 
@@ -300,7 +315,7 @@ with tab_platform:
     ])
 
 # ══════════════════════════════════════════════════════════════════════
-# 使用技巧（纯 HTML Grid）
+# 使用技巧
 # ══════════════════════════════════════════════════════════════════════
 st.markdown("""
 <div class="section-label">使用技巧</div>
