@@ -102,14 +102,21 @@ def get_rate_limit_reset_seconds(user_id: str = "default") -> int:
 
 def _check_preconditions(user_id: str = "default") -> str | None:
     """返回错误信息字符串；None 表示可以继续调用。不消耗 rate limit slot。"""
-    # Check if ANY AI provider is configured (not just NVIDIA)
+    # Check if ANY AI provider is configured (built-in or custom)
     has_any_key = (
         get_secret("NVIDIA_API_KEY")
         or get_secret("OPENAI_API_KEY")
         or get_secret("DEEPSEEK_API_KEY")
     )
+    # Also accept a fully-configured custom provider
     if not has_any_key:
-        return "⚠️ 请先设置 AI API Key（NVIDIA_API_KEY / OPENAI_API_KEY / DEEPSEEK_API_KEY）"
+        try:
+            from utils.ai_gateway import _get_custom_provider_config
+            has_any_key = bool(_get_custom_provider_config())
+        except Exception:
+            pass
+    if not has_any_key:
+        return "⚠️ 请先设置 AI API Key（NVIDIA / OpenAI / DeepSeek 或自定义 Provider）"
 
     # Tier-based daily limit check (only for logged-in non-admin users)
     from utils.user_auth import get_current_user
@@ -149,11 +156,20 @@ def _should_use_gateway() -> bool:
     """Determine if multi-model gateway should be used.
 
     Returns True if:
-    - Multiple AI providers are configured (NVIDIA + OpenAI/DeepSeek), OR
-    - User has explicitly selected a non-default model via preferences
+    - A custom provider is enabled (always uses gateway), OR
+    - Multiple built-in AI providers are configured (NVIDIA + OpenAI/DeepSeek)
 
-    When only NVIDIA_API_KEY is set, we use the direct path (original behavior).
+    When only NVIDIA_API_KEY is set and no custom provider is configured,
+    we use the direct path (original behaviour).
     """
+    # Custom provider → always go through gateway
+    try:
+        from utils.ai_gateway import _get_custom_provider_config
+        if _get_custom_provider_config():
+            return True
+    except Exception:
+        pass
+
     providers_configured = sum(1 for key in ("NVIDIA_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY")
                                if get_secret(key))
     return providers_configured >= 2
