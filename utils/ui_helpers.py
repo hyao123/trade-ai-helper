@@ -284,6 +284,12 @@ _CSS = """
         background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%) !important;
         border-right: 1px solid var(--border) !important;
     }
+    [data-testid="stSidebar"] > div:first-child {
+        padding-top: 0.5rem !important;
+    }
+    [data-testid="stSidebarNavItems"] {
+        padding-top: 0 !important;
+    }
     [data-testid="stSidebar"] [aria-current="page"],
     [data-testid="stSidebar"] [aria-current="page"] span {
         color: var(--primary) !important; font-weight: 700 !important;
@@ -390,7 +396,7 @@ def show_sidebar_info() -> None:
     with st.sidebar:
         # ── Logo / Brand ──
         st.markdown(
-            '<div style="text-align:center;padding:0.8rem 0 0.6rem;">'
+            '<div style="text-align:center;padding:0.2rem 0 0.5rem;">'
             '<div style="display:inline-flex;align-items:center;justify-content:center;'
             'width:44px;height:44px;border-radius:12px;'
             'background:linear-gradient(135deg,#4f46e5 0%,#6366f1 100%);'
