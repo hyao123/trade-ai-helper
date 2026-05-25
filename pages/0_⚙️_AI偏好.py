@@ -272,10 +272,7 @@ with tab_custom_model:
             "base_url": "https://api.groq.com/openai/v1",
             "model": "llama-3.3-70b-versatile",
         },
-        "Together AI": {
-            "base_url": "https://api.together.xyz/v1",
-            "model": "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
-        },
+
         "Ollama (本地)": {
             "base_url": "http://localhost:11434/v1",
             "model": "qwen2.5:72b",
