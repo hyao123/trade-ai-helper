@@ -332,20 +332,59 @@ def generate_outreach_email(
     product_info: str,
     company_intro: str = "",
     user_id: str = "default",
+    username: str = "",
+    use_catalog: bool = True,
 ) -> dict:
     """
     为单个客户生成个性化推介邮件。
 
     基于客户的行业信息、公司背景，AI自动生成针对性的产品推介内容。
+    当 use_catalog=True 且 username 非空时，自动从本地产品目录匹配对口产品，
+    将匹配到的产品详情注入 prompt，实现精准推介。
 
     Returns:
-        {"subject": str, "body": str, "error": str}
+        {
+            "subject": str,
+            "body": str,
+            "error": str,
+            "matched_products": list[dict],  # 匹配到的本地产品
+        }
     """
     from config.prompts import build_auto_outreach_prompt
     from utils.ai_client import call_llm
 
     industry = prospect.get("industry", "other")
     industry_info = INDUSTRY_TEMPLATES.get(industry, INDUSTRY_TEMPLATES["other"])
+
+    # ── 本地产品目录匹配 ──────────────────────────────────
+    matched_products = []
+    matched_product_text = ""
+    if use_catalog and username:
+        from utils.product_catalog import (
+            format_matched_products_for_prompt,
+            match_products_for_prospect,
+        )
+
+        matched_products = match_products_for_prospect(
+            username=username,
+            prospect_industry=industry,
+            prospect_product_interest=prospect.get("product_interest", ""),
+            limit=3,
+        )
+        if matched_products:
+            matched_product_text = format_matched_products_for_prompt(matched_products)
+            logger.debug(
+                "Matched %d catalog products for %s (industry=%s)",
+                len(matched_products),
+                prospect.get("email", ""),
+                industry,
+            )
+
+    # 合并产品信息：本地目录匹配优先，用户手动输入作为补充
+    effective_product_info = _build_effective_product_info(
+        product_info=product_info,
+        matched_product_text=matched_product_text,
+    )
 
     prompt, system = build_auto_outreach_prompt(
         email=prospect.get("email", ""),
@@ -355,15 +394,16 @@ def generate_outreach_email(
         industry_focus=industry_info["focus"],
         industry_pain_points=industry_info["pain_points"],
         country=prospect.get("country", ""),
-        product_info=product_info,
+        product_info=effective_product_info,
         company_intro=company_intro,
         product_interest=prospect.get("product_interest", ""),
+        matched_products=matched_product_text,
     )
 
     result = call_llm(prompt, system, user_id=user_id)
 
     if result.startswith("⚠️"):
-        return {"subject": "", "body": "", "error": result}
+        return {"subject": "", "body": "", "error": result, "matched_products": []}
 
     # 解析 Subject 和 Body
     subject = ""
@@ -377,7 +417,12 @@ def generate_outreach_email(
     if not subject:
         subject = f"Partnership Opportunity - {product_info[:30]}"
 
-    return {"subject": subject, "body": body, "error": ""}
+    return {
+        "subject": subject,
+        "body": body,
+        "error": "",
+        "matched_products": matched_products,
+    }
 
 
 def run_campaign_step(
@@ -424,6 +469,8 @@ def run_campaign_step(
             product_info=product_info,
             company_intro=company_intro,
             user_id=user_id,
+            username=username,
+            use_catalog=True,
         )
 
         if email_data["error"]:
@@ -653,6 +700,27 @@ def _forward_important(
         logger.error("Forward failed: %s", msg)
 
     return ok
+
+
+def _build_effective_product_info(product_info: str, matched_product_text: str) -> str:
+    """
+    合并用户手动输入的产品信息和本地目录匹配到的产品详情。
+
+    策略：
+    - 如果有匹配产品，以匹配产品为主体，用户输入作为补充背景
+    - 如果没有匹配产品，直接使用用户输入
+    """
+    if not matched_product_text:
+        return product_info
+
+    if product_info:
+        return (
+            f"[From Product Catalog - Best Match for Customer's Industry]\n"
+            f"{matched_product_text}\n\n"
+            f"[Additional Product/Service Context]\n"
+            f"{product_info}"
+        )
+    return matched_product_text
 
 
 # ---------------------------------------------------------------------------

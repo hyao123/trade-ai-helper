@@ -1,6 +1,7 @@
 """
 pages/34_🚀_自动推送.py
 自动客户推送：上传客户列表 → AI按行业生成个性化邮件 → 批量发送 → 自动回复 → 重点转发
+支持本地产品目录管理，自动匹配对口企业产品信息
 """
 import csv
 import io
@@ -21,6 +22,14 @@ from utils.auto_outreach import (
     parse_prospect_file,
     run_campaign_step,
     update_campaign,
+)
+from utils.product_catalog import (
+    add_product,
+    delete_product,
+    get_catalog,
+    get_catalog_industries,
+    match_products_for_prospect,
+    update_product,
 )
 from utils.ui_helpers import check_auth, copy_button, get_user_id, inject_css
 
@@ -46,8 +55,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ── 功能切换 Tab ──────────────────────────────────────
-tab_new, tab_campaigns, tab_auto_reply, tab_logs = st.tabs([
-    "📤 新建推送", "📊 推送任务", "💬 自动回复", "📋 推送日志"
+tab_new, tab_catalog, tab_campaigns, tab_auto_reply, tab_logs = st.tabs([
+    "📤 新建推送", "📦 产品目录", "📊 推送任务", "💬 自动回复", "📋 推送日志"
 ])
 
 # ══════════════════════════════════════════════════════
@@ -178,6 +187,26 @@ with tab_new:
     st.markdown("---")
     st.markdown("### 🚀 第三步：预览并发送")
 
+    # 产品目录匹配状态提示
+    username_for_catalog = _get_username()
+    catalog = get_catalog(username_for_catalog)
+    if catalog:
+        ind_counts = get_catalog_industries(username_for_catalog)
+        st.markdown(
+            f'<div class="tip-card">'
+            f'🎯 <b>产品目录已启用：</b>{len(catalog)} 个产品，覆盖 {len(ind_counts)} 个行业。'
+            f'系统将自动为每位客户匹配最相关的产品参数写入邮件。'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            '<div class="tip-card">'
+            '💡 <b>提示：</b>前往「📦 产品目录」添加你的产品信息，系统可自动匹配客户行业推送对口产品，大幅提升邮件精准度。'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
     col_preview, col_send = st.columns(2)
 
     with col_preview:
@@ -197,19 +226,38 @@ with tab_new:
 
     # 预览逻辑
     if preview_clicked and prospects and product_info:
-        with st.spinner("AI 正在生成预览邮件..."):
+        with st.spinner("AI 正在生成预览邮件（自动匹配本地产品目录）..."):
             user_id = get_user_id()
+            username = _get_username()
             email_data = generate_outreach_email(
                 prospect=prospects[0],
                 product_info=product_info,
                 company_intro=company_intro,
                 user_id=user_id,
+                username=username,
+                use_catalog=True,
             )
             if email_data["error"]:
                 st.error(email_data["error"])
             else:
                 st.markdown("#### 📧 预览邮件")
                 ind = prospects[0].get("industry", "other")
+
+                # 显示匹配到的本地产品
+                matched = email_data.get("matched_products", [])
+                if matched:
+                    matched_names = ", ".join(p.get("name", "") for p in matched[:3])
+                    st.success(
+                        f"🎯 **已匹配本地产品目录:** {matched_names}\n\n"
+                        f"AI 将基于你的实际产品参数生成精准推介邮件"
+                    )
+                else:
+                    catalog = get_catalog(_get_username())
+                    if not catalog:
+                        st.warning("💡 提示：尚未配置产品目录，前往「📦 产品目录」添加产品可提升邮件精准度")
+                    else:
+                        st.info("ℹ️ 未匹配到与该客户行业对口的产品，使用通用产品描述")
+
                 st.info(
                     f"**收件人:** {prospects[0].get('contact_name', '')} "
                     f"<{prospects[0].get('email', '')}>\n\n"
@@ -293,7 +341,136 @@ with tab_new:
 
 
 # ══════════════════════════════════════════════════════
-# Tab 2: 推送任务管理
+# Tab 2: 产品目录管理
+# ══════════════════════════════════════════════════════
+with tab_catalog:
+    username = _get_username()
+    catalog = get_catalog(username)
+
+    st.markdown("""
+    <div class="tip-card">
+    💡 <b>产品目录说明：</b>在这里添加你的产品信息并标注适用行业。
+    推送邮件时，系统会<b>自动匹配客户行业</b>对应的产品，将真实产品名称、参数、认证写入邮件，大幅提升专业度和回复率。
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── 目录统计 ──
+    if catalog:
+        ind_counts = get_catalog_industries(username)
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("产品总数", len(catalog))
+        with col2:
+            st.metric("覆盖行业", len(ind_counts))
+        with col3:
+            # 未覆盖行业提示
+            all_industries = set(INDUSTRY_TEMPLATES.keys()) - {"other"}
+            covered = set(ind_counts.keys())
+            uncovered = all_industries - covered
+            st.metric("未覆盖行业", len(uncovered))
+
+        if uncovered:
+            uncovered_labels = [INDUSTRY_TEMPLATES[i]["label"] for i in uncovered if i in INDUSTRY_TEMPLATES]
+            with st.expander("⚠️ 未覆盖的行业（该行业客户将使用通用描述）"):
+                for label in uncovered_labels:
+                    st.markdown(f"- {label}")
+
+    # ── 添加新产品 ──
+    st.markdown("### ➕ 添加产品")
+    with st.form("add_product_form", clear_on_submit=True):
+        col_name, col_ind = st.columns([2, 1])
+        with col_name:
+            new_name = st.text_input("产品名称 *", placeholder="例如: LED Street Light 200W")
+        with col_ind:
+            industry_options = [(k, v["label"]) for k, v in INDUSTRY_TEMPLATES.items() if k != "other"]
+            new_industries = st.multiselect(
+                "适用行业 *",
+                options=[k for k, _ in industry_options],
+                format_func=lambda x: INDUSTRY_TEMPLATES[x]["label"],
+                help="选择该产品适合推送的目标行业",
+            )
+
+        new_description = st.text_area(
+            "产品描述",
+            placeholder="一句话概述产品用途和优势...",
+            height=60,
+        )
+        new_features = st.text_area(
+            "核心卖点/参数 *",
+            placeholder="每行一条，例如：\n• IP67防水\n• 寿命50000小时\n• 光效160lm/W\n• CE/RoHS/UL认证",
+            height=100,
+        )
+
+        col_price, col_moq, col_cert = st.columns(3)
+        with col_price:
+            new_price = st.text_input("参考价格区间", placeholder="$50-$120/unit")
+        with col_moq:
+            new_moq = st.text_input("MOQ", placeholder="100 units")
+        with col_cert:
+            new_certs = st.text_input("认证", placeholder="CE, RoHS, FCC, UL")
+
+        new_keywords = st.text_input(
+            "搜索关键词（逗号分隔）",
+            placeholder="led, street light, outdoor lighting, solar",
+            help="用于匹配客户的 product_interest 字段",
+        )
+
+        submitted = st.form_submit_button("✅ 添加到产品目录", type="primary", use_container_width=True)
+        if submitted:
+            if not new_name or not new_features:
+                st.error("请填写产品名称和核心卖点")
+            elif not new_industries:
+                st.error("请选择至少一个适用行业")
+            else:
+                keywords_list = [kw.strip() for kw in new_keywords.split(",") if kw.strip()] if new_keywords else []
+                add_product(
+                    username=username,
+                    name=new_name,
+                    description=new_description,
+                    features=new_features,
+                    industries=new_industries,
+                    keywords=keywords_list,
+                    price_range=new_price,
+                    moq=new_moq,
+                    certifications=new_certs,
+                )
+                st.success(f"✅ 已添加产品: {new_name}")
+                st.rerun()
+
+    # ── 现有产品列表 ──
+    if catalog:
+        st.markdown("### 📦 我的产品目录")
+        for product in catalog:
+            ind_labels = [INDUSTRY_TEMPLATES.get(i, {}).get("label", i) for i in product.get("industries", [])]
+            with st.expander(
+                f"**{product['name']}** — 行业: {', '.join(ind_labels) or '未分类'} | "
+                f"{'💰 ' + product.get('price_range', '') if product.get('price_range') else ''}"
+            ):
+                col_detail, col_action = st.columns([4, 1])
+                with col_detail:
+                    if product.get("description"):
+                        st.markdown(f"📝 {product['description']}")
+                    if product.get("features"):
+                        st.markdown(f"**卖点:** {product['features'][:200]}")
+                    info_parts = []
+                    if product.get("moq"):
+                        info_parts.append(f"MOQ: {product['moq']}")
+                    if product.get("certifications"):
+                        info_parts.append(f"认证: {product['certifications']}")
+                    if product.get("keywords"):
+                        info_parts.append(f"关键词: {', '.join(product['keywords'][:5])}")
+                    if info_parts:
+                        st.markdown(" | ".join(info_parts))
+                with col_action:
+                    if st.button("🗑️ 删除", key=f"del_prod_{product['id']}"):
+                        delete_product(username, product["id"])
+                        st.rerun()
+    else:
+        st.info("📭 产品目录为空，请添加产品以启用智能匹配推送")
+
+
+# ══════════════════════════════════════════════════════
+# Tab 3: 推送任务管理
 # ══════════════════════════════════════════════════════
 with tab_campaigns:
     username = _get_username()
@@ -395,7 +572,7 @@ with tab_campaigns:
 
 
 # ══════════════════════════════════════════════════════
-# Tab 3: 自动回复测试
+# Tab 4: 自动回复测试
 # ══════════════════════════════════════════════════════
 with tab_auto_reply:
     st.markdown("""
@@ -485,7 +662,7 @@ with tab_auto_reply:
 
 
 # ══════════════════════════════════════════════════════
-# Tab 4: 推送日志
+# Tab 5: 推送日志
 # ══════════════════════════════════════════════════════
 with tab_logs:
     username = _get_username()

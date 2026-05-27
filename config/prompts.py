@@ -1166,8 +1166,13 @@ def build_auto_outreach_prompt(
     product_info: str,
     company_intro: str = "",
     product_interest: str = "",
+    matched_products: str = "",
 ) -> tuple[str, str | None]:
-    """构建自动推送邮件的 Prompt — 基于客户行业信息生成针对性产品推介。"""
+    """构建自动推送邮件的 Prompt — 基于客户行业信息生成针对性产品推介。
+
+    当 matched_products 非空时，表示已从本地产品目录中匹配到对口产品，
+    AI应优先使用匹配产品的具体信息（名称、卖点、认证、价格等）来撰写邮件。
+    """
     email = sanitize_prompt_param(email, "email")
     company = sanitize_prompt_param(company, "company")
     contact_name = sanitize_prompt_param(contact_name, "contact_name")
@@ -1182,10 +1187,29 @@ def build_auto_outreach_prompt(
     country_info = f"\nTarget Country: {country}" if country else ""
     interest_info = f"\nKnown Product Interest: {product_interest}" if product_interest else ""
 
+    # 构建产品信息区块：区分「目录匹配」和「手动输入」
+    if matched_products:
+        product_section = f"""
+--- MATCHED FROM YOUR PRODUCT CATALOG (use these details as primary source) ---
+{matched_products}
+--- END CATALOG MATCH ---
+
+Additional Context / General Product Info:
+- {product_info}"""
+        catalog_instruction = (
+            "\n7. IMPORTANT: Use the specific product details from the CATALOG MATCH above "
+            "(name, features, certifications, pricing) to make the email concrete and credible. "
+            "Do NOT use vague or generic descriptions when catalog data is available."
+        )
+    else:
+        product_section = f"- {product_info}"
+        catalog_instruction = ""
+
     system = (
         "你是一位有15年经验的外贸业务开发专家，精通各行业的采购需求和痛点。"
         "你擅长根据客户的行业背景，撰写高度个性化、高回复率的产品推介邮件。"
         "邮件必须切中行业痛点，展示产品如何解决客户的具体问题。"
+        "当提供了产品目录匹配数据时，你必须优先使用其中的具体产品名称、参数和认证信息。"
     )
     prompt = f"""Please generate a highly personalized product introduction email for an automated outreach campaign.
 
@@ -1198,7 +1222,7 @@ Target Customer Information:
 - Industry Pain Points: {industry_pain_points}{country_info}{interest_info}
 
 Your Product/Service:
-- {product_info}{company_info}
+{product_section}{company_info}
 
 Output format (strictly follow):
 Subject: [Compelling subject line under 60 chars, personalized to their industry, avoid spam trigger words]
@@ -1208,7 +1232,7 @@ Dear {greeting_name},
 [Email body, 80-120 words, structured as:]
 1. Industry-relevant opening: Reference a specific trend or challenge in their industry
 2. Product connection: How your product/service directly addresses their pain point
-3. Key differentiator: 1-2 unique advantages relevant to their industry
+3. Key differentiator: 1-2 unique advantages relevant to their industry (use specific specs/certifications from catalog)
 4. Social proof: Brief mention of similar industry clients (if applicable)
 5. Soft CTA: Non-pushy call to action (e.g., "Would you be open to a brief conversation?")
 
@@ -1222,7 +1246,7 @@ Critical Requirements:
 3. Avoid spam words (free, discount, limited time, act now, etc.)
 4. Write as if you genuinely understand their business challenges
 5. Keep professional but conversational tone
-6. Output in English, plain text only, no markdown symbols."""
+6. Output in English, plain text only, no markdown symbols.{catalog_instruction}"""
     return prompt, system
 
 
