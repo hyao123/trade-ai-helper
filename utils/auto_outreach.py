@@ -902,3 +902,344 @@ def get_campaign_summary(username: str) -> dict:
         "total_important": total_important,
         "success_rate": round(total_sent / max(total_sent + total_failed, 1) * 100, 1),
     }
+
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# Drip Campaign 多步序列：在现有 campaign 数据结构上扩展
+# ───────────────────────────────────────────────────────────────────────────
+
+def create_drip_campaign(
+    username: str,
+    campaign_name: str,
+    prospects: list[dict],
+    product_info: str,
+    sequence_template: str = "b2b_standard",
+    company_intro: str = "",
+    sender_name: str = "",
+    forward_email: str = "",
+    forward_channel: str = "email",
+    auto_reply_enabled: bool = True,
+    start_at: datetime | None = None,
+) -> dict:
+    """
+    创建一个开启序列模式的推送任务。
+
+    比 create_campaign() 多做的事：
+    - 解析 sequence_template 并把 steps 快照到 campaign
+    - 为每个 prospect 初始化 prospects_state（D0送达时间）
+    - sequence_enabled=True 让 tick 流程接管发送
+
+    Args:
+        sequence_template: 模板名（见 drip_sequences.SEQUENCE_TEMPLATES）
+        start_at: 序列起始时间（D0），默认现在
+    """
+    from utils.drip_sequences import get_template, init_prospects_state
+
+    tpl = get_template(sequence_template)
+    if not tpl:
+        raise ValueError(f"Unknown sequence template: {sequence_template}")
+
+    steps = list(tpl["steps"])  # snapshot
+    state = init_prospects_state(prospects, steps, start_at=start_at)
+
+    # 复用基础 create_campaign，再写入序列字段
+    campaign = create_campaign(
+        username=username,
+        campaign_name=campaign_name,
+        prospects=prospects,
+        product_info=product_info,
+        company_intro=company_intro,
+        sender_name=sender_name,
+        forward_email=forward_email,
+        forward_channel=forward_channel,
+        auto_reply_enabled=auto_reply_enabled,
+    )
+
+    update_campaign(username, campaign["id"], {
+        "sequence_enabled": True,
+        "sequence_template": sequence_template,
+        "sequence_template_label": tpl["label"],
+        "sequence_steps": steps,
+        "prospects_state": state,
+    })
+
+    logger.info(
+        "Drip campaign created: %s (%s) template=%s, %d steps × %d prospects",
+        campaign_name, campaign["id"], sequence_template, len(steps), len(state),
+    )
+    # Return refreshed campaign
+    return get_campaign(username, campaign["id"]) or campaign
+
+
+def tick_drip_campaign(
+    username: str,
+    campaign_id: str,
+    user_id: str = "default",
+    send_interval: float = SEND_INTERVAL_SECONDS,
+    max_per_tick: int = 50,
+) -> Generator[dict, None, None]:
+    """
+    Run one "tick" of a drip campaign: send all prospects whose next step is due.
+
+    Designed to be called periodically (manually via UI button, or by a
+    scheduler). Each call sends 0 or more emails — only those whose
+    next_send_at has passed.
+
+    Yields per-send progress dicts (same shape as run_campaign_step):
+        {"index", "email", "status", "detail", "step", "step_label"}
+
+    Args:
+        max_per_tick: cap on emails sent in this tick (defaults to 50,
+                      protecting against an unbounded burst if many prospects
+                      come due simultaneously)
+    """
+    from config.prompts import build_drip_step_prompt
+    from utils.ai_client import call_llm
+    from utils.drip_sequences import advance_state, get_due_prospects
+    from utils.email_service import send_ai_generated_email
+
+    campaign = get_campaign(username, campaign_id)
+    if not campaign:
+        yield {"index": -1, "email": "", "status": "failed",
+               "detail": "任务不存在", "step": -1, "step_label": ""}
+        return
+
+    if not campaign.get("sequence_enabled"):
+        yield {"index": -1, "email": "", "status": "failed",
+               "detail": "此 campaign 未开启序列模式", "step": -1, "step_label": ""}
+        return
+
+    steps = campaign.get("sequence_steps", [])
+    state = campaign.get("prospects_state", {})
+    if not steps or not state:
+        yield {"index": -1, "email": "", "status": "failed",
+               "detail": "序列配置缺失", "step": -1, "step_label": ""}
+        return
+
+    due = get_due_prospects(campaign)
+    if not due:
+        return  # nothing to do this tick
+
+    due = due[:max_per_tick]
+    logger.info("Drip tick: campaign=%s, due=%d (capped to %d)",
+                campaign_id, len(due), max_per_tick)
+
+    update_campaign(username, campaign_id, {"status": "running"})
+
+    product_info = campaign.get("product_info", "")
+    company_intro = campaign.get("company_intro", "")
+    sender_name = campaign.get("sender_name", "")
+
+    # Auto-pull seller profile if intro empty
+    effective_company_intro = company_intro or _get_company_profile_for_outreach(username)
+
+    results = _load_campaign_results(username, campaign_id)
+    stats = campaign.get("stats", {})
+
+    for i, (email, prospect, step_idx) in enumerate(due):
+        step = steps[step_idx]
+        step_type = step.get("step_type", "followup")
+        step_label = step.get("label", f"Step {step_idx + 1}")
+        industry = prospect.get("industry", "other")
+        industry_info = INDUSTRY_TEMPLATES.get(industry, INDUSTRY_TEMPLATES["other"])
+
+        # ── catalog matching (same as single-shot) ─────────────────────
+        matched_product_text = ""
+        try:
+            from utils.product_catalog import (
+                format_matched_products_for_prompt,
+                match_products_for_prospect,
+            )
+            matched_products = match_products_for_prospect(
+                username=username,
+                prospect_industry=industry,
+                prospect_product_interest=prospect.get("product_interest", ""),
+                limit=3,
+            )
+            if matched_products:
+                matched_product_text = format_matched_products_for_prompt(matched_products)
+        except Exception as e:
+            logger.debug("Catalog match skipped: %s", e)
+
+        # ── collect prior subjects from history to avoid repetition ────
+        prior_subjects = []
+        ps = state.get(email, {})
+        for h in ps.get("history", []):
+            if h.get("subject"):
+                prior_subjects.append(h["subject"])
+
+        # ── build step-specific prompt ─────────────────────────────────
+        prompt, system = build_drip_step_prompt(
+            step_type=step_type,
+            step_index=step_idx,
+            total_steps=len(steps),
+            prospect=prospect,
+            industry=industry_info["label"],
+            industry_focus=industry_info["focus"],
+            industry_pain_points=industry_info["pain_points"],
+            product_info=product_info,
+            company_intro=effective_company_intro,
+            matched_products=matched_product_text,
+            previous_subjects=prior_subjects,
+        )
+
+        ai_result = call_llm(prompt, system, user_id=user_id)
+        if ai_result.startswith("⚠️"):
+            results.append({
+                "email": email,
+                "step": step_idx,
+                "step_label": step_label,
+                "status": "failed",
+                "error": ai_result,
+                "timestamp": datetime.now().isoformat(),
+            })
+            stats["failed"] = stats.get("failed", 0) + 1
+            yield {"index": i, "email": email, "status": "failed",
+                   "detail": ai_result, "step": step_idx, "step_label": step_label}
+            continue
+
+        # Parse subject + body
+        subject = ""
+        body = ai_result
+        for line in ai_result.splitlines():
+            if line.strip().lower().startswith("subject:"):
+                subject = line.strip()[len("subject:"):].strip()
+                body = ai_result[ai_result.index("\n", ai_result.index(line)) + 1:].strip()
+                break
+        if not subject:
+            subject = f"[{step_label}] {product_info[:30]}"
+
+        # ── send ────────────────────────────────────────────────────────
+        ok, msg = send_ai_generated_email(
+            to_email=email,
+            subject=subject,
+            body=body,
+            from_name=sender_name,
+            campaign=f"{campaign.get('name', '')}/step{step_idx}",
+        )
+
+        sent_at = datetime.now()
+        if ok:
+            results.append({
+                "email": email,
+                "company": prospect.get("company", ""),
+                "contact_name": prospect.get("contact_name", ""),
+                "step": step_idx,
+                "step_label": step_label,
+                "status": "sent",
+                "subject": subject,
+                "body": body[:500],
+                "timestamp": sent_at.isoformat(),
+            })
+            stats["sent"] = stats.get("sent", 0) + 1
+            # Advance prospect state
+            advance_state(state, email, step_idx, sent_at, steps, subject=subject)
+            yield {
+                "index": i, "email": email, "status": "sent",
+                "detail": f"[{step_label}] {subject[:40]}",
+                "step": step_idx, "step_label": step_label,
+            }
+        else:
+            results.append({
+                "email": email,
+                "step": step_idx,
+                "step_label": step_label,
+                "status": "failed",
+                "error": msg,
+                "timestamp": sent_at.isoformat(),
+            })
+            stats["failed"] = stats.get("failed", 0) + 1
+            # Don't advance state on send failure — will retry next tick
+            yield {
+                "index": i, "email": email, "status": "failed",
+                "detail": msg, "step": step_idx, "step_label": step_label,
+            }
+
+        # Persist state every step (low IO since drip ticks are small)
+        update_campaign(username, campaign_id, {
+            "prospects_state": state, "stats": stats,
+        })
+        _save_campaign_results(username, campaign_id, results)
+
+        # Throttle between sends
+        time.sleep(send_interval)
+
+    # Final persist + check if all done
+    summary = {
+        ps.get("status", "active") for ps in state.values()
+    }
+    if "active" not in summary:
+        update_campaign(username, campaign_id, {"status": "completed"})
+    else:
+        update_campaign(username, campaign_id, {"status": "running"})
+
+
+def mark_campaign_reply(
+    username: str,
+    campaign_id: str,
+    customer_email: str,
+) -> bool:
+    """
+    Mark a prospect as having replied — pauses their drip sequence.
+
+    Called by inbox integration / auto_reply flow when a customer reply is
+    detected. Idempotent: re-calling has no effect.
+    """
+    from utils.drip_sequences import mark_replied
+
+    campaign = get_campaign(username, campaign_id)
+    if not campaign or not campaign.get("sequence_enabled"):
+        return False
+
+    state = campaign.get("prospects_state", {})
+    if not mark_replied(state, customer_email):
+        return False
+
+    stats = campaign.get("stats", {})
+    stats["replied"] = stats.get("replied", 0) + 1
+
+    update_campaign(username, campaign_id, {
+        "prospects_state": state, "stats": stats,
+    })
+    logger.info("Drip reply marked: %s in campaign %s", customer_email, campaign_id)
+    return True
+
+
+def get_drip_progress(username: str, campaign_id: str) -> dict:
+    """
+    Get drip campaign progress for UI display.
+
+    Returns:
+        {
+            "enabled": bool,
+            "template": str,
+            "template_label": str,
+            "step_count": int,
+            "summary": {active, replied, completed, ...},
+            "step_completions": list[int],   # how many got step N
+            "reply_rate_per_step": list[float],
+        }
+    """
+    from utils.drip_sequences import (
+        count_step_completions, reply_rate_per_step, summarize_state,
+    )
+
+    campaign = get_campaign(username, campaign_id)
+    if not campaign or not campaign.get("sequence_enabled"):
+        return {"enabled": False}
+
+    steps = campaign.get("sequence_steps", [])
+    state = campaign.get("prospects_state", {})
+    step_count = len(steps)
+
+    return {
+        "enabled": True,
+        "template": campaign.get("sequence_template", ""),
+        "template_label": campaign.get("sequence_template_label", ""),
+        "steps": steps,
+        "step_count": step_count,
+        "summary": summarize_state(state),
+        "step_completions": count_step_completions(state, step_count),
+        "reply_rate_per_step": reply_rate_per_step(state, step_count),
+    }
