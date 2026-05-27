@@ -1149,3 +1149,141 @@ Requirements:
 3. Provide ready-to-use sales language
 4. Output in English with section headers"""
     return prompt, system
+
+
+
+# ---------------------------------------------------------------------------
+# 自动推送 — 个性化产品推介邮件
+# ---------------------------------------------------------------------------
+def build_auto_outreach_prompt(
+    email: str,
+    company: str,
+    contact_name: str,
+    industry: str,
+    industry_focus: str,
+    industry_pain_points: str,
+    country: str,
+    product_info: str,
+    company_intro: str = "",
+    product_interest: str = "",
+) -> tuple[str, str | None]:
+    """构建自动推送邮件的 Prompt — 基于客户行业信息生成针对性产品推介。"""
+    email = sanitize_prompt_param(email, "email")
+    company = sanitize_prompt_param(company, "company")
+    contact_name = sanitize_prompt_param(contact_name, "contact_name")
+    industry = sanitize_prompt_param(industry, "industry")
+    product_info = sanitize_prompt_param(product_info, "product_info")
+    company_intro = sanitize_prompt_param(company_intro, "company_intro")
+    country = sanitize_prompt_param(country, "country")
+    product_interest = sanitize_prompt_param(product_interest, "product_interest")
+
+    greeting_name = contact_name if contact_name else "Sir/Madam"
+    company_info = f"\nYour Company Introduction: {company_intro}" if company_intro else ""
+    country_info = f"\nTarget Country: {country}" if country else ""
+    interest_info = f"\nKnown Product Interest: {product_interest}" if product_interest else ""
+
+    system = (
+        "你是一位有15年经验的外贸业务开发专家，精通各行业的采购需求和痛点。"
+        "你擅长根据客户的行业背景，撰写高度个性化、高回复率的产品推介邮件。"
+        "邮件必须切中行业痛点，展示产品如何解决客户的具体问题。"
+    )
+    prompt = f"""Please generate a highly personalized product introduction email for an automated outreach campaign.
+
+Target Customer Information:
+- Email: {email}
+- Company: {company or "(Unknown)"}
+- Contact: {greeting_name}
+- Industry: {industry}
+- Industry Focus Areas: {industry_focus}
+- Industry Pain Points: {industry_pain_points}{country_info}{interest_info}
+
+Your Product/Service:
+- {product_info}{company_info}
+
+Output format (strictly follow):
+Subject: [Compelling subject line under 60 chars, personalized to their industry, avoid spam trigger words]
+
+Dear {greeting_name},
+
+[Email body, 80-120 words, structured as:]
+1. Industry-relevant opening: Reference a specific trend or challenge in their industry
+2. Product connection: How your product/service directly addresses their pain point
+3. Key differentiator: 1-2 unique advantages relevant to their industry
+4. Social proof: Brief mention of similar industry clients (if applicable)
+5. Soft CTA: Non-pushy call to action (e.g., "Would you be open to a brief conversation?")
+
+Best regards,
+[Your Name]
+[Your Company]
+
+Critical Requirements:
+1. DO NOT use generic language - every sentence must relate to their specific industry
+2. Subject line must reference their industry or a specific pain point
+3. Avoid spam words (free, discount, limited time, act now, etc.)
+4. Write as if you genuinely understand their business challenges
+5. Keep professional but conversational tone
+6. Output in English, plain text only, no markdown symbols."""
+    return prompt, system
+
+
+# ---------------------------------------------------------------------------
+# 自动推送 — 智能回复（识别意图 + 生成回复）
+# ---------------------------------------------------------------------------
+def build_auto_reply_prompt(
+    customer_email: str,
+    customer_message: str,
+    product_info: str,
+    company_intro: str = "",
+) -> tuple[str, str | None]:
+    """构建自动回复 Prompt — 识别客户意图并生成合适回复。"""
+    customer_email = sanitize_prompt_param(customer_email, "customer_email")
+    customer_message = sanitize_input(customer_message, max_length=3000)
+    product_info = sanitize_prompt_param(product_info, "product_info")
+    company_intro = sanitize_prompt_param(company_intro, "company_intro")
+
+    company_info = f"\nYour Company: {company_intro}" if company_intro else ""
+
+    system = (
+        "你是一位智能外贸助手，能准确识别客户回复的意图，"
+        "并根据意图生成专业、得体的回复邮件。"
+        "你的目标是推动对话向成交方向发展，同时保持专业友好。"
+    )
+    prompt = f"""Analyze the following customer reply and generate an appropriate response.
+
+Customer Email: {customer_email}
+Customer's Message:
+---
+{customer_message}
+---
+
+Your Product/Service: {product_info}{company_info}
+
+Please analyze and output in EXACTLY this format (use the markers precisely):
+
+INTENT: [One of: Interested/Needs Info/Price Negotiation/Sample Request/Purchase Intent/Not Interested/Auto-Reply/Other]
+
+REPLY_SUBJECT: [Appropriate reply subject line]
+
+REPLY_BODY: [Professional reply email, 60-100 words, that:
+- Acknowledges their message appropriately
+- Addresses their specific question or need
+- Provides relevant product/pricing information if asked
+- Includes a clear next step
+- Maintains warm professional tone
+- If they show purchase intent: express enthusiasm and propose next steps
+- If they need info: provide concise answers and offer more details
+- If not interested: thank them politely and leave door open
+]
+
+Best regards,
+[Your Name]
+[Your Company]
+
+IMPORTANCE: [HIGH if purchase/sample/order intent, MEDIUM if interested/needs info, LOW if not interested/auto-reply]
+
+Requirements:
+1. Be accurate in intent detection - look for buying signals
+2. Reply must directly address what the customer wrote
+3. Keep the reply concise and actionable
+4. Output in English, plain text only"""
+    return prompt, system
