@@ -395,7 +395,7 @@ with tab_catalog:
         new_description = st.text_area(
             "产品描述",
             placeholder="一句话概述产品用途和优势...",
-            height=60,
+            height=68,
         )
         new_features = st.text_area(
             "核心卖点/参数 *",

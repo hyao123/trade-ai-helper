@@ -288,7 +288,57 @@ _CSS = """
         padding-top: 0.5rem !important;
     }
     [data-testid="stSidebarNavItems"] {
-        padding-top: 0 !important;
+        padding-top: 0.3rem !important;
+    }
+
+    /* ── Navigation link items (专业化) ── */
+    [data-testid="stSidebarNavItems"] li {
+        margin-bottom: 1px !important;
+    }
+    [data-testid="stSidebarNavItems"] a {
+        padding: 0.5rem 0.75rem !important;
+        border-radius: 8px !important;
+        font-size: 0.82rem !important;
+        font-weight: 500 !important;
+        color: var(--text-2) !important;
+        transition: all 0.15s ease !important;
+        border-left: 3px solid transparent !important;
+        margin: 0 0.4rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    [data-testid="stSidebarNavItems"] a:hover {
+        background: rgba(37,99,235,0.06) !important;
+        color: var(--text-1) !important;
+        border-left-color: rgba(37,99,235,0.3) !important;
+    }
+    [data-testid="stSidebarNavItems"] a span {
+        font-size: 0.82rem !important;
+    }
+    /* Active page: bold left indicator */
+    [data-testid="stSidebarNavItems"] [aria-current="page"],
+    [data-testid="stSidebarNavItems"] [aria-current="page"] span {
+        color: var(--primary) !important;
+        font-weight: 700 !important;
+        background: linear-gradient(135deg, rgba(37,99,235,0.08) 0%, rgba(124,58,237,0.05) 100%) !important;
+        border-left-color: var(--primary) !important;
+        border-radius: 8px !important;
+    }
+    /* First nav item (app.py = 首页) — 隐藏"app"文字，用"🏠 首页"替代 */
+    [data-testid="stSidebarNavItems"] li:first-child a span {
+        font-size: 0 !important;
+        line-height: 0 !important;
+    }
+    [data-testid="stSidebarNavItems"] li:first-child a span::after {
+        content: "🏠 工作台";
+        font-size: 0.82rem !important;
+        line-height: normal !important;
+        font-weight: 600 !important;
+    }
+    /* Navigation section separator — more subtle */
+    [data-testid="stSidebarNavSeparator"] {
+        margin: 0.6rem 0.75rem !important;
+        border-color: rgba(226,232,240,0.6) !important;
     }
 
     /* ── Sidebar collapse/expand toggle button (更醒目) ── */
