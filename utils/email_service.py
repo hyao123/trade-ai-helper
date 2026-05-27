@@ -4,10 +4,15 @@ utils/email_service.py
 Email sending service using SMTP (Python stdlib smtplib + email.mime).
 All SMTP config is read via get_secret().
 Functions return (success: bool, message: str) tuples and handle errors gracefully.
+
+Supports plain-text bodies and arbitrary file attachments (PDF reports,
+quotes, invoices, etc.). Attachments use the standard dict format from
+utils.email_attachments.
 """
 from __future__ import annotations
 
 import smtplib
+from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -25,12 +30,42 @@ def is_email_configured() -> bool:
 
 def send_email(to_email: str, subject: str, body: str) -> tuple[bool, str]:
     """
-    Send an email via SMTP.
+    Send a plain-text email via SMTP (no attachments).
 
     Returns (success, message) tuple.
     """
+    return send_email_with_attachments(to_email, subject, body, attachments=None)
+
+
+def send_email_with_attachments(
+    to_email: str,
+    subject: str,
+    body: str,
+    attachments: list[dict] | None = None,
+) -> tuple[bool, str]:
+    """
+    Send an email with optional file attachments via SMTP.
+
+    Args:
+        to_email: recipient email address
+        subject: email subject line
+        body: plain-text body
+        attachments: list of standard attachment dicts (see utils.email_attachments).
+                     Each dict must have 'filename', 'content' (bytes),
+                     and 'content_type' keys.
+
+    Returns:
+        (success, message) tuple.
+    """
     if not is_email_configured():
         return False, "SMTP is not configured"
+
+    # Validate attachments before opening any connection
+    if attachments:
+        from utils.email_attachments import validate_attachments
+        ok, err = validate_attachments(attachments)
+        if not ok:
+            return False, err
 
     smtp_host = get_secret("SMTP_HOST")
     smtp_port = get_secret("SMTP_PORT")
@@ -49,16 +84,42 @@ def send_email(to_email: str, subject: str, body: str) -> tuple[bool, str]:
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "plain", "utf-8"))
 
+    # Attach files (if any)
+    if attachments:
+        for att in attachments:
+            filename = att["filename"]
+            content = att["content"]
+            ctype = att.get("content_type", "application/octet-stream")
+            maintype, _, subtype = ctype.partition("/")
+            subtype = subtype or "octet-stream"
+
+            part = MIMEApplication(content, _subtype=subtype)
+            # RFC 2231-encoded filename to support unicode (CJK) safely
+            try:
+                part.add_header(
+                    "Content-Disposition",
+                    "attachment",
+                    filename=("utf-8", "", filename),
+                )
+            except Exception:
+                # Fallback for older Python: ASCII-only header
+                part.add_header(
+                    "Content-Disposition",
+                    f'attachment; filename="{filename}"',
+                )
+            msg.attach(part)
+
     try:
         if port == 465:
-            server = smtplib.SMTP_SSL(smtp_host, port, timeout=30)
+            server = smtplib.SMTP_SSL(smtp_host, port, timeout=60)
         else:
-            server = smtplib.SMTP(smtp_host, port, timeout=30)
+            server = smtplib.SMTP(smtp_host, port, timeout=60)
             server.starttls()
         server.login(smtp_user, smtp_password)
         server.sendmail(from_email, [to_email], msg.as_string())
         server.quit()
-        logger.info("Email sent to %s: %s", to_email, subject)
+        n_att = len(attachments) if attachments else 0
+        logger.info("Email sent to %s: %s (attachments=%d)", to_email, subject, n_att)
         return True, "Email sent successfully"
     except smtplib.SMTPAuthenticationError:
         logger.error("SMTP authentication failed for %s", smtp_user)
@@ -144,6 +205,7 @@ def send_ai_generated_email(
     from_name: str = "",
     customer_id: str = "",
     campaign: str = "",
+    attachments: list | None = None,
 ) -> tuple[bool, str]:
     """
     Send an AI-generated email directly to a customer.
@@ -158,10 +220,27 @@ def send_ai_generated_email(
         from_name: optional display name for sender
         customer_id: optional CRM customer ID for linking tracking
         campaign: optional campaign name for grouping stats
+        attachments: optional list of attachment inputs. Accepts:
+                     - standard dicts: {"filename","content","content_type"}
+                     - tuples: (filename, bytes) or (filename, bytes, content_type)
+                     - file paths (str / Path)
+                     See utils.email_attachments for full spec.
 
     Returns:
         (success, message) tuple
     """
+    # ── Normalize and validate attachments up-front ──
+    norm_attachments: list[dict] = []
+    if attachments:
+        from utils.email_attachments import (
+            normalize_attachments,
+            validate_attachments,
+        )
+        norm_attachments = normalize_attachments(attachments)
+        ok, err = validate_attachments(norm_attachments)
+        if not ok:
+            return False, err
+
     # ── Create tracking record ──
     tracking_id = ""
     try:
@@ -189,6 +268,7 @@ def send_ai_generated_email(
                 body=body,
                 from_name=from_name,
                 tracking_id=tracking_id,
+                attachments=norm_attachments or None,
             )
             return ok, msg
     except ImportError:
@@ -200,7 +280,9 @@ def send_ai_generated_email(
     if not is_email_configured():
         return False, "SMTP 未配置，请在设置中填写 SMTP 参数"
 
-    success, msg = send_email(to_email, subject, body)
+    success, msg = send_email_with_attachments(
+        to_email, subject, body, attachments=norm_attachments or None,
+    )
 
     if success:
         return True, f"邮件已发送到 {to_email}"

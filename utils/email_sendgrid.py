@@ -48,6 +48,7 @@ def send_tracked_email(
     enable_click_tracking: bool = True,
     categories: list[str] | None = None,
     reply_to: str = "",
+    attachments: list[dict] | None = None,
 ) -> tuple[bool, str, str]:
     """
     Send an email via SendGrid API with tracking.
@@ -62,14 +63,20 @@ def send_tracked_email(
         enable_click_tracking: Enable link click tracking
         categories: SendGrid categories for filtering
         reply_to: Reply-to email address
+        attachments: optional list of standard attachment dicts
+                     (filename / content / content_type) — see
+                     utils.email_attachments. Will be base64-encoded
+                     into the SendGrid v3 payload.
 
     Returns:
         (success, message, tracking_id) tuple
     """
     if not is_sendgrid_configured():
-        # Fall back to SMTP
+        # Fall back to SMTP (with attachments preserved)
         from utils.email_service import send_ai_generated_email
-        ok, msg = send_ai_generated_email(to_email, subject, body, from_name)
+        ok, msg = send_ai_generated_email(
+            to_email, subject, body, from_name, attachments=attachments,
+        )
         return ok, msg, ""
 
     api_key = get_secret("SENDGRID_API_KEY")
@@ -106,6 +113,21 @@ def send_tracked_email(
 
     if reply_to:
         payload["reply_to"] = {"email": reply_to}
+
+    # Encode attachments per SendGrid v3 spec:
+    # https://docs.sendgrid.com/api-reference/mail-send/mail-send#body
+    if attachments:
+        import base64
+        sg_attachments = []
+        for att in attachments:
+            content_b64 = base64.b64encode(att["content"]).decode("ascii")
+            sg_attachments.append({
+                "content": content_b64,
+                "filename": att["filename"],
+                "type": att.get("content_type", "application/octet-stream"),
+                "disposition": "attachment",
+            })
+        payload["attachments"] = sg_attachments
 
     # Send via SendGrid API
     try:
@@ -148,9 +170,11 @@ def send_tracked_email(
         return False, f"SendGrid 错误 ({e.code})", tracking_id
     except Exception as e:
         logger.error("SendGrid send failed: %s", e)
-        # Fall back to SMTP
+        # Fall back to SMTP (preserve attachments)
         from utils.email_service import send_ai_generated_email
-        ok, msg = send_ai_generated_email(to_email, subject, body, from_name)
+        ok, msg = send_ai_generated_email(
+            to_email, subject, body, from_name, attachments=attachments,
+        )
         return ok, msg, ""
 
 
