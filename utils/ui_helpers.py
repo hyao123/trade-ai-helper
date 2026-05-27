@@ -290,6 +290,42 @@ _CSS = """
     [data-testid="stSidebarNavItems"] {
         padding-top: 0 !important;
     }
+
+    /* ── Sidebar collapse/expand toggle button (更醒目) ── */
+    [data-testid="collapsedControl"] {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
+        border-radius: 0 12px 12px 0 !important;
+        padding: 12px 10px 12px 8px !important;
+        box-shadow: 0 4px 16px rgba(99,102,241,0.35), 0 2px 6px rgba(0,0,0,0.1) !important;
+        transition: all 0.3s ease !important;
+        border: none !important;
+        top: 1rem !important;
+    }
+    [data-testid="collapsedControl"]:hover {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+        box-shadow: 0 6px 24px rgba(99,102,241,0.5), 0 3px 8px rgba(0,0,0,0.12) !important;
+        transform: translateX(3px) !important;
+    }
+    [data-testid="collapsedControl"] svg {
+        color: white !important;
+        width: 20px !important;
+        height: 20px !important;
+    }
+    /* Sidebar内的 collapse 按钮(收起按钮) */
+    [data-testid="stSidebar"] button[kind="header"] {
+        background: rgba(79, 70, 229, 0.08) !important;
+        border-radius: 8px !important;
+        border: 1.5px solid rgba(79, 70, 229, 0.2) !important;
+        transition: all 0.2s ease !important;
+    }
+    [data-testid="stSidebar"] button[kind="header"]:hover {
+        background: rgba(79, 70, 229, 0.15) !important;
+        border-color: var(--primary) !important;
+        transform: scale(1.05) !important;
+    }
+    [data-testid="stSidebar"] button[kind="header"] svg {
+        color: var(--primary) !important;
+    }
     [data-testid="stSidebar"] [aria-current="page"],
     [data-testid="stSidebar"] [aria-current="page"] span {
         color: var(--primary) !important; font-weight: 700 !important;
