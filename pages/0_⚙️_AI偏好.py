@@ -102,6 +102,36 @@ with tab_identity:
             ),
         )
 
+    # ── 企业介绍（用于自动推送匹配）──
+    st.markdown("---")
+    st.markdown("##### 🏢 企业介绍（用于智能推送自动匹配）")
+    from utils.auto_outreach import INDUSTRY_TEMPLATES
+    industry_keys = list(INDUSTRY_TEMPLATES.keys())
+    industry_labels = [INDUSTRY_TEMPLATES[k]["label"] for k in industry_keys]
+    current_industry = prefs.get("company_industry", "")
+    industry_idx = industry_keys.index(current_industry) if current_industry in industry_keys else 0
+    company_industry = st.selectbox(
+        "企业所属行业",
+        options=industry_keys,
+        index=industry_idx,
+        format_func=lambda x: INDUSTRY_TEMPLATES[x]["label"],
+        help="选择你的企业所属行业，推送时系统可自动匹配对口客户",
+    )
+    company_description = st.text_area(
+        "企业简介",
+        value=prefs.get("company_description", ""),
+        placeholder="例如：深圳XX科技有限公司，成立于2010年，专注LED照明产品研发与出口，服务全球80+国家，年出口额超5000万美元...",
+        height=80,
+        help="简要描述你的企业背景、优势、出口经验等，推送邮件时自动引用",
+    )
+    main_products = st.text_area(
+        "主营产品",
+        value=prefs.get("main_products", ""),
+        placeholder="例如：LED路灯、工矿灯、泛光灯、太阳能路灯等户外照明产品，功率范围30W-500W",
+        height=60,
+        help="描述你的主营产品线，逗号分隔或自由描述，推送时与产品目录互补",
+    )
+
     if st.button("💾 保存身份信息", type="primary", use_container_width=True, key="save_identity"):
         update_prefs({
             "company_name": company_name,
@@ -110,6 +140,9 @@ with tab_identity:
             "phone": phone,
             "signature_name": contact_name,
             "default_product": default_product,
+            "company_industry": company_industry,
+            "company_description": company_description,
+            "main_products": main_products,
             "default_language": default_language,
             "default_tone": default_tone,
             "default_trade_term": default_trade_term,

@@ -386,6 +386,11 @@ def generate_outreach_email(
         matched_product_text=matched_product_text,
     )
 
+    # ── 自动读取注册企业介绍 ──────────────────────────────
+    effective_company_intro = company_intro
+    if not effective_company_intro and username:
+        effective_company_intro = _get_company_profile_for_outreach(username)
+
     prompt, system = build_auto_outreach_prompt(
         email=prospect.get("email", ""),
         company=prospect.get("company", ""),
@@ -395,7 +400,7 @@ def generate_outreach_email(
         industry_pain_points=industry_info["pain_points"],
         country=prospect.get("country", ""),
         product_info=effective_product_info,
-        company_intro=company_intro,
+        company_intro=effective_company_intro,
         product_interest=prospect.get("product_interest", ""),
         matched_products=matched_product_text,
     )
@@ -721,6 +726,39 @@ def _build_effective_product_info(product_info: str, matched_product_text: str) 
             f"{product_info}"
         )
     return matched_product_text
+
+
+def _get_company_profile_for_outreach(username: str) -> str:
+    """
+    从用户注册资料/偏好设置中读取企业介绍信息，用于自动推送。
+
+    优先读取 company_description，如不存在则拼接 company_name + main_products。
+    """
+    from utils.storage import load_user_json
+
+    prefs = load_user_json(username, "prefs.json", default={})
+    parts = []
+
+    company_name = prefs.get("company_name", "").strip()
+    company_desc = prefs.get("company_description", "").strip()
+    main_products = prefs.get("main_products", "").strip()
+    company_industry = prefs.get("company_industry", "").strip()
+
+    if company_desc:
+        # 完整企业简介已配置
+        parts.append(company_desc)
+    elif company_name:
+        parts.append(company_name)
+
+    if main_products and main_products not in (company_desc or ""):
+        parts.append(f"Main Products: {main_products}")
+
+    if company_industry and company_industry != "other":
+        industry_label = INDUSTRY_TEMPLATES.get(company_industry, {}).get("label", "")
+        if industry_label and industry_label not in " ".join(parts):
+            parts.append(f"Industry: {industry_label}")
+
+    return " | ".join(parts) if parts else ""
 
 
 # ---------------------------------------------------------------------------

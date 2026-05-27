@@ -35,6 +35,9 @@ _DEFAULTS: dict[str, str] = {
     "phone": "",
     "signature_name": "",
     "default_product": "",
+    "company_industry": "",            # 企业所属行业 (electronics/automotive/...)
+    "company_description": "",         # 企业简介 (用于自动推送时的公司介绍)
+    "main_products": "",               # 主营产品概述 (逗号分隔或自由描述)
     "default_language": "英语",
     "default_trade_term": "FOB",
     "default_tone": "简洁专业",
