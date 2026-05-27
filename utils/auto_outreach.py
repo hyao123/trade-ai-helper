@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 import secrets
+import time
 from datetime import datetime
 from typing import Generator
 
@@ -27,6 +29,17 @@ logger = get_logger("auto_outreach")
 
 _CAMPAIGNS_FILE = "outreach_campaigns.json"
 _OUTREACH_LOG_FILE = "outreach_log.json"
+_CAMPAIGN_RESULTS_PREFIX = "campaign_results_"  # {campaign_id}.json
+
+# ---------------------------------------------------------------------------
+# 推送配置常量
+# ---------------------------------------------------------------------------
+MAX_PROSPECTS_PER_CAMPAIGN = 500   # 单次推送上限
+SEND_INTERVAL_SECONDS = 2.0       # 每封邮件之间的间隔（防限流）
+PERSIST_BATCH_SIZE = 10            # 每N封持久化一次结果（减少IO）
+
+# 邮箱格式校验正则
+_EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 
 # ---------------------------------------------------------------------------
 # 行业模板映射（AI会根据行业自动调整，这里提供默认参考）
@@ -126,7 +139,7 @@ def parse_prospect_file(file_content: bytes, filename: str) -> tuple[list[dict],
     valid_prospects = []
     for i, p in enumerate(prospects):
         email = p.get("email", "").strip()
-        if not email or "@" not in email:
+        if not email or not _EMAIL_RE.match(email):
             continue
         # 标准化字段
         valid_prospects.append({
@@ -140,7 +153,17 @@ def parse_prospect_file(file_content: bytes, filename: str) -> tuple[list[dict],
         })
 
     if not valid_prospects:
-        return [], "未找到有效的客户记录（需要至少包含 email 列）"
+        return [], "未找到有效的客户记录（需要至少包含 email 列，且邮箱格式正确）"
+
+    # 限制单次推送上限
+    if len(valid_prospects) > MAX_PROSPECTS_PER_CAMPAIGN:
+        error = (
+            f"⚠️ 客户列表共 {len(valid_prospects)} 条有效记录，"
+            f"超出单次推送上限 {MAX_PROSPECTS_PER_CAMPAIGN} 封。"
+            f"已截取前 {MAX_PROSPECTS_PER_CAMPAIGN} 条，请分批推送。"
+        )
+        valid_prospects = valid_prospects[:MAX_PROSPECTS_PER_CAMPAIGN]
+        return valid_prospects, error
 
     return valid_prospects, error
 
@@ -434,9 +457,15 @@ def run_campaign_step(
     username: str,
     campaign_id: str,
     user_id: str = "default",
+    send_interval: float = SEND_INTERVAL_SECONDS,
 ) -> Generator[dict, None, None]:
     """
     逐步执行推送任务（生成器模式，便于UI实时更新进度）。
+
+    Features:
+    - 每封邮件之间自动间隔 send_interval 秒（防SMTP限流）
+    - 每 PERSIST_BATCH_SIZE 封才持久化一次结果（减少IO）
+    - 结果存储在独立文件中（减小主campaign文件体积）
 
     Yields:
         {"index": int, "email": str, "status": "sent"|"failed"|"skipped", "detail": str}
@@ -455,10 +484,13 @@ def run_campaign_step(
     product_info = campaign.get("product_info", "")
     company_intro = campaign.get("company_intro", "")
     sender_name = campaign.get("sender_name", "")
-    results = campaign.get("results", [])
+
+    # 从独立结果文件加载已有结果
+    results = _load_campaign_results(username, campaign_id)
     sent_emails = {r["email"] for r in results if r.get("status") == "sent"}
 
     stats = campaign.get("stats", {})
+    unsaved_count = 0  # 追踪未持久化的结果数
 
     for i, prospect in enumerate(prospects):
         email = prospect.get("email", "")
@@ -489,7 +521,9 @@ def run_campaign_step(
             }
             results.append(result_entry)
             stats["failed"] = stats.get("failed", 0) + 1
+            unsaved_count += 1
             yield {"index": i, "email": email, "status": "failed", "detail": email_data["error"]}
+            # 失败不需要间隔
             continue
 
         # 发送邮件
@@ -508,7 +542,7 @@ def run_campaign_step(
                 "contact_name": prospect.get("contact_name", ""),
                 "status": "sent",
                 "subject": email_data["subject"],
-                "body": email_data["body"],
+                "body": email_data["body"][:500],  # 只保留前500字符节省存储
                 "timestamp": datetime.now().isoformat(),
             }
             stats["sent"] = stats.get("sent", 0) + 1
@@ -526,12 +560,20 @@ def run_campaign_step(
             yield {"index": i, "email": email, "status": "failed", "detail": msg}
 
         results.append(result_entry)
+        unsaved_count += 1
 
-        # 每发一封更新一次持久化
-        update_campaign(username, campaign_id, {"results": results, "stats": stats})
+        # 批量持久化（每N封写一次，减少IO）
+        if unsaved_count >= PERSIST_BATCH_SIZE:
+            _save_campaign_results(username, campaign_id, results)
+            update_campaign(username, campaign_id, {"stats": stats})
+            unsaved_count = 0
 
-    # 完成
-    update_campaign(username, campaign_id, {"status": "completed", "results": results, "stats": stats})
+        # 发送间隔（防SMTP限流）
+        time.sleep(send_interval)
+
+    # 最终持久化剩余结果
+    _save_campaign_results(username, campaign_id, results)
+    update_campaign(username, campaign_id, {"status": "completed", "stats": stats})
 
 
 # ---------------------------------------------------------------------------
@@ -759,6 +801,42 @@ def _get_company_profile_for_outreach(username: str) -> str:
             parts.append(f"Industry: {industry_label}")
 
     return " | ".join(parts) if parts else ""
+
+
+# ---------------------------------------------------------------------------
+# Campaign 结果独立存储（减少主文件IO压力）
+# ---------------------------------------------------------------------------
+
+def _get_results_filename(campaign_id: str) -> str:
+    """获取campaign结果的独立存储文件名。"""
+    return f"{_CAMPAIGN_RESULTS_PREFIX}{campaign_id}.json"
+
+
+def _load_campaign_results(username: str, campaign_id: str) -> list[dict]:
+    """从独立文件加载campaign发送结果。"""
+    filename = _get_results_filename(campaign_id)
+    results = load_user_json(username, filename, default=[])
+    # 兼容：如果独立文件为空，尝试从主campaign文件迁移
+    if not results:
+        campaign = get_campaign(username, campaign_id)
+        if campaign and campaign.get("results"):
+            results = campaign["results"]
+            # 迁移到独立文件
+            _save_campaign_results(username, campaign_id, results)
+            # 清理主文件中的results字段
+            update_campaign(username, campaign_id, {"results": []})
+    return results
+
+
+def _save_campaign_results(username: str, campaign_id: str, results: list[dict]) -> None:
+    """将campaign发送结果保存到独立文件。"""
+    filename = _get_results_filename(campaign_id)
+    save_user_json(username, filename, results)
+
+
+def get_campaign_results(username: str, campaign_id: str) -> list[dict]:
+    """公开接口：获取campaign的发送结果。"""
+    return _load_campaign_results(username, campaign_id)
 
 
 # ---------------------------------------------------------------------------

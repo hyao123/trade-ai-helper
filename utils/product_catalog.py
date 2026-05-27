@@ -106,11 +106,20 @@ def add_product(
 
 
 def update_product(username: str, product_id: str, updates: dict) -> bool:
-    """更新产品信息。"""
+    """更新产品信息（仅允许更新白名单内的字段）。"""
+    _ALLOWED_UPDATE_KEYS = {
+        "name", "description", "features", "industries", "keywords",
+        "price_range", "moq", "certifications",
+    }
+    # 过滤非法字段
+    safe_updates = {k: v for k, v in updates.items() if k in _ALLOWED_UPDATE_KEYS}
+    if not safe_updates:
+        return False
+
     catalog = load_user_json(username, _CATALOG_FILE, default=[])
     for p in catalog:
         if p.get("id") == product_id:
-            p.update(updates)
+            p.update(safe_updates)
             p["updated_at"] = datetime.now().isoformat()
             save_user_json(username, _CATALOG_FILE, catalog)
             logger.info("Product updated: %s by %s", product_id, username)

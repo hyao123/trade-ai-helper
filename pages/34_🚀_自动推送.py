@@ -11,10 +11,12 @@ import streamlit as st
 
 from utils.auto_outreach import (
     INDUSTRY_TEMPLATES,
+    MAX_PROSPECTS_PER_CAMPAIGN,
     auto_reply_to_customer,
     create_campaign,
     delete_campaign,
     get_campaign,
+    get_campaign_results,
     get_campaign_summary,
     get_campaigns,
     get_outreach_logs,
@@ -535,7 +537,7 @@ with tab_campaigns:
                         st.rerun()
 
                 # 发送结果详情
-                results = campaign.get("results", [])
+                results = get_campaign_results(username, campaign["id"])
                 if results:
                     st.markdown("**发送记录:**")
                     result_data = []
