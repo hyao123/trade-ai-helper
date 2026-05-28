@@ -1311,3 +1311,220 @@ Requirements:
 3. Keep the reply concise and actionable
 4. Output in English, plain text only"""
     return prompt, system
+
+
+
+# ---------------------------------------------------------------------------
+# Drip 序列：按 step_type 生成不同语境的邮件
+# ---------------------------------------------------------------------------
+
+DRIP_STEP_GUIDANCE: dict[str, dict] = {
+    "initial": {
+        "label": "首次开发信",
+        "goal": "Make a strong first impression. Introduce yourself and product briefly.",
+        "tone": "Professional and intriguing, not salesy.",
+        "length_words": "80-120",
+        "key_elements": [
+            "Hook: industry-specific opening (avoid 'I hope this finds you well')",
+            "Brief product/value introduction (1-2 specific advantages)",
+            "Why you reached out to THIS company specifically",
+            "Soft CTA: 'Worth a quick chat?' or 'Open to receiving more info?'",
+        ],
+    },
+    "value_add": {
+        "label": "提供价值",
+        "goal": "Provide something useful WITHOUT asking for anything in return.",
+        "tone": "Helpful, generous, like a peer sharing intel.",
+        "length_words": "60-100",
+        "key_elements": [
+            "Reference: 'Following up on my last email...' (acknowledge prior touch)",
+            "Share something concrete: a market trend, a guide, a comparison sheet",
+            "Position the value as 'thought you'd find this useful'",
+            "Light close: 'Hope this helps. Let me know if you'd like to discuss.'",
+        ],
+    },
+    "followup": {
+        "label": "温和跟进",
+        "goal": "Gentle nudge after silence, no pressure.",
+        "tone": "Warm but brief; assume they're busy.",
+        "length_words": "40-70",
+        "key_elements": [
+            "Short opener: 'Just wanted to circle back...' / 'Bumping this up...'",
+            "ONE concrete reason it might be relevant for them right now",
+            "Easy out: 'No pressure if it's not the right time'",
+            "Single clear CTA",
+        ],
+    },
+    "social_proof": {
+        "label": "案例佐证",
+        "goal": "Reduce risk perception by showing similar customers' success.",
+        "tone": "Confident, fact-based, not bragging.",
+        "length_words": "70-100",
+        "key_elements": [
+            "Mention 1-2 similar industry customers (or generic types if confidential)",
+            "ONE specific metric or result (e.g. '30% lead time reduction')",
+            "Connect their potential outcome to that result",
+            "Invite a quick conversation to learn more",
+        ],
+    },
+    "case_study": {
+        "label": "深度案例",
+        "goal": "Deep-dive into one customer story that mirrors the prospect's situation.",
+        "tone": "Storytelling, narrative.",
+        "length_words": "100-140",
+        "key_elements": [
+            "Setup: 'Last quarter we worked with [type of company]...'",
+            "Challenge they faced (mirror prospect's likely pain)",
+            "Solution + concrete result with numbers",
+            "Bridge: 'I think this may apply to you because...'",
+            "CTA to discuss or share more details",
+        ],
+    },
+    "breakup": {
+        "label": "Break-up邮件",
+        "goal": "Trigger a response with reverse-psychology closure.",
+        "tone": "Polite, slightly self-deprecating, no guilt-tripping.",
+        "length_words": "40-60",
+        "key_elements": [
+            "Direct: 'I haven't heard back, so I'll close your file for now'",
+            "Take blame: 'Maybe I caught you at a bad time / wrong contact'",
+            "ONE-line offer: leave the door open ('happy to reconnect anytime')",
+            "Brief sign-off, no aggressive ask",
+        ],
+    },
+    "reengage": {
+        "label": "重新激活",
+        "goal": "Reach out to a dormant prospect with a fresh angle.",
+        "tone": "Acknowledging the gap; positioning new info as the reason.",
+        "length_words": "60-100",
+        "key_elements": [
+            "Acknowledge time gap: 'It's been a while since we last connected...'",
+            "What's CHANGED that makes this relevant now (new product, new pricing, market shift)",
+            "Brief recap of what you do (they may have forgotten)",
+            "Soft CTA tied to the change",
+        ],
+    },
+}
+
+
+def build_drip_step_prompt(
+    step_type: str,
+    step_index: int,
+    total_steps: int,
+    prospect: dict,
+    industry: str,
+    industry_focus: str,
+    industry_pain_points: str,
+    product_info: str,
+    company_intro: str = "",
+    matched_products: str = "",
+    previous_subjects: list[str] | None = None,
+) -> tuple[str, str | None]:
+    """
+    Build a Drip campaign step email prompt.
+
+    Each step type follows DRIP_STEP_GUIDANCE rules to vary tone, length,
+    and intent so the sequence doesn't feel like 5 copies of the same email.
+
+    Args:
+        step_type: one of DRIP_STEP_GUIDANCE keys (initial / value_add / etc.)
+        step_index: 0-based index in the sequence
+        total_steps: total step count (for context, e.g. "this is step 3 of 5")
+        prospect: dict with email/company/contact_name/country/etc.
+        industry: industry label
+        industry_focus: what this industry cares about
+        industry_pain_points: what hurts in this industry
+        product_info: your product description
+        company_intro: optional company background
+        matched_products: optional matched local catalog products text
+        previous_subjects: list of subjects already used (so AI won't repeat)
+    """
+    guidance = DRIP_STEP_GUIDANCE.get(step_type, DRIP_STEP_GUIDANCE["followup"])
+
+    # Sanitize prospect fields
+    email = sanitize_prompt_param(prospect.get("email", ""), "email")
+    company = sanitize_prompt_param(prospect.get("company", ""), "company")
+    contact_name = sanitize_prompt_param(prospect.get("contact_name", ""), "contact_name")
+    country = sanitize_prompt_param(prospect.get("country", ""), "country")
+    product_interest = sanitize_prompt_param(prospect.get("product_interest", ""), "product_interest")
+
+    # Sanitize content fields
+    product_info = sanitize_prompt_param(product_info, "product_info")
+    company_intro = sanitize_prompt_param(company_intro, "company_intro")
+
+    greeting_name = contact_name if contact_name else "Sir/Madam"
+    company_info = f"\nYour Company: {company_intro}" if company_intro else ""
+    country_info = f"\nTarget Country: {country}" if country else ""
+    interest_info = f"\nKnown Product Interest: {product_interest}" if product_interest else ""
+
+    # Block subjects already used to avoid repetition
+    avoid_subjects_block = ""
+    if previous_subjects:
+        cleaned = [sanitize_prompt_param(s, "prev_subject")[:80] for s in previous_subjects if s]
+        if cleaned:
+            avoid_subjects_block = (
+                "\n\nAlready-used subject lines (do NOT repeat or paraphrase):\n"
+                + "\n".join(f"  - {s}" for s in cleaned)
+            )
+
+    # Product source block (catalog match takes priority)
+    if matched_products:
+        product_block = (
+            f"\n--- MATCHED FROM YOUR PRODUCT CATALOG ---\n"
+            f"{matched_products}\n"
+            f"--- END CATALOG MATCH ---\n\n"
+            f"Additional context: {product_info}"
+        )
+    else:
+        product_block = product_info
+
+    key_elements_block = "\n".join(f"  - {el}" for el in guidance["key_elements"])
+
+    system = (
+        "你是一位精通邮件营销序列（Drip Campaign）的外贸开发专家，"
+        "深谙不同邮件步骤的心理触发点。你能为多步序列中的每一封邮件，"
+        "根据其在序列中的角色（首次/价值/跟进/案例/Break-up），生成"
+        "语气和重点完全不同、相互递进、不令人厌烦的英文邮件。"
+    )
+
+    prompt = f"""You are writing email step {step_index + 1} of {total_steps} in a drip outreach sequence.
+
+This step's role: **{guidance['label']}** ({step_type})
+Goal: {guidance['goal']}
+Tone: {guidance['tone']}
+Length: {guidance['length_words']} words
+
+Recipient:
+- Email: {email}
+- Company: {company or "(Unknown)"}
+- Contact: {greeting_name}
+- Industry: {industry}
+- Industry Focus: {industry_focus}
+- Industry Pain Points: {industry_pain_points}{country_info}{interest_info}
+
+Your Product/Service:
+{product_block}{company_info}
+
+Key elements this email MUST include:
+{key_elements_block}{avoid_subjects_block}
+
+Output format (strictly follow):
+Subject: [Compelling subject line under 60 chars, distinct from any prior subjects]
+
+Dear {greeting_name},
+
+[Email body matching this step's tone, goal, and length]
+
+Best regards,
+[Your Name]
+[Your Company]
+
+Critical rules:
+1. This is step {step_index + 1} of {total_steps} — write accordingly.
+   {"This is the FIRST touch; no prior context exists." if step_index == 0 else f"Prior emails have been sent; reference subtly without listing them."}
+2. NEVER use spam-trigger words (free, guarantee, limited time, act now, $$$).
+3. Subject line MUST be different from prior subjects (see avoid list above).
+4. Output English plain text only, no markdown.
+5. Keep within the {guidance['length_words']} word range strictly.
+"""
+    return prompt, system

@@ -288,7 +288,93 @@ _CSS = """
         padding-top: 0.5rem !important;
     }
     [data-testid="stSidebarNavItems"] {
-        padding-top: 0 !important;
+        padding-top: 0.3rem !important;
+    }
+
+    /* ── Navigation link items (专业化) ── */
+    [data-testid="stSidebarNavItems"] li {
+        margin-bottom: 1px !important;
+    }
+    [data-testid="stSidebarNavItems"] a {
+        padding: 0.5rem 0.75rem !important;
+        border-radius: 8px !important;
+        font-size: 0.82rem !important;
+        font-weight: 500 !important;
+        color: var(--text-2) !important;
+        transition: all 0.15s ease !important;
+        border-left: 3px solid transparent !important;
+        margin: 0 0.4rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    [data-testid="stSidebarNavItems"] a:hover {
+        background: rgba(37,99,235,0.06) !important;
+        color: var(--text-1) !important;
+        border-left-color: rgba(37,99,235,0.3) !important;
+    }
+    [data-testid="stSidebarNavItems"] a span {
+        font-size: 0.82rem !important;
+    }
+    /* Active page: bold left indicator */
+    [data-testid="stSidebarNavItems"] [aria-current="page"],
+    [data-testid="stSidebarNavItems"] [aria-current="page"] span {
+        color: var(--primary) !important;
+        font-weight: 700 !important;
+        background: linear-gradient(135deg, rgba(37,99,235,0.08) 0%, rgba(124,58,237,0.05) 100%) !important;
+        border-left-color: var(--primary) !important;
+        border-radius: 8px !important;
+    }
+    /* First nav item (app.py = 首页) — 隐藏"app"文字，用"🏠 首页"替代 */
+    [data-testid="stSidebarNavItems"] li:first-child a span {
+        font-size: 0 !important;
+        line-height: 0 !important;
+    }
+    [data-testid="stSidebarNavItems"] li:first-child a span::after {
+        content: "🏠 工作台";
+        font-size: 0.82rem !important;
+        line-height: normal !important;
+        font-weight: 600 !important;
+    }
+    /* Navigation section separator — more subtle */
+    [data-testid="stSidebarNavSeparator"] {
+        margin: 0.6rem 0.75rem !important;
+        border-color: rgba(226,232,240,0.6) !important;
+    }
+
+    /* ── Sidebar collapse/expand toggle button (更醒目) ── */
+    [data-testid="collapsedControl"] {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
+        border-radius: 0 12px 12px 0 !important;
+        padding: 12px 10px 12px 8px !important;
+        box-shadow: 0 4px 16px rgba(99,102,241,0.35), 0 2px 6px rgba(0,0,0,0.1) !important;
+        transition: all 0.3s ease !important;
+        border: none !important;
+        top: 1rem !important;
+    }
+    [data-testid="collapsedControl"]:hover {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+        box-shadow: 0 6px 24px rgba(99,102,241,0.5), 0 3px 8px rgba(0,0,0,0.12) !important;
+        transform: translateX(3px) !important;
+    }
+    [data-testid="collapsedControl"] svg {
+        color: white !important;
+        width: 20px !important;
+        height: 20px !important;
+    }
+    /* Sidebar内的 collapse 按钮(收起按钮) */
+    [data-testid="stSidebar"] button[kind="header"] {
+        background: rgba(79, 70, 229, 0.08) !important;
+        border-radius: 8px !important;
+        border: 1.5px solid rgba(79, 70, 229, 0.2) !important;
+        transition: all 0.2s ease !important;
+    }
+    [data-testid="stSidebar"] button[kind="header"]:hover {
+        background: rgba(79, 70, 229, 0.15) !important;
+        border-color: var(--primary) !important;
+        transform: scale(1.05) !important;
+    }
+    [data-testid="stSidebar"] button[kind="header"] svg {
+        color: var(--primary) !important;
     }
     [data-testid="stSidebar"] [aria-current="page"],
     [data-testid="stSidebar"] [aria-current="page"] span {
@@ -397,12 +483,9 @@ def show_sidebar_info() -> None:
         # ── Logo / Brand ──
         st.markdown(
             '<div style="text-align:center;padding:0.2rem 0 0.5rem;">'
-            '<div style="display:inline-flex;align-items:center;justify-content:center;'
-            'width:44px;height:44px;border-radius:12px;'
-            'background:linear-gradient(135deg,#4f46e5 0%,#6366f1 100%);'
-            'box-shadow:0 2px 8px rgba(99,102,241,0.3);margin-bottom:6px;">'
-            '<span style="font-size:1.4rem;filter:brightness(10);">🌐</span>'
-            '</div>'
+            '<img src="app/static/logo.svg" alt="AI-Trade Pro" '
+            'style="width:52px;height:52px;margin-bottom:6px;'
+            'filter:drop-shadow(0 2px 8px rgba(99,102,241,0.3));" />'
             '<div style="font-size:1.1rem;font-weight:800;color:#1e293b;letter-spacing:-0.02em;">AI-Trade Pro</div>'
             '<div style="font-size:0.66rem;color:#64748b;margin-top:2px;">外贸全流程 AI 助手</div>'
             '</div>',
