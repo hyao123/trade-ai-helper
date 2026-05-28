@@ -285,13 +285,111 @@ if st.session_state.results.get("quote_pdf"):
         unsafe_allow_html=True,
     )
     first_product = (sku_list[0]["product"] or "报价单") if sku_list else "报价单"
+    pdf_filename = f"报价单_{first_product}.pdf"
     st.download_button(
         "📥 下载报价单 PDF",
         st.session_state.results["quote_pdf"],
-        file_name=f"报价单_{first_product}.pdf",
+        file_name=pdf_filename,
         mime="application/pdf",
         use_container_width=True,
     )
+
+    # ─────────────────────────────────────────────────────
+    # 直接发邮件给客户（带 PDF 附件）
+    # ─────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("### 📧 直接发送给客户")
+    st.caption("无需手动下载附件，AI 起草邮件正文，一键带 PDF 报价单发送")
+
+    buyer_email_default = (
+        st.session_state.get("quote_buyer_email", "") or
+        st.session_state.results.get("quote_buyer_email", "")
+    )
+    buyer_contact_default = st.session_state.get("quote_buyer_contact", "")
+
+    # Default subject and body — pre-filled with quote info
+    default_subject = f"Quotation {quote_no_saved} - {first_product}"
+    greeting_name = buyer_contact_default or "Sir/Madam"
+    default_body = (
+        f"Dear {greeting_name},\n\n"
+        f"Thank you for your interest in our products. Please find attached "
+        f"our quotation {quote_no_saved} for your kind review.\n\n"
+        f"Quotation Summary:\n"
+        f"  • Reference No: {quote_no_saved}\n"
+        f"  • Items: {sku_count_saved} product(s)\n"
+        f"  • Total Amount: {currency_saved} {subtotal_saved:,.2f}\n\n"
+        f"Should you have any questions, please feel free to contact me. "
+        f"We look forward to your feedback.\n\n"
+        f"Best regards,\n"
+        f"{contact_name or '[Your Name]'}\n"
+        f"{company_name or '[Your Company]'}"
+    )
+
+    with st.form("send_quote_email_form"):
+        col_to, col_cc = st.columns(2)
+        with col_to:
+            send_to = st.text_input(
+                "收件人邮箱 *",
+                value=buyer_email_default,
+                placeholder="customer@example.com",
+            )
+        with col_cc:
+            from_display_name = st.text_input(
+                "发件人显示名（可选）",
+                value=f"{contact_name} - {company_name}".strip(" -")
+                if contact_name or company_name else "",
+                placeholder="Tom Wang - XYZ Trading",
+            )
+
+        send_subject = st.text_input("邮件主题 *", value=default_subject)
+        send_body = st.text_area(
+            "邮件正文",
+            value=default_body,
+            height=240,
+            help="可手动编辑；附件已自动包含本次报价单 PDF",
+        )
+
+        # Show attachment summary
+        from utils.email_attachments import attachment_summary, make_attachment
+        try:
+            preview_att = make_attachment(pdf_filename, st.session_state.results["quote_pdf"])
+            st.markdown(f"📎 **附件:** `{attachment_summary([preview_att])}`")
+        except Exception as _e:
+            st.warning(f"附件预览失败: {_e}")
+
+        send_clicked = st.form_submit_button(
+            "📧 发送邮件给客户",
+            type="primary",
+            use_container_width=True,
+        )
+
+    if send_clicked:
+        if not send_to or "@" not in send_to:
+            st.error("请填写有效的收件人邮箱")
+        elif not send_subject.strip():
+            st.error("请填写邮件主题")
+        else:
+            from utils.email_service import send_ai_generated_email
+            from utils.email_attachments import make_attachment
+
+            with st.spinner(f"正在发送到 {send_to}..."):
+                ok, result_msg = send_ai_generated_email(
+                    to_email=send_to.strip(),
+                    subject=send_subject.strip(),
+                    body=send_body,
+                    from_name=from_display_name.strip(),
+                    campaign=f"quote_{quote_no_saved}",
+                    attachments=[
+                        make_attachment(pdf_filename,
+                                        st.session_state.results["quote_pdf"]),
+                    ],
+                )
+
+            if ok:
+                st.success(f"✅ {result_msg}")
+                st.balloons()
+            else:
+                st.error(f"❌ 发送失败: {result_msg}")
 
 st.markdown("---")
 st.markdown('<div class="footer">💼 外贸AI助手 · 报价单生成</div>', unsafe_allow_html=True)
