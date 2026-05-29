@@ -168,7 +168,6 @@ with tab_notify:
 
     try:
         from utils.notifications import (
-            delete_notification,
             get_all_notifications,
             get_unread_count,
             mark_all_read,
@@ -228,7 +227,7 @@ with tab_referral:
     st.markdown("### 🎁 邀请好友，双方获益")
 
     try:
-        from utils.referral import get_referral_link, get_referral_stats
+        from utils.referral import get_referral_stats
 
         stats = get_referral_stats(uid)
 

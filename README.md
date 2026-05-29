@@ -207,8 +207,10 @@ trade-ai-helper/
 | `APP_BASE_URL` | 可选 | 应用 URL（用于 Stripe 回调） |
 | `SMTP_HOST` | 可选 | SMTP 服务器（启用邮件验证） |
 | `SMTP_PORT` | 可选 | SMTP 端口 |
-| `SMTP_USERNAME` | 可选 | SMTP 用户名 |
+| `SMTP_USER` | 可选 | SMTP 用户名 |
 | `SMTP_PASSWORD` | 可选 | SMTP 密码 |
+| `SMTP_FROM_EMAIL` | 可选 | SMTP 发件邮箱 |
+| `SMTP_USE_TLS` | 可选 | 非 465 端口是否启用 STARTTLS，默认 `true` |
 
 ---
 

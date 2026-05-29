@@ -11,16 +11,15 @@ import streamlit as st
 
 from utils.auto_outreach import (
     INDUSTRY_TEMPLATES,
-    MAX_PROSPECTS_PER_CAMPAIGN,
     auto_reply_to_customer,
     create_campaign,
     delete_campaign,
+    generate_outreach_email,
     get_campaign,
     get_campaign_results,
     get_campaign_summary,
     get_campaigns,
     get_outreach_logs,
-    generate_outreach_email,
     parse_prospect_file,
     run_campaign_step,
     update_campaign,
@@ -30,8 +29,6 @@ from utils.product_catalog import (
     delete_product,
     get_catalog,
     get_catalog_industries,
-    match_products_for_prospect,
-    update_product,
 )
 from utils.ui_helpers import check_auth, copy_button, get_user_id, inject_css
 
@@ -688,7 +685,7 @@ with tab_logs:
             format_func=lambda x: "全部" if x == "all" else type_labels.get(x, x),
         )
 
-        filtered_logs = logs if selected_type == "all" else [l for l in logs if l.get("type") == selected_type]
+        filtered_logs = logs if selected_type == "all" else [entry for entry in logs if entry.get("type") == selected_type]
 
         for log in filtered_logs[:50]:
             log_type = log.get("type", "unknown")

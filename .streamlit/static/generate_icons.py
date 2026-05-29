@@ -11,7 +11,6 @@ If Pillow is not available, the app will work without icons
 from __future__ import annotations
 
 import os
-import sys
 
 ICON_DIR = os.path.dirname(os.path.abspath(__file__))
 

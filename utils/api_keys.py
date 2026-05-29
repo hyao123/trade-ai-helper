@@ -155,8 +155,8 @@ def validate_api_key(raw_key: str) -> tuple[bool, dict | str]:
 
     # Search all users' keys (in production, use a global index/DB)
     # For JSON backend, we need to scan — acceptable for small scale
+
     from utils.storage import get_data_dir
-    import os
 
     users_dir = get_data_dir() / "users"
     if not users_dir.exists():

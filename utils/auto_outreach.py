@@ -642,7 +642,7 @@ def auto_reply_to_customer(
     if not reply_body:
         # fallback: 直接使用整个结果作为回复
         reply_body = result
-        reply_subject = f"Re: Your inquiry"
+        reply_subject = "Re: Your inquiry"
 
     # 重点邮件转发
     forwarded = False
@@ -704,7 +704,7 @@ def _forward_important(
     campaign_name: str,
 ) -> bool:
     """转发重点邮件到指定邮箱。"""
-    from utils.email_service import send_email, is_email_configured
+    from utils.email_service import is_email_configured, send_email
     from utils.notifications import notify
 
     if not is_email_configured():
@@ -1222,7 +1222,9 @@ def get_drip_progress(username: str, campaign_id: str) -> dict:
         }
     """
     from utils.drip_sequences import (
-        count_step_completions, reply_rate_per_step, summarize_state,
+        count_step_completions,
+        reply_rate_per_step,
+        summarize_state,
     )
 
     campaign = get_campaign(username, campaign_id)

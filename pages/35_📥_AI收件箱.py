@@ -22,7 +22,6 @@ from utils.inbox_integration import (
     get_auth_url,
     get_available_providers,
     get_connection_status,
-    is_provider_configured,
     send_via_provider,
 )
 from utils.secrets import get_secret
@@ -426,13 +425,7 @@ with tab_inbox:
                         st.success(f"✅ 已发送给 {to_email}")
                         # 清空草稿
                         st.session_state.pop(draft_key, None)
-                        # 记录到 outreach log（可选）
-                        try:
-                            from utils.email_tracking import record_reply
-                            # 这里我们记录的是"我们回复了客户"
-                            # 真实场景应关联原 tracking_id
-                        except Exception:
-                            pass
+                        # TODO: 关联原 tracking_id 后记录到 outreach log。
                     else:
                         st.error(f"❌ 发送失败: {send_msg}")
 
