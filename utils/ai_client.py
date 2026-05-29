@@ -72,9 +72,33 @@ RATE_LIMIT_MAX_CALLS = int(get_secret("RATE_LIMIT_MAX_CALLS", "20"))
 RATE_LIMIT_WINDOW    = int(get_secret("RATE_LIMIT_WINDOW", "3600"))
 
 
+def _prune_rate_limit_slots(user_id: str, now: float | None = None) -> list[float]:
+    """Drop expired sliding-window slots and return the active slots."""
+    current_time = time.time() if now is None else now
+    active = [t for t in _call_times[user_id] if current_time - t < RATE_LIMIT_WINDOW]
+    _call_times[user_id] = active
+    return active
+
+
+def _rate_limit_check(user_id: str = "default") -> tuple[bool, int]:
+    """Check and consume one sliding-window rate-limit slot.
+
+    Returns ``(allowed, remaining)``. Expired slots are pruned before the
+    decision, and a successful check consumes exactly one slot.
+    """
+    now = time.time()
+    active = _prune_rate_limit_slots(user_id, now)
+    if len(active) >= RATE_LIMIT_MAX_CALLS:
+        return False, 0
+
+    active.append(now)
+    return True, max(0, RATE_LIMIT_MAX_CALLS - len(active))
+
+
 def _rate_limit_consume(user_id: str) -> None:
     """消耗一个 rate-limit slot。"""
-    _call_times[user_id].append(time.time())
+    now = time.time()
+    _prune_rate_limit_slots(user_id, now).append(now)
 
 
 def _rate_limit_rollback(user_id: str) -> None:
@@ -85,15 +109,14 @@ def _rate_limit_rollback(user_id: str) -> None:
 
 def get_rate_limit_remaining(user_id: str = "default") -> int:
     """返回当前窗口内剩余调用次数（不消耗配额）。"""
-    now = time.time()
-    used = len([t for t in _call_times[user_id] if now - t < RATE_LIMIT_WINDOW])
+    used = len(_prune_rate_limit_slots(user_id))
     return max(0, RATE_LIMIT_MAX_CALLS - used)
 
 
 def get_rate_limit_reset_seconds(user_id: str = "default") -> int:
     """返回最早 slot 释放的剩余秒数（供 UI 显示倒计时）。"""
     now = time.time()
-    active = [t for t in _call_times[user_id] if now - t < RATE_LIMIT_WINDOW]
+    active = _prune_rate_limit_slots(user_id, now)
     if not active:
         return 0
     earliest = min(active)
@@ -130,9 +153,7 @@ def _check_preconditions(user_id: str = "default") -> str | None:
             return err_msg
 
     # Sliding-window burst guard (secondary)
-    now = time.time()
-    _call_times[user_id] = [t for t in _call_times[user_id] if now - t < RATE_LIMIT_WINDOW]
-    if len(_call_times[user_id]) >= RATE_LIMIT_MAX_CALLS:
+    if len(_prune_rate_limit_slots(user_id)) >= RATE_LIMIT_MAX_CALLS:
         wait_min = RATE_LIMIT_WINDOW // 60
         logger.warning("Rate limit hit for user=%s", user_id)
         return f"⚠️ 调用频率超限，每 {wait_min} 分钟最多 {RATE_LIMIT_MAX_CALLS} 次，请稍后再试。"

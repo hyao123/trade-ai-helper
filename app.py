@@ -9,6 +9,29 @@ from config.i18n import t
 from utils.logger import configure_logging
 from utils.ui_helpers import check_auth, inject_css
 
+
+def application(environ, start_response):
+    """Minimal WSGI fallback for platforms that probe app.py exports.
+
+    The production web process is still Streamlit via Procfile; this keeps
+    generic Python app detectors from failing before Streamlit is launched.
+    """
+    start_response("200 OK", [("Content-Type", "text/plain; charset=utf-8")])
+    return [b"AI-Trade Pro Streamlit app. Start with: streamlit run app.py"]
+
+
+def handler(event=None, context=None):
+    """Minimal serverless-style fallback for app export probes."""
+    return {
+        "statusCode": 200,
+        "headers": {"Content-Type": "text/plain; charset=utf-8"},
+        "body": "AI-Trade Pro Streamlit app. Start with: streamlit run app.py",
+    }
+
+
+app = application
+
+
 configure_logging()
 
 st.set_page_config(
