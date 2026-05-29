@@ -8,8 +8,10 @@ and per-user data isolation.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import os
 import secrets
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -21,7 +23,11 @@ from utils.storage import get_data_dir, load_json, save_json
 logger = get_logger("user_auth")
 
 _PBKDF2_ITERATIONS = 100_000
+_PASSWORD_MIN_LENGTH = 8
+_LOGIN_FAILURE_LIMIT = 5
+_LOGIN_FAILURE_WINDOW_SECONDS = 15 * 60
 _USERS_DB_FILENAME = "users_db.json"
+_LOGIN_FAILURES_FILENAME = "login_failures.json"
 
 
 def _get_users_db_path() -> Path:
@@ -63,7 +69,63 @@ def _verify_password(password: str, stored_hash: str) -> bool:
     if ":" not in stored_hash:
         return False
     salt = stored_hash.split(":")[0]
-    return _hash_password(password, salt) == stored_hash
+    return hmac.compare_digest(_hash_password(password, salt), stored_hash)
+
+
+def _is_strong_password(password: str) -> bool:
+    """Return True when a password meets the current minimum policy."""
+    return bool(password) and len(password) >= _PASSWORD_MIN_LENGTH
+
+
+def _load_login_failures() -> dict:
+    """Load login failure counters keyed by normalized username."""
+    return load_json(_LOGIN_FAILURES_FILENAME, default={})
+
+
+def _save_login_failures(failures: dict) -> None:
+    """Persist login failure counters."""
+    save_json(_LOGIN_FAILURES_FILENAME, failures)
+
+
+def _active_failures(username: str, now: float | None = None) -> list[float]:
+    """Return recent failed-login timestamps for a username."""
+    current_time = time.time() if now is None else now
+    failures = _load_login_failures()
+    active = [
+        float(ts)
+        for ts in failures.get(username, [])
+        if current_time - float(ts) < _LOGIN_FAILURE_WINDOW_SECONDS
+    ]
+    failures[username] = active
+    _save_login_failures(failures)
+    return active
+
+
+def _is_login_locked(username: str) -> bool:
+    """Return True if recent failures exceed the login lock threshold."""
+    return len(_active_failures(username)) >= _LOGIN_FAILURE_LIMIT
+
+
+def _record_login_failure(username: str) -> None:
+    """Record a failed login attempt for rate limiting."""
+    failures = _load_login_failures()
+    now = time.time()
+    active = [
+        float(ts)
+        for ts in failures.get(username, [])
+        if now - float(ts) < _LOGIN_FAILURE_WINDOW_SECONDS
+    ]
+    active.append(now)
+    failures[username] = active
+    _save_login_failures(failures)
+
+
+def _clear_login_failures(username: str) -> None:
+    """Clear failed-login attempts after a successful login."""
+    failures = _load_login_failures()
+    if username in failures:
+        failures.pop(username, None)
+        _save_login_failures(failures)
 
 
 def _load_users_db() -> dict:
@@ -91,8 +153,8 @@ def register_user(username: str, password: str, email: str = "") -> tuple[bool, 
         return False, "Username must be at least 3 characters"
     if not username.isalnum():
         return False, "Username must contain only letters and numbers"
-    if not password or len(password) < 4:
-        return False, "Password must be at least 4 characters"
+    if not _is_strong_password(password):
+        return False, f"Password must be at least {_PASSWORD_MIN_LENGTH} characters"
 
     # Check uniqueness
     users = _load_users_db()
@@ -137,13 +199,19 @@ def authenticate_user(username: str, password: str) -> tuple[bool, dict | None]:
         return False, None
 
     username = username.strip().lower()
+    if _is_login_locked(username):
+        logger.warning("Login temporarily locked for user: %s", username)
+        return False, None
+
     users = _load_users_db()
 
     if username not in users:
+        _record_login_failure(username)
         return False, None
 
     user = users[username]
     if _verify_password(password, user["password_hash"]):
+        _clear_login_failures(username)
         # Return user info without password hash
         user_info = {
             "username": user["username"],
@@ -156,6 +224,7 @@ def authenticate_user(username: str, password: str) -> tuple[bool, dict | None]:
         logger.info("User authenticated: %s", username)
         return True, user_info
 
+    _record_login_failure(username)
     return False, None
 
 
@@ -170,8 +239,8 @@ def change_password(username: str, old_password: str, new_password: str) -> tupl
 
     Returns (success, message) tuple.
     """
-    if not new_password or len(new_password) < 4:
-        return False, "New password must be at least 4 characters"
+    if not _is_strong_password(new_password):
+        return False, f"New password must be at least {_PASSWORD_MIN_LENGTH} characters"
 
     username = username.strip().lower()
     users = _load_users_db()
@@ -365,8 +434,8 @@ def reset_password(username: str, token: str, new_password: str) -> tuple[bool, 
     Validates the token has not expired (1 hour) and matches stored token.
     Returns (success, message) tuple.
     """
-    if not new_password or len(new_password) < 4:
-        return False, "Password must be at least 4 characters"
+    if not _is_strong_password(new_password):
+        return False, f"Password must be at least {_PASSWORD_MIN_LENGTH} characters"
 
     if not username or not token:
         return False, "Username and token are required"

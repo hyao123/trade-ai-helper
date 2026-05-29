@@ -5,7 +5,10 @@ import builtins
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 APP_PATH = Path(__file__).resolve().parent.parent / "app.py"
+pytestmark = pytest.mark.smoke
 
 
 def _load_app_module(module_name: str = "app_entrypoint_probe"):

@@ -21,6 +21,8 @@ import types
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 # Setup path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -36,6 +38,9 @@ sys.modules["streamlit.components.v1"] = MagicMock()
 _mock_dotenv = types.ModuleType("dotenv")
 _mock_dotenv.load_dotenv = lambda *a, **kw: None
 sys.modules["dotenv"] = _mock_dotenv
+
+
+pytestmark = pytest.mark.integration
 
 
 # Mock openai if not available

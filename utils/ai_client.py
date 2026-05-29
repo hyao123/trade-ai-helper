@@ -8,7 +8,7 @@ AI 调用层 — 支持多模型路由（NVIDIA NIM / OpenAI / DeepSeek）。
 
 - call_llm()       非流式，返回 str
 - stream_llm()     流式，返回 Generator[str]，供 st.write_stream() 消费
-- Rate Limiting 基于内存 sliding-window（注：多进程/重启后计数重置）
+- Rate Limiting 基于持久化 sliding-window（重启后保留窗口内计数）
 - 所有 Prompt 模板从 config.prompts 导入
 - Rate-limit slot 仅在 API 成功时消耗（失败自动回滚）
 
@@ -40,6 +40,7 @@ from config.prompts import (
 )
 from utils.logger import get_logger
 from utils.secrets import get_secret
+from utils.storage import load_json, save_json
 
 logger = get_logger("ai_client")
 
@@ -64,19 +65,39 @@ def _get_client() -> OpenAI:
 
 
 # ---------------------------------------------------------------------------
-# Rate Limiting（内存 sliding-window）
+# Rate Limiting（持久化 sliding-window）
 # ---------------------------------------------------------------------------
 _call_times: dict[str, list[float]] = defaultdict(list)
+_RATE_LIMIT_FILE = "ai_rate_limits.json"
 
 RATE_LIMIT_MAX_CALLS = int(get_secret("RATE_LIMIT_MAX_CALLS", "20"))
 RATE_LIMIT_WINDOW    = int(get_secret("RATE_LIMIT_WINDOW", "3600"))
 
 
+def _load_rate_limit_slots(user_id: str | None = None) -> None:
+    """Hydrate missing in-memory rate-limit slots from persistent storage."""
+    if user_id is not None and user_id in _call_times:
+        return
+    raw = load_json(_RATE_LIMIT_FILE, default={})
+    if not isinstance(raw, dict):
+        return
+    for stored_user_id, slots in raw.items():
+        if isinstance(slots, list) and stored_user_id not in _call_times:
+            _call_times[stored_user_id] = [float(slot) for slot in slots]
+
+
+def _save_rate_limit_slots() -> None:
+    """Persist sliding-window rate-limit slots for restart-safe counters."""
+    save_json(_RATE_LIMIT_FILE, {user_id: slots for user_id, slots in _call_times.items() if slots})
+
+
 def _prune_rate_limit_slots(user_id: str, now: float | None = None) -> list[float]:
     """Drop expired sliding-window slots and return the active slots."""
+    _load_rate_limit_slots(user_id)
     current_time = time.time() if now is None else now
     active = [t for t in _call_times[user_id] if current_time - t < RATE_LIMIT_WINDOW]
     _call_times[user_id] = active
+    _save_rate_limit_slots()
     return active
 
 
@@ -92,6 +113,7 @@ def _rate_limit_check(user_id: str = "default") -> tuple[bool, int]:
         return False, 0
 
     active.append(now)
+    _save_rate_limit_slots()
     return True, max(0, RATE_LIMIT_MAX_CALLS - len(active))
 
 
@@ -99,12 +121,15 @@ def _rate_limit_consume(user_id: str) -> None:
     """消耗一个 rate-limit slot。"""
     now = time.time()
     _prune_rate_limit_slots(user_id, now).append(now)
+    _save_rate_limit_slots()
 
 
 def _rate_limit_rollback(user_id: str) -> None:
     """回滚最近一个 slot（API 调用失败时调用）。"""
+    _load_rate_limit_slots(user_id)
     if _call_times[user_id]:
         _call_times[user_id].pop()
+        _save_rate_limit_slots()
 
 
 def get_rate_limit_remaining(user_id: str = "default") -> int:

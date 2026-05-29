@@ -7,6 +7,10 @@ import types
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
+pytestmark = pytest.mark.integration
+
 
 def _fake_streamlit():
     module = types.SimpleNamespace()
