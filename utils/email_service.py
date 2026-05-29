@@ -20,6 +20,7 @@ from utils.logger import get_logger
 from utils.secrets import get_secret
 
 logger = get_logger("email_service")
+SMTP_TIMEOUT_SECONDS = 30
 
 
 def is_email_configured() -> bool:
@@ -111,9 +112,9 @@ def send_email_with_attachments(
 
     try:
         if port == 465:
-            server = smtplib.SMTP_SSL(smtp_host, port, timeout=60)
+            server = smtplib.SMTP_SSL(smtp_host, port, timeout=SMTP_TIMEOUT_SECONDS)
         else:
-            server = smtplib.SMTP(smtp_host, port, timeout=60)
+            server = smtplib.SMTP(smtp_host, port, timeout=SMTP_TIMEOUT_SECONDS)
             server.starttls()
         server.login(smtp_user, smtp_password)
         server.sendmail(from_email, [to_email], msg.as_string())

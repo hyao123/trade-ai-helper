@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import datetime
 import os
+from pathlib import Path
 
 from fpdf import FPDF
 
@@ -21,34 +22,99 @@ logger = get_logger("pdf_gen")
 # ---------------------------------------------------------------------------
 # 字体配置
 # ---------------------------------------------------------------------------
-_BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
-_FONT_DIR  = os.path.join(_BASE_DIR, "..", "fonts")
-_NOTO_PATH = os.path.join(_FONT_DIR, "NotoSansSC-Regular.ttf")
+_BASE_DIR = Path(__file__).resolve().parent
+_FONT_DIR = _BASE_DIR.parent / "fonts"
+_CORE_FONT_NAMES = {"arial", "helvetica", "times", "courier", "symbol", "zapfdingbats"}
+
+
+def _existing_path(path: Path | None) -> str | None:
+    """Return a string path only when the font file exists."""
+    return str(path) if path and path.exists() else None
+
+
+def _register_font_family(
+    pdf: FPDF,
+    family: str,
+    regular_path: Path,
+    bold_path: Path | None = None,
+    italic_path: Path | None = None,
+    bold_italic_path: Path | None = None,
+) -> bool:
+    """Register regular/bold/italic aliases for a Unicode font family."""
+    regular = _existing_path(regular_path)
+    if not regular:
+        return False
+
+    try:
+        pdf.add_font(family, "", regular)
+        pdf.add_font(family, "B", _existing_path(bold_path) or regular)
+        pdf.add_font(family, "I", _existing_path(italic_path) or regular)
+        pdf.add_font(
+            family,
+            "BI",
+            _existing_path(bold_italic_path) or _existing_path(bold_path) or regular,
+        )
+        return True
+    except Exception as exc:
+        logger.warning("Unable to register PDF font %s: %s", family, exc)
+        return False
+
+
+def _font_candidates() -> list[tuple[str, Path, Path | None, Path | None, Path | None]]:
+    """Return bundled and common system Unicode font candidates."""
+    return [
+        (
+            "NotoSans",
+            _FONT_DIR / "NotoSansSC-Regular.ttf",
+            _FONT_DIR / "NotoSansSC-Bold.ttf",
+            None,
+            None,
+        ),
+        (
+            "DejaVu",
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf"),
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-BoldOblique.ttf"),
+        ),
+        (
+            "DejaVu",
+            Path("/usr/local/share/fonts/DejaVuSans.ttf"),
+            Path("/usr/local/share/fonts/DejaVuSans-Bold.ttf"),
+            Path("/usr/local/share/fonts/DejaVuSans-Oblique.ttf"),
+            Path("/usr/local/share/fonts/DejaVuSans-BoldOblique.ttf"),
+        ),
+    ]
 
 
 def _setup_font(pdf: FPDF) -> str:
     """
     注册字体并返回字体名称。
-    优先级：NotoSansSC（完整CJK）> DejaVu（内置Unicode）> Arial（ASCII兜底）
+    优先级：项目 fonts/ 中的 NotoSansSC > 常见系统 DejaVu > Arial（ASCII兜底）
     """
-    if os.path.exists(_NOTO_PATH):
-        try:
-            pdf.add_font("NotoSans", "", _NOTO_PATH, uni=True)
-            return "NotoSans"
-        except Exception:
-            pass
-
-    # fpdf2 >= 2.7.6 内置 DejaVu
-    try:
-        from fpdf.fonts import FPDF_FONT_DIR  # type: ignore
-        dejavu = os.path.join(FPDF_FONT_DIR, "DejaVuSans.ttf")
-        if os.path.exists(dejavu):
-            pdf.add_font("DejaVu", "", dejavu, uni=True)
-            return "DejaVu"
-    except Exception:
-        pass
+    for family, regular, bold, italic, bold_italic in _font_candidates():
+        if _register_font_family(pdf, family, regular, bold, italic, bold_italic):
+            return family
 
     return "Arial"
+
+
+def _uses_core_font(font_name: str) -> bool:
+    """Return True when fpdf will use a Latin-1 core font."""
+    return font_name.lower() in _CORE_FONT_NAMES
+
+
+def _placeholder(font_name: str) -> str:
+    """Return a missing-value placeholder supported by the active font."""
+    return "-" if _uses_core_font(font_name) else "—"
+
+
+def _pdf_text(font_name: str, value: object, fallback: str | None = None) -> str:
+    """Normalize text so core-font fallback never raises Unicode encoding errors."""
+    text = str(value) if value not in (None, "") else (fallback or _placeholder(font_name))
+    if _uses_core_font(font_name):
+        return text.encode("latin-1", errors="replace").decode("latin-1")
+    return text
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +144,7 @@ class QuotePDF(FPDF):
         if self._company:
             self.set_font(self._font_name, "", 8)
             self.set_y(3)
-            self.cell(0, 12, self._company, 0, 0, "R")
+            self.cell(0, 12, _pdf_text(self._font_name, self._company), 0, 0, "R")
         self.set_text_color(0, 0, 0)
         self.ln(18)
 
@@ -99,7 +165,7 @@ def _section(pdf: FPDF, font_name: str, title: str) -> None:
     pdf.set_fill_color(239, 246, 255)
     pdf.set_font(font_name, "B", 11)
     pdf.set_text_color(30, 58, 95)
-    pdf.cell(0, 8, f"  {title}", 0, 1, "L", fill=True)
+    pdf.cell(0, 8, _pdf_text(font_name, f"  {title}"), 0, 1, "L", fill=True)
     pdf.set_text_color(0, 0, 0)
     pdf.ln(1)
 
@@ -109,13 +175,14 @@ def _truncate_by_width(pdf: FPDF, font_name: str, text: str, max_mm: float) -> s
     按渲染宽度截断字符串，避免 CJK/混合字符溢出。
     使用 fpdf2 的 get_string_width() 而非字符数，确保视觉宽度正确。
     """
+    text = _pdf_text(font_name, text, fallback="")
     if not text:
         return text
     pdf.set_font(font_name, "", 9)
     if pdf.get_string_width(text) <= max_mm:
         return text
     # 逐字符缩减直到满足宽度
-    ellipsis = "…"
+    ellipsis = "..." if _uses_core_font(font_name) else "…"
     for i in range(len(text) - 1, 0, -1):
         candidate = text[:i] + ellipsis
         if pdf.get_string_width(candidate) <= max_mm:
@@ -130,7 +197,7 @@ def _row(pdf: FPDF, font_name: str, label: str, value: str,
     pdf.cell(label_w, row_h, label, 0, 0, "L")
     pdf.set_font(font_name, "", 9)
     pdf.set_text_color(17, 24, 39)
-    pdf.cell(0, row_h, str(value) if value else "—", 0, 1, "L")
+    pdf.cell(0, row_h, _pdf_text(font_name, value), 0, 1, "L")
     pdf.set_text_color(0, 0, 0)
 
 
@@ -199,7 +266,7 @@ def generate_quote_pdf(
     fill = False
     for sku in skus:
         name     = sku.get("product", "")
-        model    = sku.get("model", "") or "—"
+        model    = sku.get("model", "")
         price    = float(sku.get("price", 0))
         quantity = int(sku.get("quantity", 0))
         unit     = sku.get("unit", "PCS")
@@ -218,7 +285,7 @@ def generate_quote_pdf(
             f"${amount:,.2f}",
         ]
         for w, val in zip(COL, row_data):
-            pdf.cell(w, 7, val, 0, 0, "C" if w <= 35 else "L", fill=True)
+            pdf.cell(w, 7, _pdf_text(font_name, val), 0, 0, "C" if w <= 35 else "L", fill=True)
         pdf.ln()
         fill = not fill
 
@@ -237,7 +304,7 @@ def generate_quote_pdf(
     _row(pdf, font_name, "Payment Terms:", payment)
     _row(pdf, font_name, "Delivery Time:", delivery)
     _row(pdf, font_name, "Validity:",      validity)
-    _row(pdf, font_name, "Shipping Port:", shipping or "—")
+    _row(pdf, font_name, "Shipping Port:", shipping)
     pdf.ln(4)
 
     # ── 客户信息（Buyer）──────────────────────────────
