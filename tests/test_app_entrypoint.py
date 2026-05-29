@@ -36,6 +36,7 @@ def test_app_exports_probe_entrypoints_without_importing_streamlit(monkeypatch):
     assert module.app is module.application
     assert callable(module.application)
     assert callable(module.handler)
+    assert callable(module.main)
 
 
 def test_wsgi_and_serverless_probe_responses():
