@@ -369,8 +369,8 @@ if st.session_state.results.get("quote_pdf"):
         elif not send_subject.strip():
             st.error("请填写邮件主题")
         else:
-            from utils.email_service import send_ai_generated_email
             from utils.email_attachments import make_attachment
+            from utils.email_service import send_ai_generated_email
 
             with st.spinner(f"正在发送到 {send_to}..."):
                 ok, result_msg = send_ai_generated_email(

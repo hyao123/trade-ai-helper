@@ -21,6 +21,8 @@ import types
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 # Setup path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -38,9 +40,12 @@ _mock_dotenv.load_dotenv = lambda *a, **kw: None
 sys.modules["dotenv"] = _mock_dotenv
 
 
+pytestmark = pytest.mark.integration
+
+
 # Mock openai if not available
 try:
-    import openai
+    __import__("openai")
 except ImportError:
     _mock_openai = types.ModuleType("openai")
     _mock_openai.OpenAI = MagicMock
@@ -596,7 +601,10 @@ class TestCustomerScoringIntegration:
             with patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from datetime import date
 
-                from utils.customer_scoring import batch_score_customers, get_score_summary
+                from utils.customer_scoring import (
+                    batch_score_customers,
+                    get_score_summary,
+                )
                 customers = [
                     {"company": "A", "contact": "X", "email": "x@a.com",
                      "country": "US", "product": "P", "stage": "new",
@@ -656,7 +664,7 @@ class TestI18nIntegration:
         i18n = I18n()
         langs = i18n.available_languages()
         assert len(langs) >= 5
-        codes = [l["code"] for l in langs]
+        codes = [lang["code"] for lang in langs]
         assert "zh" in codes
         assert "en" in codes
         assert "ja" in codes

@@ -29,6 +29,7 @@ try:
 except ImportError:
     OpenAI = None  # type: ignore[assignment, misc]
 
+from config.ai_models import load_ai_model_config
 from utils.analytics import track_event
 from utils.logger import get_logger
 from utils.secrets import get_secret
@@ -74,54 +75,10 @@ def _get_custom_provider_config() -> dict | None:
 # ---------------------------------------------------------------------------
 # Provider configuration
 # ---------------------------------------------------------------------------
-
-PROVIDERS: dict[str, dict] = {
-    "nvidia": {
-        "base_url": "https://integrate.api.nvidia.com/v1",
-        "key_env": "NVIDIA_API_KEY",
-        "models": {
-            "llama-3.3-70b": "meta/llama-3.3-70b-instruct",
-            "mistral-large-2": "mistralai/mistral-large-2-instruct",
-        },
-        "default_model": "llama-3.3-70b",
-        "cost_per_1k_tokens": 0.003,
-    },
-    "openai": {
-        "base_url": "https://api.openai.com/v1",
-        "key_env": "OPENAI_API_KEY",
-        "models": {
-            "gpt-4o": "gpt-4o",
-            "gpt-4o-mini": "gpt-4o-mini",
-        },
-        "default_model": "gpt-4o-mini",
-        "cost_per_1k_tokens": 0.015,
-    },
-    "deepseek": {
-        "base_url": "https://api.deepseek.com/v1",
-        "key_env": "DEEPSEEK_API_KEY",
-        "models": {
-            "deepseek-chat": "deepseek-chat",
-            "deepseek-reasoner": "deepseek-reasoner",
-        },
-        "default_model": "deepseek-chat",
-        "cost_per_1k_tokens": 0.001,
-    },
-}
-
-# Tier-to-strategy mapping
-TIER_STRATEGY: dict[str, dict] = {
-    "fast": {"provider": "deepseek", "model": "deepseek-chat"},
-    "balanced": {"provider": "nvidia", "model": "llama-3.3-70b"},
-    "premium": {"provider": "openai", "model": "gpt-4o"},
-}
-
-# Plan-to-default tier
-PLAN_DEFAULTS: dict[str, str] = {
-    "free": "fast",
-    "pro": "balanced",
-    "team": "premium",
-    "enterprise": "premium",
-}
+_AI_MODEL_CONFIG = load_ai_model_config()
+PROVIDERS: dict[str, dict] = _AI_MODEL_CONFIG["providers"]
+TIER_STRATEGY: dict[str, dict] = _AI_MODEL_CONFIG["tier_strategy"]
+PLAN_DEFAULTS: dict[str, str] = _AI_MODEL_CONFIG["plan_defaults"]
 
 
 class AIGateway:

@@ -12,8 +12,8 @@ from datetime import datetime
 
 import streamlit as st
 
+from utils import storage
 from utils.logger import get_logger
-from utils.storage import load_json, load_user_json, save_json, save_user_json
 
 logger = get_logger("workflow")
 
@@ -38,43 +38,39 @@ def _get_current_username() -> str | None:
 
 
 def _get_workflows() -> list[dict]:
-    username = _get_current_username()
-    if username:
-        flag_key = f"_workflows_loaded_from_disk_{username}"
-        state_key = f"email_workflows_{username}"
-        if state_key not in st.session_state or not st.session_state.get(flag_key):
-            st.session_state[state_key] = load_user_json(username, _FILENAME, default=[])
-            st.session_state[flag_key] = True
-        return st.session_state[state_key]
-    else:
-        if "email_workflows" not in st.session_state or not st.session_state.get("_workflows_loaded_from_disk"):
-            st.session_state["email_workflows"] = load_json(_FILENAME, default=[])
-            st.session_state["_workflows_loaded_from_disk"] = True
-        return st.session_state["email_workflows"]
+    return storage.load_scoped_session_json(
+        st.session_state,
+        _FILENAME,
+        state_key="email_workflows",
+        loaded_key="_workflows_loaded_from_disk",
+        scope_key="_workflows_storage_scope",
+        default=[],
+        username=_get_current_username(),
+    )
 
 
 def _persist_workflows() -> None:
     """Save current workflows to disk."""
-    username = _get_current_username()
-    if username:
-        state_key = f"email_workflows_{username}"
-        save_user_json(username, _FILENAME, st.session_state.get(state_key, []))
-    else:
-        save_json(_FILENAME, st.session_state.get("email_workflows", []))
+    storage.save_scoped_session_json(
+        st.session_state,
+        _FILENAME,
+        state_key="email_workflows",
+        default=[],
+        username=_get_current_username(),
+    )
 
 
 def import_workflows(data: list) -> None:
     """Bulk-import workflow data, replacing current state and persisting to disk."""
-    username = _get_current_username()
-    if username:
-        state_key = f"email_workflows_{username}"
-        flag_key = f"_workflows_loaded_from_disk_{username}"
-        st.session_state[state_key] = data
-        st.session_state[flag_key] = True
-    else:
-        st.session_state["email_workflows"] = data
-        st.session_state["_workflows_loaded_from_disk"] = True
-    _persist_workflows()
+    storage.import_scoped_session_json(
+        st.session_state,
+        _FILENAME,
+        data,
+        state_key="email_workflows",
+        loaded_key="_workflows_loaded_from_disk",
+        scope_key="_workflows_storage_scope",
+        username=_get_current_username(),
+    )
     logger.info("Workflows imported: %d records", len(data))
 
 

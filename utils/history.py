@@ -13,8 +13,8 @@ from datetime import datetime
 
 import streamlit as st
 
+from utils import storage
 from utils.logger import get_logger
-from utils.storage import load_json, load_user_json, save_json, save_user_json
 
 logger = get_logger("history")
 
@@ -31,44 +31,39 @@ def _get_current_username() -> str | None:
 
 def _get_history() -> list[dict]:
     """获取历史记录列表。"""
-    username = _get_current_username()
-    if username:
-        flag_key = f"_history_loaded_from_disk_{username}"
-        state_key = f"generation_history_{username}"
-        if state_key not in st.session_state or not st.session_state.get(flag_key):
-            st.session_state[state_key] = load_user_json(username, _FILENAME, default=[])
-            st.session_state[flag_key] = True
-        return st.session_state[state_key]
-    else:
-        if "generation_history" not in st.session_state or not st.session_state.get("_history_loaded_from_disk"):
-            st.session_state["generation_history"] = load_json(_FILENAME, default=[])
-            st.session_state["_history_loaded_from_disk"] = True
-        return st.session_state["generation_history"]
+    return storage.load_scoped_session_json(
+        st.session_state,
+        _FILENAME,
+        state_key="generation_history",
+        loaded_key="_history_loaded_from_disk",
+        scope_key="_history_storage_scope",
+        default=[],
+        username=_get_current_username(),
+    )
 
 
 def _persist_history() -> None:
     """Save current history to disk."""
-    username = _get_current_username()
-    if username:
-        state_key = f"generation_history_{username}"
-        save_user_json(username, _FILENAME, st.session_state.get(state_key, []))
-    else:
-        save_json(_FILENAME, st.session_state.get("generation_history", []))
+    storage.save_scoped_session_json(
+        st.session_state,
+        _FILENAME,
+        state_key="generation_history",
+        default=[],
+        username=_get_current_username(),
+    )
 
 
 def import_history(data: list) -> None:
     """Bulk-import history data, replacing current state and persisting to disk."""
-    username = _get_current_username()
-    if username:
-        state_key = f"generation_history_{username}"
-        flag_key = f"_history_loaded_from_disk_{username}"
-        st.session_state[state_key] = data
-        st.session_state[flag_key] = True
-        save_user_json(username, _FILENAME, data)
-    else:
-        st.session_state["generation_history"] = data
-        st.session_state["_history_loaded_from_disk"] = True
-        save_json(_FILENAME, data)
+    storage.import_scoped_session_json(
+        st.session_state,
+        _FILENAME,
+        data,
+        state_key="generation_history",
+        loaded_key="_history_loaded_from_disk",
+        scope_key="_history_storage_scope",
+        username=_get_current_username(),
+    )
     logger.info("History imported: %d records", len(data))
 
 
@@ -121,14 +116,15 @@ def get_history(feature: str | None = None, limit: int = 20) -> list[dict]:
 
 def clear_history() -> None:
     """清空所有历史记录。"""
-    username = _get_current_username()
-    if username:
-        state_key = f"generation_history_{username}"
-        st.session_state[state_key] = []
-        save_user_json(username, _FILENAME, [])
-    else:
-        st.session_state["generation_history"] = []
-        save_json(_FILENAME, [])
+    storage.import_scoped_session_json(
+        st.session_state,
+        _FILENAME,
+        [],
+        state_key="generation_history",
+        loaded_key="_history_loaded_from_disk",
+        scope_key="_history_storage_scope",
+        username=_get_current_username(),
+    )
     logger.info("History cleared")
 
 

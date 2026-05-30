@@ -33,7 +33,7 @@ Usage:
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 from utils.logger import get_logger
 from utils.storage import load_user_json, save_user_json

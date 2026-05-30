@@ -1521,7 +1521,7 @@ Best regards,
 
 Critical rules:
 1. This is step {step_index + 1} of {total_steps} — write accordingly.
-   {"This is the FIRST touch; no prior context exists." if step_index == 0 else f"Prior emails have been sent; reference subtly without listing them."}
+   {"This is the FIRST touch; no prior context exists." if step_index == 0 else "Prior emails have been sent; reference subtly without listing them."}
 2. NEVER use spam-trigger words (free, guarantee, limited time, act now, $$$).
 3. Subject line MUST be different from prior subjects (see avoid list above).
 4. Output English plain text only, no markdown.

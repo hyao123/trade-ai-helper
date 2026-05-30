@@ -31,11 +31,10 @@ from __future__ import annotations
 import hashlib
 import secrets
 import time
-from collections import defaultdict
 from datetime import datetime
 
 from utils.logger import get_logger
-from utils.storage import load_user_json, save_user_json
+from utils.storage import load_json, load_user_json, save_json, save_user_json
 
 logger = get_logger("api_keys")
 
@@ -67,10 +66,25 @@ SCOPES = {
 }
 
 _KEYS_FILE = "api_keys.json"
+_RATE_COUNTERS_FILE = "api_rate_counters.json"
 
-# In-memory rate limit tracking (resets on restart — production would use Redis)
-_rate_counters: dict[str, list[float]] = defaultdict(list)
 
+def _load_rate_counters() -> dict[str, list[float]]:
+    """Load persisted per-key API request timestamps."""
+    raw = load_json(_RATE_COUNTERS_FILE, default={})
+    return {key: [float(t) for t in value] for key, value in raw.items() if isinstance(value, list)}
+
+
+def _save_rate_counters(counters: dict[str, list[float]]) -> None:
+    """Persist per-key API request timestamps."""
+    save_json(_RATE_COUNTERS_FILE, counters)
+
+
+def _prune_rate_counters(counters: dict[str, list[float]], key_id: str, now: float) -> list[float]:
+    """Keep only timestamps within the daily rate-limit window."""
+    day_ago = now - 86400
+    counters[key_id] = [t for t in counters.get(key_id, []) if t > day_ago]
+    return counters[key_id]
 
 # ---------------------------------------------------------------------------
 # Key generation & management
@@ -155,8 +169,8 @@ def validate_api_key(raw_key: str) -> tuple[bool, dict | str]:
 
     # Search all users' keys (in production, use a global index/DB)
     # For JSON backend, we need to scan — acceptable for small scale
+
     from utils.storage import get_data_dir
-    import os
 
     users_dir = get_data_dir() / "users"
     if not users_dir.exists():
@@ -256,21 +270,20 @@ def check_api_rate_limit(key_metadata: dict) -> tuple[bool, str]:
     limits = TIER_RATE_LIMITS.get(tier, TIER_RATE_LIMITS["team"])
 
     now = time.time()
-
-    # Clean old entries
-    hour_ago = now - 3600
-    day_ago = now - 86400
-    _rate_counters[key_id] = [t for t in _rate_counters[key_id] if t > day_ago]
+    counters = _load_rate_counters()
+    key_timestamps = _prune_rate_counters(counters, key_id, now)
+    _save_rate_counters(counters)
 
     # Check hourly limit
-    hour_count = sum(1 for t in _rate_counters[key_id] if t > hour_ago)
+    hour_ago = now - 3600
+    hour_count = sum(1 for t in key_timestamps if t > hour_ago)
     if hour_count >= limits["requests_per_hour"]:
         return False, f"Hourly rate limit exceeded ({limits['requests_per_hour']}/hour)"
 
     # Check daily limit (if applicable)
     daily_limit = limits["requests_per_day"]
     if daily_limit is not None:
-        day_count = len(_rate_counters[key_id])
+        day_count = len(key_timestamps)
         if day_count >= daily_limit:
             return False, f"Daily rate limit exceeded ({daily_limit}/day)"
 
@@ -280,7 +293,10 @@ def check_api_rate_limit(key_metadata: dict) -> tuple[bool, str]:
 def record_api_usage(key_metadata: dict) -> None:
     """Record a successful API request for rate limiting."""
     key_id = key_metadata.get("key_id", "unknown")
-    _rate_counters[key_id].append(time.time())
+    counters = _load_rate_counters()
+    now = time.time()
+    _prune_rate_counters(counters, key_id, now).append(now)
+    _save_rate_counters(counters)
 
 
 def get_api_usage_stats(username: str) -> dict:
@@ -297,11 +313,12 @@ def get_api_usage_stats(username: str) -> dict:
     total_requests = sum(k.get("total_requests", 0) for k in keys)
 
     # Per-key breakdown
+    counters = _load_rate_counters()
     key_stats = []
+    now = time.time()
     for k in active:
         key_id = k["id"]
-        now = time.time()
-        hour_count = sum(1 for t in _rate_counters.get(key_id, []) if t > now - 3600)
+        hour_count = sum(1 for t in counters.get(key_id, []) if t > now - 3600)
         key_stats.append({
             "id": k["id"],
             "name": k["name"],

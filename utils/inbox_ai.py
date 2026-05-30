@@ -37,7 +37,6 @@ from datetime import datetime
 from typing import Generator
 
 from utils.logger import get_logger
-from utils.secrets import get_secret
 from utils.storage import load_user_json, save_user_json
 
 logger = get_logger("inbox_ai")

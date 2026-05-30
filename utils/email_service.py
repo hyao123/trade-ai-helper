@@ -110,6 +110,7 @@ def send_email_with_attachments(
                 )
             msg.attach(part)
 
+    server = None
     try:
         if port == 465:
             server = smtplib.SMTP_SSL(smtp_host, port, timeout=SMTP_TIMEOUT_SECONDS)
@@ -118,7 +119,6 @@ def send_email_with_attachments(
             server.starttls()
         server.login(smtp_user, smtp_password)
         server.sendmail(from_email, [to_email], msg.as_string())
-        server.quit()
         n_att = len(attachments) if attachments else 0
         logger.info("Email sent to %s: %s (attachments=%d)", to_email, subject, n_att)
         return True, "Email sent successfully"
@@ -134,6 +134,12 @@ def send_email_with_attachments(
     except OSError as e:
         logger.error("Network error sending email: %s", e)
         return False, f"Network error: {e}"
+    finally:
+        if server is not None:
+            try:
+                server.quit()
+            except Exception as e:
+                logger.debug("Error closing SMTP connection: %s", e)
 
 
 def send_verification_email(to_email: str, token: str) -> tuple[bool, str]:

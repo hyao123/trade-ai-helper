@@ -197,8 +197,10 @@ trade-ai-helper/
 | 变量 | 必填 | 说明 |
 |------|------|------|
 | `NVIDIA_API_KEY` | ✅ | NVIDIA NIM API Key |
+| `OPENAI_API_KEY` | 可选 | OpenAI API Key（用于 AI Gateway 多模型路由） |
+| `DEEPSEEK_API_KEY` | 可选 | DeepSeek API Key（用于 AI Gateway 多模型路由） |
 | `APP_PASSWORD` | 可选 | 访问密码（留空不启用鉴权） |
-| `NVIDIA_MODEL` | 可选 | 模型名，默认 `meta/llama-3.3-70b-instruct` |
+| `NVIDIA_MODEL` | 可选 | 直连 NVIDIA 模型名，默认 `meta/llama-3.3-70b-instruct` |
 | `RATE_LIMIT_MAX_CALLS` | 可选 | 每窗口最大调用次数，默认 `20` |
 | `RATE_LIMIT_WINDOW` | 可选 | 限速窗口（秒），默认 `3600` |
 | `STRIPE_SECRET_KEY` | 可选 | Stripe 密钥（启用支付功能） |
@@ -207,8 +209,18 @@ trade-ai-helper/
 | `APP_BASE_URL` | 可选 | 应用 URL（用于 Stripe 回调） |
 | `SMTP_HOST` | 可选 | SMTP 服务器（启用邮件验证） |
 | `SMTP_PORT` | 可选 | SMTP 端口 |
-| `SMTP_USERNAME` | 可选 | SMTP 用户名 |
+| `SMTP_USER` | 可选 | SMTP 用户名 |
 | `SMTP_PASSWORD` | 可选 | SMTP 密码 |
+| `SMTP_FROM_EMAIL` | 可选 | SMTP 发件邮箱 |
+| `SMTP_USE_TLS` | 可选 | 非 465 端口是否启用 STARTTLS，默认 `true` |
+
+---
+
+## 🤖 AI Provider / Model 配置
+
+- 默认模型路由放在 `config/ai_models.json`，包含 provider、模型别名、套餐默认 tier。
+- `config/ai_models.py` 会加载该 JSON，并在文件缺失或格式异常时回退到内置默认配置。
+- 生产环境调整 provider/model 时优先改配置文件，避免在 `utils/ai_gateway.py` 中硬编码发布。
 
 ---
 
@@ -228,11 +240,11 @@ trade-ai-helper/
 
 ## 🛡️ 安全说明
 
-- **认证**：PBKDF2-HMAC-SHA256（10万次迭代）密码哈希
+- **认证**：PBKDF2-HMAC-SHA256（10万次迭代）密码哈希，`hmac.compare_digest` 常量时间比对，登录失败持久化限速
 - **Prompt 安全**：25+ 注入模式过滤，sanitize 所有用户输入
 - **数据隔离**：per-user 目录隔离，用户间完全独立
 - **支付安全**：Stripe Checkout Sessions + 消费会话防重放
-- **速率限制**：双层限速（Tier 日限 + 全局滑动窗口）
+- **速率限制**：双层限速（Tier 日限 + 持久化滑动窗口），API key 计数持久化到 JSON 存储层
 
 ---
 
@@ -242,8 +254,11 @@ trade-ai-helper/
 # 运行所有测试
 pytest tests/ -v
 
-# 仅运行 Tier 2 测试
-pytest tests/test_tier2.py -v
+# 仅运行 smoke 分层
+pytest -m smoke -q
+
+# 仅运行 integration 分层
+pytest -m integration -q
 
 # 代码规范检查
 ruff check . --select E,F,I --ignore E501

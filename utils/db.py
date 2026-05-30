@@ -159,7 +159,6 @@ class PostgreSQLBackend(DatabaseBackend):
             raise
 
     def get_all_users(self) -> dict:
-        import json
         conn = self._get_conn()
         with conn.cursor() as cur:
             cur.execute("SELECT username, data FROM users_db")

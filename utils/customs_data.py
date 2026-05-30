@@ -30,11 +30,7 @@ Usage:
 """
 from __future__ import annotations
 
-import json
-import urllib.parse
-import urllib.request
 from datetime import datetime
-from typing import Any
 
 from utils.logger import get_logger
 from utils.secrets import get_secret

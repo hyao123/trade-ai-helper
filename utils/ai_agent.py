@@ -549,7 +549,7 @@ class Agent:
         failed = sum(1 for t in plan.tasks if t.status == TaskStatus.FAILED)
         total = len(plan.tasks)
 
-        lines = [f"## Agent Execution Summary"]
+        lines = ["## Agent Execution Summary"]
         lines.append(f"**Goal:** {plan.goal}")
         lines.append(f"**Status:** {plan.status.value}")
         lines.append(f"**Progress:** {completed}/{total} steps completed")

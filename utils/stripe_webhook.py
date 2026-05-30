@@ -23,7 +23,7 @@ from utils.analytics import track_event
 from utils.logger import get_logger
 from utils.pricing import upgrade_user_tier
 from utils.secrets import get_secret
-from utils.storage import load_json, save_json
+from utils.storage import load_json
 
 logger = get_logger("stripe_webhook")
 
@@ -177,7 +177,7 @@ def _handle_payment_failed(invoice: dict) -> tuple[bool, str]:
 
 def _save_subscription_info(username: str, info: dict) -> None:
     """Save Stripe subscription info to user's data."""
-    from utils.storage import load_user_json, save_user_json
+    from utils.storage import save_user_json
     save_user_json(username, "subscription.json", info)
 
 

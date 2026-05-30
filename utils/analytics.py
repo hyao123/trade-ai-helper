@@ -136,8 +136,8 @@ def _forward_external(event: dict) -> None:
     posthog_key = get_secret("POSTHOG_API_KEY")
     if posthog_key:
         try:
-            import urllib.request
             import json
+            import urllib.request
 
             payload = json.dumps({
                 "api_key": posthog_key,

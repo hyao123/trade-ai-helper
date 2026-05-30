@@ -232,6 +232,26 @@ class TestStorage:
             result = load_json("bad.json", default=[])
             assert result == []
 
+    def test_load_json_quarantines_invalid_json(self):
+        from utils.storage import load_json
+        tmp_dir = self._make_temp_dir()
+        bad_file = tmp_dir / "bad.json"
+        bad_file.write_text("not valid json {{{", encoding="utf-8")
+        with patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            result = load_json("bad.json", default={})
+            assert result == {}
+            assert list(tmp_dir.glob("bad.json.corrupt.*"))
+
+    def test_save_json_creates_backup_on_overwrite(self):
+        from utils.storage import load_json, save_json
+        tmp_dir = self._make_temp_dir()
+        with patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            save_json("backup.json", {"version": 1})
+            save_json("backup.json", {"version": 2})
+            assert load_json("backup.json") == {"version": 2}
+            assert (tmp_dir / "backup.json.bak").exists()
+            assert load_json("backup.json.bak") == {"version": 1}
+
     def test_get_data_dir_creates_directory(self):
         from utils.storage import get_data_dir
         # Simply test the real function creates directory

@@ -12,8 +12,8 @@ from datetime import datetime
 
 import streamlit as st
 
+from utils import storage
 from utils.logger import get_logger
-from utils.storage import load_json, load_user_json, save_json, save_user_json
 
 logger = get_logger("templates")
 
@@ -30,44 +30,39 @@ def _get_current_username() -> str | None:
 
 def _get_store() -> dict[str, list[dict]]:
     """获取模板存储（按功能分类）。"""
-    username = _get_current_username()
-    if username:
-        flag_key = f"_templates_loaded_from_disk_{username}"
-        state_key = f"templates_{username}"
-        if state_key not in st.session_state or not st.session_state.get(flag_key):
-            st.session_state[state_key] = load_user_json(username, _FILENAME, default={})
-            st.session_state[flag_key] = True
-        return st.session_state[state_key]
-    else:
-        if "templates" not in st.session_state or not st.session_state.get("_templates_loaded_from_disk"):
-            st.session_state["templates"] = load_json(_FILENAME, default={})
-            st.session_state["_templates_loaded_from_disk"] = True
-        return st.session_state["templates"]
+    return storage.load_scoped_session_json(
+        st.session_state,
+        _FILENAME,
+        state_key="templates",
+        loaded_key="_templates_loaded_from_disk",
+        scope_key="_templates_storage_scope",
+        default={},
+        username=_get_current_username(),
+    )
 
 
 def _persist_templates() -> None:
     """Save current templates to disk."""
-    username = _get_current_username()
-    if username:
-        state_key = f"templates_{username}"
-        save_user_json(username, _FILENAME, st.session_state.get(state_key, {}))
-    else:
-        save_json(_FILENAME, st.session_state.get("templates", {}))
+    storage.save_scoped_session_json(
+        st.session_state,
+        _FILENAME,
+        state_key="templates",
+        default={},
+        username=_get_current_username(),
+    )
 
 
 def import_templates(data: dict) -> None:
     """Bulk-import template data, replacing current state and persisting to disk."""
-    username = _get_current_username()
-    if username:
-        state_key = f"templates_{username}"
-        flag_key = f"_templates_loaded_from_disk_{username}"
-        st.session_state[state_key] = data
-        st.session_state[flag_key] = True
-        save_user_json(username, _FILENAME, data)
-    else:
-        st.session_state["templates"] = data
-        st.session_state["_templates_loaded_from_disk"] = True
-        save_json(_FILENAME, data)
+    storage.import_scoped_session_json(
+        st.session_state,
+        _FILENAME,
+        data,
+        state_key="templates",
+        loaded_key="_templates_loaded_from_disk",
+        scope_key="_templates_storage_scope",
+        username=_get_current_username(),
+    )
     logger.info("Templates imported: %d categories", len(data))
 
 

@@ -41,7 +41,6 @@ Usage:
 from __future__ import annotations
 
 import base64
-import hashlib
 import json
 import secrets
 import urllib.parse
@@ -458,7 +457,7 @@ def provision_sso_user(
         username = f"sso{secrets.token_hex(4)}"
 
     # Check if user already exists
-    from utils.user_auth import _load_users_db, _save_users_db, _hash_password
+    from utils.user_auth import _hash_password, _load_users_db, _save_users_db
 
     users = _load_users_db()
 

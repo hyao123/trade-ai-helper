@@ -8,7 +8,6 @@ from __future__ import annotations
 import streamlit as st
 
 from utils.analytics import track_event
-from utils.secrets import get_secret
 from utils.storage import load_json, save_json
 
 st.set_page_config(page_title="外贸AI助手 | TradeAI Pro", page_icon="💼", layout="wide")

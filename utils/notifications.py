@@ -357,7 +357,7 @@ def send_digest(username: str, force: bool = False) -> tuple[bool, str]:
     body = "\n".join(body_lines)
 
     # Send email
-    from utils.email_service import send_email, is_email_configured
+    from utils.email_service import is_email_configured, send_email
     if not is_email_configured():
         return False, "Email not configured"
 
