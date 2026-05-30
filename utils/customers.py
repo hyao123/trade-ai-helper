@@ -22,28 +22,48 @@ def _get_current_username() -> str | None:
     return None
 
 
+def _get_storage_scope() -> str:
+    """Return a session-cache scope for the active storage backend."""
+    return str(storage.get_data_dir().resolve())
+
+
 def _get_customers() -> list[dict]:
     """Get customer list from session_state, loading from disk on first access."""
-    return storage.load_scoped_session_json(
-        st.session_state,
-        _FILENAME,
-        state_key="customers",
-        loaded_key="_customers_loaded_from_disk",
-        scope_key="_customers_storage_scope",
-        default=[],
-        username=_get_current_username(),
-    )
+    username = _get_current_username()
+    scope = _get_storage_scope()
+    if username:
+        flag_key = f"_customers_loaded_from_disk_{username}"
+        state_key = f"customers_{username}"
+        scope_key = f"_customers_storage_scope_{username}"
+        if (
+            state_key not in st.session_state
+            or not st.session_state.get(flag_key)
+            or st.session_state.get(scope_key) != scope
+        ):
+            st.session_state[state_key] = storage.load_user_json(username, _FILENAME, default=[])
+            st.session_state[flag_key] = True
+            st.session_state[scope_key] = scope
+        return st.session_state[state_key]
+    else:
+        if (
+            "customers" not in st.session_state
+            or not st.session_state.get("_customers_loaded_from_disk")
+            or st.session_state.get("_customers_storage_scope") != scope
+        ):
+            st.session_state["customers"] = storage.load_json(_FILENAME, default=[])
+            st.session_state["_customers_loaded_from_disk"] = True
+            st.session_state["_customers_storage_scope"] = scope
+        return st.session_state["customers"]
 
 
 def _persist_customers() -> None:
     """Save current customer list to disk."""
-    storage.save_scoped_session_json(
-        st.session_state,
-        _FILENAME,
-        state_key="customers",
-        default=[],
-        username=_get_current_username(),
-    )
+    username = _get_current_username()
+    if username:
+        state_key = f"customers_{username}"
+        storage.save_user_json(username, _FILENAME, st.session_state.get(state_key, []))
+    else:
+        storage.save_json(_FILENAME, st.session_state.get("customers", []))
 
 
 def get_customers() -> list[dict]:
@@ -76,15 +96,20 @@ def update_customer(index: int, data: dict) -> None:
 
 def import_customers(data: list) -> None:
     """Bulk-import customer data, replacing current state and persisting to disk."""
-    storage.import_scoped_session_json(
-        st.session_state,
-        _FILENAME,
-        data,
-        state_key="customers",
-        loaded_key="_customers_loaded_from_disk",
-        scope_key="_customers_storage_scope",
-        username=_get_current_username(),
-    )
+    username = _get_current_username()
+    scope = _get_storage_scope()
+    if username:
+        state_key = f"customers_{username}"
+        flag_key = f"_customers_loaded_from_disk_{username}"
+        scope_key = f"_customers_storage_scope_{username}"
+        st.session_state[state_key] = data
+        st.session_state[flag_key] = True
+        st.session_state[scope_key] = scope
+    else:
+        st.session_state["customers"] = data
+        st.session_state["_customers_loaded_from_disk"] = True
+        st.session_state["_customers_storage_scope"] = scope
+    _persist_customers()
 
 
 def find_customer(company: str, contact: str) -> dict | None:

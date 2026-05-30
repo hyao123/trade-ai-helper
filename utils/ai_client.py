@@ -113,7 +113,6 @@ def _rate_limit_check(user_id: str = "default") -> tuple[bool, int]:
         return False, 0
 
     active.append(now)
-    _save_rate_limit_slots()
     return True, max(0, RATE_LIMIT_MAX_CALLS - len(active))
 
 
@@ -121,7 +120,6 @@ def _rate_limit_consume(user_id: str) -> None:
     """消耗一个 rate-limit slot。"""
     now = time.time()
     _prune_rate_limit_slots(user_id, now).append(now)
-    _save_rate_limit_slots()
 
 
 def _rate_limit_rollback(user_id: str) -> None:

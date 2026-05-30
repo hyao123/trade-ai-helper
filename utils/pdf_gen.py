@@ -148,10 +148,7 @@ class QuotePDF(FPDF):
         if self._company:
             self.set_font(self._font_name, "", 8)
             self.set_y(3)
-            self.cell(
-                0, 12, _pdf_text(self._font_name, self._company),
-                border=0, align="R", new_x=XPos.RIGHT, new_y=YPos.TOP,
-            )
+            self.cell(0, 12, _pdf_text(self._font_name, self._company), 0, 0, "R")
         self.set_text_color(0, 0, 0)
         self.ln(18)
 
@@ -175,10 +172,7 @@ def _section(pdf: FPDF, font_name: str, title: str) -> None:
     pdf.set_fill_color(239, 246, 255)
     pdf.set_font(font_name, "B", 11)
     pdf.set_text_color(30, 58, 95)
-    pdf.cell(
-        0, 8, _pdf_text(font_name, f"  {title}"),
-        border=0, align="L", fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT,
-    )
+    pdf.cell(0, 8, _pdf_text(font_name, f"  {title}"), 0, 1, "L", fill=True)
     pdf.set_text_color(0, 0, 0)
     pdf.ln(1)
 
@@ -210,10 +204,7 @@ def _row(pdf: FPDF, font_name: str, label: str, value: str,
     pdf.cell(label_w, row_h, label, border=0, align="L", new_x=XPos.RIGHT, new_y=YPos.TOP)
     pdf.set_font(font_name, "", 9)
     pdf.set_text_color(17, 24, 39)
-    pdf.cell(
-        0, row_h, _pdf_text(font_name, value),
-        border=0, align="L", new_x=XPos.LMARGIN, new_y=YPos.NEXT,
-    )
+    pdf.cell(0, row_h, _pdf_text(font_name, value), 0, 1, "L")
     pdf.set_text_color(0, 0, 0)
 
 
@@ -304,11 +295,7 @@ def generate_quote_pdf(
             f"${amount:,.2f}",
         ]
         for w, val in zip(COL, row_data):
-            pdf.cell(
-                w, 7, _pdf_text(font_name, val),
-                border=0, align="C" if w <= 35 else "L", fill=True,
-                new_x=XPos.RIGHT, new_y=YPos.TOP,
-            )
+            pdf.cell(w, 7, _pdf_text(font_name, val), 0, 0, "C" if w <= 35 else "L", fill=True)
         pdf.ln()
         fill = not fill
 
