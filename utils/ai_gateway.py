@@ -22,7 +22,12 @@ Usage:
 """
 from __future__ import annotations
 
+import hashlib
+import ipaddress
+import re
+import socket
 from typing import Generator
+from urllib.parse import urlsplit, urlunsplit
 
 try:
     from openai import OpenAI
@@ -37,6 +42,102 @@ from utils.secrets import get_secret
 logger = get_logger("ai_gateway")
 
 # ---------------------------------------------------------------------------
+# Custom provider security helpers
+# ---------------------------------------------------------------------------
+_CUSTOM_PROVIDER_GENERIC_ERROR = "⚠️ 自定义模型调用失败，请检查 Provider 配置后重试"
+_BLOCKED_HOSTNAMES = {"localhost", "localhost.localdomain"}
+_SENSITIVE_QUERY_PATTERNS = re.compile(
+    r"(?i)(api[_-]?key|token|secret|password|authorization)=([^&\s]+)"
+)
+
+
+def _redact(value: object, secrets: list[str] | None = None) -> str:
+    """Return a log-safe string with obvious credentials and supplied secrets hidden."""
+    text = str(value)
+    for secret in secrets or []:
+        if secret:
+            text = text.replace(secret, "[REDACTED]")
+    text = _SENSITIVE_QUERY_PATTERNS.sub(r"\1=[REDACTED]", text)
+    text = re.sub(r"(?i)(bearer\s+)[A-Za-z0-9._\-]+", r"\1[REDACTED]", text)
+    return text
+
+
+def _is_blocked_ip(ip_text: str) -> bool:
+    """Return True when an IP is not safe for user-configured outbound requests."""
+    try:
+        ip = ipaddress.ip_address(ip_text)
+    except ValueError:
+        return True
+    return any([
+        ip.is_private,
+        ip.is_loopback,
+        ip.is_link_local,
+        ip.is_multicast,
+        ip.is_reserved,
+        ip.is_unspecified,
+    ])
+
+
+def _resolve_host_ips(hostname: str) -> set[str]:
+    """Resolve a hostname to IP strings. Separated for tests and clearer SSRF checks."""
+    results = socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)
+    return {item[4][0] for item in results}
+
+
+def _validate_custom_provider_base_url(raw_url: str) -> tuple[bool, str, str]:
+    """
+    Validate and normalize a custom provider base URL.
+
+    Returns (ok, normalized_url, reason). The URL must be HTTPS, must not contain
+    credentials/query/fragment components, and must resolve only to public IPs.
+    """
+    if not raw_url:
+        return False, "", "empty URL"
+
+    parsed = urlsplit(raw_url.strip())
+    if parsed.scheme.lower() != "https":
+        return False, "", "custom provider base_url must use https"
+    if parsed.username or parsed.password:
+        return False, "", "custom provider base_url must not contain credentials"
+    if parsed.query or parsed.fragment:
+        return False, "", "custom provider base_url must not contain query or fragment"
+    if not parsed.hostname:
+        return False, "", "custom provider base_url must include a hostname"
+
+    hostname = parsed.hostname.rstrip(".").lower()
+    if hostname in _BLOCKED_HOSTNAMES or hostname.endswith(".localhost"):
+        return False, "", "custom provider hostname is not allowed"
+
+    try:
+        # If the host is already an IP literal, validate it directly.
+        ipaddress.ip_address(hostname)
+        resolved_ips = {hostname}
+    except ValueError:
+        try:
+            resolved_ips = _resolve_host_ips(hostname)
+        except OSError as exc:
+            return False, "", f"custom provider hostname could not be resolved: {type(exc).__name__}"
+
+    if not resolved_ips:
+        return False, "", "custom provider hostname did not resolve"
+    if any(_is_blocked_ip(ip) for ip in resolved_ips):
+        return False, "", "custom provider hostname resolves to a blocked network"
+
+    netloc = hostname
+    if parsed.port:
+        netloc = f"{hostname}:{parsed.port}"
+    path = parsed.path.rstrip("/")
+    normalized = urlunsplit(("https", netloc, path, "", ""))
+    return True, normalized, ""
+
+
+def _custom_client_cache_key(base_url: str, api_key: str) -> str:
+    """Build a cache key without storing the raw API key in memory."""
+    key_digest = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+    return f"{base_url}|sha256:{key_digest}"
+
+
+# ---------------------------------------------------------------------------
 # Custom provider helpers
 # ---------------------------------------------------------------------------
 
@@ -44,8 +145,8 @@ def _get_custom_provider_config() -> dict | None:
     """
     Read user-configured custom provider from session prefs.
 
-    Returns a provider-config-style dict if the custom provider is enabled
-    and has a non-empty base_url + api_key, otherwise None.
+    Returns a provider-config-style dict if the custom provider is enabled,
+    has a non-empty base_url + api_key + model, and passes SSRF protections.
     """
     try:
         from utils.user_prefs import get_prefs
@@ -56,19 +157,24 @@ def _get_custom_provider_config() -> dict | None:
     if prefs.get("custom_provider_enabled", "false").lower() != "true":
         return None
 
-    base_url = prefs.get("custom_provider_base_url", "").strip().rstrip("/")
-    api_key  = prefs.get("custom_provider_api_key", "").strip()
+    raw_base_url = prefs.get("custom_provider_base_url", "").strip().rstrip("/")
+    api_key = prefs.get("custom_provider_api_key", "").strip()
     model_id = prefs.get("custom_provider_model", "").strip()
-    name     = prefs.get("custom_provider_name", "custom").strip() or "custom"
+    name = prefs.get("custom_provider_name", "custom").strip() or "custom"
 
-    if not base_url or not api_key or not model_id:
+    if not raw_base_url or not api_key or not model_id:
+        return None
+
+    ok, base_url, reason = _validate_custom_provider_base_url(raw_base_url)
+    if not ok:
+        logger.warning("Rejected custom provider config: %s", _redact(reason, [api_key]))
         return None
 
     return {
         "base_url": base_url,
-        "api_key":  api_key,
+        "api_key": api_key,
         "model_id": model_id,
-        "name":     name,
+        "name": name,
     }
 
 
@@ -96,7 +202,7 @@ class AIGateway:
         self._clients: dict[str, OpenAI | None] = {}
         # Custom client is ephemeral — re-created when prefs change
         self._custom_client: OpenAI | None = None
-        self._custom_client_key: str = ""  # tracks which api_key+url the client was built for
+        self._custom_client_key: str = ""  # tracks base_url + api_key digest
 
     # ── Client builders ───────────────────────────────
 
@@ -126,7 +232,7 @@ class AIGateway:
         if not cfg:
             return None, ""
 
-        cache_key = f"{cfg['base_url']}|{cfg['api_key']}"
+        cache_key = _custom_client_cache_key(cfg["base_url"], cfg["api_key"])
         if self._custom_client is None or self._custom_client_key != cache_key:
             self._custom_client = OpenAI(api_key=cfg["api_key"], base_url=cfg["base_url"])
             self._custom_client_key = cache_key
@@ -201,9 +307,9 @@ class AIGateway:
                 resp = custom_client.chat.completions.create(**kwargs)
                 return resp.choices[0].message.content or ""
             except Exception as e:
-                logger.error("Custom provider call failed (%s): %s", custom_model_id, e)
+                logger.error("Custom provider call failed (%s): %s", custom_model_id, _redact(e))
                 if not fallback:
-                    return f"⚠️ 自定义模型调用失败: {e}"
+                    return _CUSTOM_PROVIDER_GENERIC_ERROR
                 logger.info("Falling back to built-in providers after custom provider failure")
                 # Fall through to built-in providers below
 
@@ -227,10 +333,10 @@ class AIGateway:
             self._track_usage(provider_name, model_id, resp)
             return result
         except Exception as e:
-            logger.error("AI generation failed (%s/%s): %s", provider_name, model_id, e)
+            logger.error("AI generation failed (%s/%s): %s", provider_name, model_id, _redact(e))
             if fallback:
                 return self._fallback_generate(prompt, system_prompt, temperature, max_tokens, exclude=provider_name)
-            return f"⚠️ AI 调用失败: {e}"
+            return "⚠️ AI 调用失败，请稍后重试"
 
     def stream(
         self,
@@ -265,8 +371,8 @@ class AIGateway:
                         yield delta
                 return
             except Exception as e:
-                logger.error("Custom provider stream failed (%s): %s", custom_model_id, e)
-                yield f"⚠️ 自定义模型调用失败: {e}"
+                logger.error("Custom provider stream failed (%s): %s", custom_model_id, _redact(e))
+                yield _CUSTOM_PROVIDER_GENERIC_ERROR
                 return
 
         # ── Priority 2 & 3: explicit override or tier strategy ──
@@ -289,8 +395,8 @@ class AIGateway:
                 if delta:
                     yield delta
         except Exception as e:
-            logger.error("AI stream failed (%s/%s): %s", provider_name, model_id, e)
-            yield f"⚠️ AI 调用失败: {e}"
+            logger.error("AI stream failed (%s/%s): %s", provider_name, model_id, _redact(e))
+            yield "⚠️ AI 调用失败，请稍后重试"
 
     # ── Internal helpers ──────────────────────────────
 
@@ -352,7 +458,7 @@ class AIGateway:
                 self._track_usage(provider_name, model_id, resp)
                 return resp.choices[0].message.content or ""
             except Exception as e:
-                logger.warning("Fallback %s also failed: %s", provider_name, e)
+                logger.warning("Fallback %s also failed: %s", provider_name, _redact(e))
                 continue
         return "⚠️ 所有 AI 服务暂时不可用，请稍后重试"
 
