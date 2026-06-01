@@ -141,13 +141,13 @@ class TestPayment:
         self._setup()
         with patch.object(utils.payment, "verify_checkout_session", return_value=(True, {"username": "testuser", "target_tier": "pro"})), \
              patch.object(utils.payment, "upgrade_user_tier", return_value=True) as mock_upgrade, \
-             patch.object(utils.payment, "load_user_json", return_value=[]), \
-             patch.object(utils.payment, "save_user_json") as mock_save:
+             patch.object(utils.payment, "load_consumed_sessions", return_value=[]), \
+             patch.object(utils.payment, "save_consumed_sessions") as mock_save:
             success, msg = complete_upgrade("testuser", "cs_test_123")
             assert success is True
             assert "pro" in msg.lower() or "Pro" in msg
             mock_upgrade.assert_called_once_with("testuser", "pro")
-            mock_save.assert_called_once_with("testuser", "consumed_sessions.json", ["cs_test_123"])
+            mock_save.assert_called_once_with("testuser", ["cs_test_123"])
 
     def test_complete_upgrade_username_mismatch(self):
         """complete_upgrade fails if metadata username doesn't match."""
