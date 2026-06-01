@@ -7,8 +7,8 @@ Wraps stripe in try/except since it may not be installed locally.
 from __future__ import annotations
 
 from utils.pricing import upgrade_user_tier
+from utils.repositories import load_consumed_sessions, save_consumed_sessions
 from utils.secrets import get_secret
-from utils.storage import load_user_json, save_user_json
 
 try:
     import stripe
@@ -119,7 +119,7 @@ def complete_upgrade(username: str, session_id: str) -> tuple[bool, str]:
         return (False, "No target tier in session metadata")
 
     # Check if session was already consumed (prevent replay)
-    consumed = load_user_json(username, "consumed_sessions.json", default=[])
+    consumed = load_consumed_sessions(username)
     if session_id in consumed:
         return (False, "Session already consumed")
 
@@ -127,6 +127,6 @@ def complete_upgrade(username: str, session_id: str) -> tuple[bool, str]:
     if success:
         # Mark session as consumed
         consumed.append(session_id)
-        save_user_json(username, "consumed_sessions.json", consumed)
+        save_consumed_sessions(username, consumed)
         return (True, f"Upgraded to {target_tier}")
     return (False, "Upgrade failed")
