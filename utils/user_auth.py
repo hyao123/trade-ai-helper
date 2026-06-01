@@ -18,7 +18,13 @@ from pathlib import Path
 import streamlit as st
 
 from utils.logger import get_logger
-from utils.storage import get_data_dir, load_json, save_json
+from utils.repositories import (
+    load_login_failures,
+    load_users,
+    save_login_failures,
+    save_users,
+)
+from utils.storage import get_data_dir
 
 logger = get_logger("user_auth")
 
@@ -27,11 +33,10 @@ _PASSWORD_MIN_LENGTH = 8
 _LOGIN_FAILURE_LIMIT = 5
 _LOGIN_FAILURE_WINDOW_SECONDS = 15 * 60
 _USERS_DB_FILENAME = "users_db.json"
-_LOGIN_FAILURES_FILENAME = "login_failures.json"
 
 
 def _get_users_db_path() -> Path:
-    """Return path to the users database JSON file."""
+    """Return path to the users database JSON file for legacy callers/tests."""
     return get_data_dir() / _USERS_DB_FILENAME
 
 
@@ -79,12 +84,12 @@ def _is_strong_password(password: str) -> bool:
 
 def _load_login_failures() -> dict:
     """Load login failure counters keyed by normalized username."""
-    return load_json(_LOGIN_FAILURES_FILENAME, default={})
+    return load_login_failures()
 
 
 def _save_login_failures(failures: dict) -> None:
     """Persist login failure counters."""
-    save_json(_LOGIN_FAILURES_FILENAME, failures)
+    save_login_failures(failures)
 
 
 def _active_failures(username: str, now: float | None = None) -> list[float]:
@@ -129,13 +134,13 @@ def _clear_login_failures(username: str) -> None:
 
 
 def _load_users_db() -> dict:
-    """Load users database from disk."""
-    return load_json(_USERS_DB_FILENAME, default={})
+    """Load users database from the active database backend."""
+    return load_users()
 
 
 def _save_users_db(users: dict) -> None:
-    """Save users database to disk."""
-    save_json(_USERS_DB_FILENAME, users)
+    """Save users database through the active database backend."""
+    save_users(users)
 
 
 def register_user(username: str, password: str, email: str = "") -> tuple[bool, str]:
@@ -360,7 +365,7 @@ def resend_verification_email(username: str) -> tuple[bool, str]:
 
 def find_user_by_email(email: str) -> str | None:
     """
-    Scan users_db.json for a user with matching email field (case-insensitive).
+    Scan users from the active database backend for a matching email field.
 
     Returns username (str) or None if not found.
     """
