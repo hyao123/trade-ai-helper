@@ -161,7 +161,7 @@ def get_user_id() -> str:
 def check_auth() -> None:
     """
     Multi-user authentication with login/register tabs.
-    - APP_PASSWORD not set: pass through
+    - Auth required by default; set AUTH_REQUIRED=false to bypass.
     - Already authenticated: pass through
     - Not authenticated: show login/register UI and st.stop()
     - APP_PASSWORD as admin fallback: if login password matches APP_PASSWORD,
@@ -243,21 +243,17 @@ def check_auth() -> None:
                 else:
                     success, msg = register_user(reg_username, reg_password, reg_email)
                     if success:
-                        st.success(f"✅ {t('registration_successful')}")
-                        # Apply referral code if provided
+                        # Apply referral code if provided before leaving auth UI.
                         if reg_referral and reg_referral.strip():
                             try:
                                 from utils.referral import apply_referral
-                                ref_ok, ref_msg = apply_referral(
+                                apply_referral(
                                     reg_referral.strip(),
                                     reg_username.strip().lower(),
                                 )
-                                if ref_ok:
-                                    st.success(f"🎁 {ref_msg}")
-                                else:
-                                    st.caption(f"邀请码未生效: {ref_msg}")
-                            except Exception as e:
-                                st.caption(f"邀请码处理失败: {e}")
+                            except Exception:
+                                pass
+                        st.rerun()
                     else:
                         st.error(f"❌ {msg}")
 
