@@ -3,28 +3,36 @@ utils/db.py
 -----------
 Database abstraction layer supporting multiple backends.
 Provides a unified interface that can be switched between:
-  - JSON file storage (default, for development / Streamlit Cloud)
-  - PostgreSQL (for production / commercial deployment)
+  - JSON file storage (default, for local development)
+  - SQLite (simple persistent demo/single-instance deployment)
+  - PostgreSQL (production / commercial deployment)
 
-Backend is selected by the DATABASE_URL environment variable:
+Backend is selected by configuration:
+  - DATABASE_URL=postgres...: uses PostgreSQL backend
+  - DATABASE_URL=sqlite:///path/to/app.sqlite3: uses SQLite backend
+  - SQLITE_DB_PATH=/path/to/app.sqlite3: uses SQLite backend
   - Not set or empty: uses JSON file backend
-  - postgresql://...: uses PostgreSQL backend
 
 Usage:
     from utils.db import get_db
 
     db = get_db()
-    db.save_user(username, data)
+    db.save_all_users(users)
     user = db.get_user(username)
-    db.save_customers(username, customers_list)
+    db.save_user_data(username, "history.json", history)
 """
 from __future__ import annotations
 
 import abc
+import json
+import sqlite3
+from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlparse
 
 from utils.logger import get_logger
 from utils.secrets import get_secret
+from utils.storage import get_data_dir
 
 logger = get_logger("db")
 
@@ -75,7 +83,7 @@ class JSONBackend(DatabaseBackend):
     """
     JSON file-based storage backend.
     Delegates to the existing utils/storage.py functions.
-    This is the default backend for development and Streamlit Cloud.
+    This is the default backend for development.
     """
 
     def get_all_users(self) -> dict:
@@ -105,6 +113,135 @@ class JSONBackend(DatabaseBackend):
     def save_global_data(self, collection: str, data: Any) -> None:
         from utils.storage import save_json
         save_json(collection, data)
+
+
+def _json_loads(value: str | bytes | None, default: Any = None) -> Any:
+    if value is None:
+        return default if default is not None else []
+    try:
+        return json.loads(value)
+    except (TypeError, json.JSONDecodeError):
+        return default if default is not None else []
+
+
+def _json_dumps(data: Any) -> str:
+    return json.dumps(data, ensure_ascii=False)
+
+
+class SQLiteBackend(DatabaseBackend):
+    """
+    SQLite storage backend for single-instance demos and lightweight deployments.
+
+    Data uses the same logical shape as PostgreSQLBackend:
+      - users_db(username, data)
+      - user_data(username, collection, data)
+      - global_data(collection, data)
+    """
+
+    def __init__(self, db_path: str | Path):
+        self._path = Path(db_path).expanduser()
+        if not self._path.is_absolute():
+            self._path = get_data_dir() / self._path
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._ensure_tables()
+
+    def _get_conn(self):
+        conn = sqlite3.connect(self._path, timeout=30)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA foreign_keys=ON")
+        return conn
+
+    def _ensure_tables(self) -> None:
+        with self._get_conn() as conn:
+            conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS users_db (
+                    username TEXT PRIMARY KEY,
+                    data TEXT NOT NULL DEFAULT '{}',
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE IF NOT EXISTS user_data (
+                    username TEXT NOT NULL,
+                    collection TEXT NOT NULL,
+                    data TEXT NOT NULL DEFAULT '[]',
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (username, collection)
+                );
+                CREATE TABLE IF NOT EXISTS global_data (
+                    collection TEXT PRIMARY KEY,
+                    data TEXT NOT NULL DEFAULT '[]',
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                """
+            )
+        logger.info("SQLite tables ensured at %s", self._path)
+
+    def get_all_users(self) -> dict:
+        with self._get_conn() as conn:
+            rows = conn.execute("SELECT username, data FROM users_db").fetchall()
+        return {row["username"]: _json_loads(row["data"], default={}) for row in rows}
+
+    def save_all_users(self, users: dict) -> None:
+        with self._get_conn() as conn:
+            for username, data in users.items():
+                conn.execute(
+                    """
+                    INSERT INTO users_db (username, data, updated_at)
+                    VALUES (?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(username)
+                    DO UPDATE SET data = excluded.data, updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (username, _json_dumps(data)),
+                )
+
+    def get_user(self, username: str) -> dict | None:
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT data FROM users_db WHERE username = ?",
+                (username,),
+            ).fetchone()
+        return _json_loads(row["data"], default={}) if row else None
+
+    def load_user_data(self, username: str, collection: str, default: Any = None) -> Any:
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT data FROM user_data WHERE username = ? AND collection = ?",
+                (username, collection),
+            ).fetchone()
+        return _json_loads(row["data"], default=default) if row else (default if default is not None else [])
+
+    def save_user_data(self, username: str, collection: str, data: Any) -> None:
+        with self._get_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO user_data (username, collection, data, updated_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(username, collection)
+                DO UPDATE SET data = excluded.data, updated_at = CURRENT_TIMESTAMP
+                """,
+                (username, collection, _json_dumps(data)),
+            )
+
+    def load_global_data(self, collection: str, default: Any = None) -> Any:
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT data FROM global_data WHERE collection = ?",
+                (collection,),
+            ).fetchone()
+        return _json_loads(row["data"], default=default) if row else (default if default is not None else [])
+
+    def save_global_data(self, collection: str, data: Any) -> None:
+        with self._get_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO global_data (collection, data, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(collection)
+                DO UPDATE SET data = excluded.data, updated_at = CURRENT_TIMESTAMP
+                """,
+                (collection, _json_dumps(data)),
+            )
 
 
 class PostgreSQLBackend(DatabaseBackend):
@@ -167,7 +304,6 @@ class PostgreSQLBackend(DatabaseBackend):
         return {row[0]: row[1] for row in rows}
 
     def save_all_users(self, users: dict) -> None:
-        import json
         conn = self._get_conn()
         with conn.cursor() as cur:
             # Upsert all users
@@ -201,7 +337,6 @@ class PostgreSQLBackend(DatabaseBackend):
         return row[0] if row else (default if default is not None else [])
 
     def save_user_data(self, username: str, collection: str, data: Any) -> None:
-        import json
         conn = self._get_conn()
         with conn.cursor() as cur:
             cur.execute("""
@@ -222,7 +357,6 @@ class PostgreSQLBackend(DatabaseBackend):
         return row[0] if row else (default if default is not None else [])
 
     def save_global_data(self, collection: str, data: Any) -> None:
-        import json
         conn = self._get_conn()
         with conn.cursor() as cur:
             cur.execute("""
@@ -241,24 +375,54 @@ class PostgreSQLBackend(DatabaseBackend):
 _db_instance: DatabaseBackend | None = None
 
 
+def _sqlite_path_from_database_url(database_url: str) -> str:
+    parsed = urlparse(database_url)
+    if parsed.scheme != "sqlite":
+        raise ValueError("Not a sqlite URL")
+    if parsed.netloc and parsed.netloc not in ("", "localhost"):
+        # sqlite:///relative.db or sqlite:////absolute.db are supported.
+        # Remote sqlite hosts are not meaningful here.
+        raise ValueError("SQLite DATABASE_URL must not include a remote host")
+    path = unquote(parsed.path or "")
+    if path.startswith("/") and not database_url.startswith("sqlite:////"):
+        path = path.lstrip("/")
+    return path or "trade_ai_helper.sqlite3"
+
+
 def get_db() -> DatabaseBackend:
     """
     Get the database backend singleton.
 
     Returns JSONBackend by default.
-    Returns PostgreSQLBackend if DATABASE_URL is configured.
+    Returns SQLiteBackend if SQLITE_DB_PATH or sqlite DATABASE_URL is configured.
+    Returns PostgreSQLBackend if DATABASE_URL starts with postgres.
     """
     global _db_instance
     if _db_instance is not None:
         return _db_instance
 
     database_url = get_secret("DATABASE_URL")
+    sqlite_path = get_secret("SQLITE_DB_PATH")
     if database_url and database_url.startswith("postgres"):
         try:
             _db_instance = PostgreSQLBackend(database_url)
             logger.info("Using PostgreSQL backend")
         except Exception as e:
             logger.warning("PostgreSQL init failed, falling back to JSON: %s", e)
+            _db_instance = JSONBackend()
+    elif database_url and database_url.startswith("sqlite:"):
+        try:
+            _db_instance = SQLiteBackend(_sqlite_path_from_database_url(database_url))
+            logger.info("Using SQLite backend from DATABASE_URL")
+        except Exception as e:
+            logger.warning("SQLite init failed, falling back to JSON: %s", e)
+            _db_instance = JSONBackend()
+    elif sqlite_path:
+        try:
+            _db_instance = SQLiteBackend(sqlite_path)
+            logger.info("Using SQLite backend from SQLITE_DB_PATH")
+        except Exception as e:
+            logger.warning("SQLite init failed, falling back to JSON: %s", e)
             _db_instance = JSONBackend()
     else:
         _db_instance = JSONBackend()

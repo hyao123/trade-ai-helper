@@ -50,6 +50,12 @@ APP_PASSWORD = "your-admin-password"
 # Set only for local/demo deployments that should bypass login and registration.
 # AUTH_REQUIRED = "false"
 
+# Simple single-instance demo persistence. Uses Python's built-in sqlite3 module.
+SQLITE_DB_PATH = "trade_ai_helper.sqlite3"
+
+# Production/commercial persistence option.
+# DATABASE_URL = "your-postgres-database-url"
+
 OPENAI_API_KEY = "sk-xxx"
 DEEPSEEK_API_KEY = "sk-xxx"
 STRIPE_SECRET_KEY = "sk_live_xxx"
@@ -71,9 +77,19 @@ By default, deployed users can self-register from the authentication screen:
 2. Choose the registration tab.
 3. Enter username, optional email, password, and optional referral code.
 4. Submit the form to create a Free account.
-5. Log in with the new username and password.
+5. The app signs the user in and lands on the home page.
 
 `APP_PASSWORD` is not required for user registration. When set, it only acts as an admin fallback password for the `admin` login. To intentionally run the app without any login gate, set `AUTH_REQUIRED = "false"` in Streamlit secrets or environment variables.
+
+## User data persistence
+
+Logged-in user history is saved per account. AI generation history is stored in the configured `DatabaseBackend`:
+
+- With `SQLITE_DB_PATH` or a SQLite `DATABASE_URL`: users, usage, payment state, and per-user history are saved in a single SQLite file. This is the recommended first step for a lightweight demo or single-instance deployment.
+- With a PostgreSQL `DATABASE_URL`: per-user data is saved in PostgreSQL and is better suited for commercial or multi-instance deployment.
+- Without either setting: per-user data falls back to JSON files under the app's local `data/` directory. This is fine for local development, but hosted ephemeral file systems may lose data on restart or redeploy.
+
+For a public demo, start with SQLite. For production with multiple app instances or strict durability requirements, move to PostgreSQL.
 
 ## Railway / Render
 
@@ -104,11 +120,13 @@ After deploying to Streamlit Cloud, verify:
 
 1. The app loads at `https://trade-ai-helper.streamlit.app`.
 2. Login and self-service registration are visible before authentication.
-3. A new user can register and then log in as a Free account.
-4. Navigation between pages works without full-page errors.
-5. AI generation works with `NVIDIA_API_KEY` or another configured provider.
-6. File upload/download flows work for PDF and CSV features.
-7. Stripe upgrade flows use the correct `APP_BASE_URL`.
+3. A new user can register and land on the app home page.
+4. The user can generate AI content and see it in history.
+5. The same user can log out, log back in, and still see account history.
+6. Navigation between pages works without full-page errors.
+7. AI generation works with `NVIDIA_API_KEY` or another configured provider.
+8. File upload/download flows work for PDF and CSV features.
+9. Stripe upgrade flows use the correct `APP_BASE_URL`.
 
 ## Security notes
 
