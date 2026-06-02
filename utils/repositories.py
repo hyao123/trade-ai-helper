@@ -1,8 +1,8 @@
 """Repository helpers built on top of the configured DatabaseBackend.
 
-This module is the narrow data-access seam for account, pricing, and payment
-state. The default backend remains JSON via ``utils.db.JSONBackend``, but callers
-no longer reach into ``utils.storage`` directly.
+This module is the narrow data-access seam for account, pricing, payment, and
+history state. The default backend remains JSON via ``utils.db.JSONBackend``, but
+callers no longer reach into ``utils.storage`` directly for core per-user data.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ USERS_COLLECTION = "users_db.json"
 LOGIN_FAILURES_COLLECTION = "login_failures.json"
 USAGE_COLLECTION = "usage.json"
 CONSUMED_SESSIONS_COLLECTION = "consumed_sessions.json"
+HISTORY_COLLECTION = "history.json"
 
 
 # ---------------------------------------------------------------------------
@@ -79,3 +80,28 @@ def load_consumed_sessions(username: str) -> list[str]:
 def save_consumed_sessions(username: str, sessions: list[str]) -> None:
     """Persist consumed Stripe checkout session IDs for a user."""
     get_db().save_user_data(username, CONSUMED_SESSIONS_COLLECTION, sessions)
+
+
+# ---------------------------------------------------------------------------
+# Per-user generation history
+# ---------------------------------------------------------------------------
+def load_user_history(username: str) -> list[dict]:
+    """Return persisted generation history for a user."""
+    data: Any = get_db().load_user_data(username, HISTORY_COLLECTION, default=[])
+    return data if isinstance(data, list) else []
+
+
+def save_user_history(username: str, history: list[dict]) -> None:
+    """Persist generation history for a user."""
+    get_db().save_user_data(username, HISTORY_COLLECTION, history)
+
+
+def load_shared_history() -> list[dict]:
+    """Return shared/admin generation history."""
+    data: Any = get_db().load_global_data(HISTORY_COLLECTION, default=[])
+    return data if isinstance(data, list) else []
+
+
+def save_shared_history(history: list[dict]) -> None:
+    """Persist shared/admin generation history."""
+    get_db().save_global_data(HISTORY_COLLECTION, history)
