@@ -50,6 +50,10 @@ APP_PASSWORD = "your-admin-password"
 # Set only for local/demo deployments that should bypass login and registration.
 # AUTH_REQUIRED = "false"
 
+# Recommended for production/commercial deployments so users, usage, history,
+# payment state, and other per-user data survive app restarts and redeploys.
+# DATABASE_URL = "your-postgres-database-url"
+
 OPENAI_API_KEY = "sk-xxx"
 DEEPSEEK_API_KEY = "sk-xxx"
 STRIPE_SECRET_KEY = "sk_live_xxx"
@@ -71,9 +75,18 @@ By default, deployed users can self-register from the authentication screen:
 2. Choose the registration tab.
 3. Enter username, optional email, password, and optional referral code.
 4. Submit the form to create a Free account.
-5. Log in with the new username and password.
+5. The app signs the user in and lands on the home page.
 
 `APP_PASSWORD` is not required for user registration. When set, it only acts as an admin fallback password for the `admin` login. To intentionally run the app without any login gate, set `AUTH_REQUIRED = "false"` in Streamlit secrets or environment variables.
+
+## User data persistence
+
+Logged-in user history is saved per account. AI generation history is stored in the configured `DatabaseBackend`:
+
+- With `DATABASE_URL`: per-user history is saved in PostgreSQL and survives app restarts/redeploys.
+- Without `DATABASE_URL`: per-user history is saved under the app's local `data/users/{username}/history.json` path. This works for local/dev usage, but hosted ephemeral file systems may lose data on restart or redeploy.
+
+For any public demo where users expect their history to remain available later, configure a persistent PostgreSQL `DATABASE_URL`.
 
 ## Railway / Render
 
@@ -104,11 +117,13 @@ After deploying to Streamlit Cloud, verify:
 
 1. The app loads at `https://trade-ai-helper.streamlit.app`.
 2. Login and self-service registration are visible before authentication.
-3. A new user can register and then log in as a Free account.
-4. Navigation between pages works without full-page errors.
-5. AI generation works with `NVIDIA_API_KEY` or another configured provider.
-6. File upload/download flows work for PDF and CSV features.
-7. Stripe upgrade flows use the correct `APP_BASE_URL`.
+3. A new user can register and land on the app home page.
+4. The user can generate AI content and see it in history.
+5. The same user can log out, log back in, and still see account history.
+6. Navigation between pages works without full-page errors.
+7. AI generation works with `NVIDIA_API_KEY` or another configured provider.
+8. File upload/download flows work for PDF and CSV features.
+9. Stripe upgrade flows use the correct `APP_BASE_URL`.
 
 ## Security notes
 
