@@ -94,11 +94,11 @@ def show_sidebar_info() -> None:
             # Persist to user profile if logged in
             current_user = get_current_user()
             if current_user and current_user.get("username") not in (None, "admin"):
-                from utils.storage import load_json, save_json
-                users_db = load_json("users_db.json", default={})
+                from utils.repositories import load_users, save_users
+                users_db = load_users()
                 if current_user["username"] in users_db:
                     users_db[current_user["username"]]["language"] = new_lang
-                    save_json("users_db.json", users_db)
+                    save_users(users_db)
             st.rerun()
 
         # Show user info and logout button
@@ -214,6 +214,8 @@ def check_auth() -> None:
                         saved_lang = user_info.get("language")
                         if saved_lang:
                             st.session_state["language"] = saved_lang
+                        from utils.history import migrate_session_history_to_user
+                        migrate_session_history_to_user(user_info["username"])
                         st.rerun()
                     else:
                         st.error(f"❌ {t('invalid_credentials')}")
@@ -253,6 +255,8 @@ def check_auth() -> None:
                                 )
                             except Exception:
                                 pass
+                        from utils.history import migrate_session_history_to_user
+                        migrate_session_history_to_user(reg_username.strip().lower())
                         st.rerun()
                     else:
                         st.error(f"❌ {msg}")
