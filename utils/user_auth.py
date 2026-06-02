@@ -143,6 +143,18 @@ def _save_users_db(users: dict) -> None:
     save_users(users)
 
 
+def _build_public_user_info(user: dict) -> dict:
+    """Return session-safe user info without password or token fields."""
+    return {
+        "username": user["username"],
+        "email": user.get("email", ""),
+        "tier": user.get("tier", "free"),
+        "created_at": user.get("created_at", ""),
+        "email_verified": user.get("email_verified", False),
+        "language": user.get("language", ""),
+    }
+
+
 def register_user(username: str, password: str, email: str = "") -> tuple[bool, str]:
     """
     Register a new user.
@@ -190,7 +202,15 @@ def register_user(username: str, password: str, email: str = "") -> tuple[bool, 
         if is_email_configured():
             send_verification_email(email.strip(), verification_token)
 
-    logger.info("User registered: %s", username)
+    # Registering through the Streamlit UI should land the user on the app home,
+    # not leave them on the auth screen. This is safe because the account was
+    # just created with the submitted password in the current session.
+    st.session_state.authenticated = True
+    st.session_state["current_user"] = _build_public_user_info(users[username])
+    if users[username].get("language"):
+        st.session_state["language"] = users[username]["language"]
+
+    logger.info("User registered and authenticated: %s", username)
     return True, "Registration successful"
 
 
@@ -217,15 +237,7 @@ def authenticate_user(username: str, password: str) -> tuple[bool, dict | None]:
     user = users[username]
     if _verify_password(password, user["password_hash"]):
         _clear_login_failures(username)
-        # Return user info without password hash
-        user_info = {
-            "username": user["username"],
-            "email": user.get("email", ""),
-            "tier": user.get("tier", "free"),
-            "created_at": user.get("created_at", ""),
-            "email_verified": user.get("email_verified", False),
-            "language": user.get("language", ""),
-        }
+        user_info = _build_public_user_info(user)
         logger.info("User authenticated: %s", username)
         return True, user_info
 
