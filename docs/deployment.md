@@ -39,10 +39,17 @@ Required secret:
 NVIDIA_API_KEY = "nvapi-xxx"
 ```
 
+Authentication is required by default in public deployments. Users will see login and registration tabs and can create their own Free accounts without an admin-created account.
+
 Common optional secrets:
 
 ```toml
-APP_PASSWORD = "your-password"
+# Optional admin fallback password. Users can still self-register without this.
+APP_PASSWORD = "your-admin-password"
+
+# Set only for local/demo deployments that should bypass login and registration.
+# AUTH_REQUIRED = "false"
+
 OPENAI_API_KEY = "sk-xxx"
 DEEPSEEK_API_KEY = "sk-xxx"
 STRIPE_SECRET_KEY = "sk_live_xxx"
@@ -55,6 +62,18 @@ SMTP_USER = "user@example.com"
 SMTP_PASSWORD = "smtp-password"
 SMTP_FROM_EMAIL = "noreply@example.com"
 ```
+
+## Self-service registration
+
+By default, deployed users can self-register from the authentication screen:
+
+1. Open the app URL.
+2. Choose the registration tab.
+3. Enter username, optional email, password, and optional referral code.
+4. Submit the form to create a Free account.
+5. Log in with the new username and password.
+
+`APP_PASSWORD` is not required for user registration. When set, it only acts as an admin fallback password for the `admin` login. To intentionally run the app without any login gate, set `AUTH_REQUIRED = "false"` in Streamlit secrets or environment variables.
 
 ## Railway / Render
 
@@ -84,11 +103,12 @@ A successful Vercel deployment only confirms that the redirect layer is live. It
 After deploying to Streamlit Cloud, verify:
 
 1. The app loads at `https://trade-ai-helper.streamlit.app`.
-2. Navigation between pages works without full-page errors.
-3. AI generation works with `NVIDIA_API_KEY` or another configured provider.
-4. Login/session behavior works if `APP_PASSWORD` or multi-user auth is enabled.
-5. File upload/download flows work for PDF and CSV features.
-6. Stripe upgrade flows use the correct `APP_BASE_URL`.
+2. Login and self-service registration are visible before authentication.
+3. A new user can register and then log in as a Free account.
+4. Navigation between pages works without full-page errors.
+5. AI generation works with `NVIDIA_API_KEY` or another configured provider.
+6. File upload/download flows work for PDF and CSV features.
+7. Stripe upgrade flows use the correct `APP_BASE_URL`.
 
 ## Security notes
 
