@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from utils.storage import load_json, load_user_json, save_json, save_user_json
+from utils.repositories import get_user, load_usage, load_users, save_usage, save_users
 
 # ---------------------------------------------------------------------------
 # Tier Configuration
@@ -41,9 +41,8 @@ _USERS_DB_FILENAME = "users_db.json"
 # Tier lookup
 # ---------------------------------------------------------------------------
 def get_user_tier(username: str) -> str:
-    """Read the user's tier from users_db.json. Defaults to 'free'."""
-    users = load_json(_USERS_DB_FILENAME, default={})
-    user = users.get(username)
+    """Read the user's tier through the active repository backend."""
+    user = get_user(username)
     if user:
         return user.get("tier", "free")
     return "free"
@@ -53,11 +52,8 @@ def get_user_tier(username: str) -> str:
 # Daily usage tracking
 # ---------------------------------------------------------------------------
 def get_daily_usage(username: str) -> int:
-    """
-    Load usage.json from user's directory, return today's count.
-    Resets to 0 if the stored date differs from today.
-    """
-    usage = load_user_json(username, _USAGE_FILENAME, default={})
+    """Return today's AI generation count for the user."""
+    usage = load_usage(username)
     today_str = date.today().isoformat()
     if usage.get("date") != today_str:
         return 0
@@ -65,37 +61,25 @@ def get_daily_usage(username: str) -> int:
 
 
 def increment_usage(username: str) -> tuple[bool, str]:
-    """
-    Increment daily usage count for the user.
-
-    Returns:
-        (True, '') if increment succeeded (within limit).
-        (False, error_message) if daily limit exceeded.
-    """
+    """Increment daily usage count for the user if within their tier limit."""
     tier = get_user_tier(username)
     config = TIER_CONFIG.get(tier, TIER_CONFIG["free"])
     daily_limit = config["daily_limit"]
 
     today_str = date.today().isoformat()
-    usage = load_user_json(username, _USAGE_FILENAME, default={})
+    usage = load_usage(username)
 
-    # Reset if date changed
     if usage.get("date") != today_str:
         usage = {"date": today_str, "count": 0}
 
     current_count = usage.get("count", 0)
-
-    # Check limit (None means unlimited)
     if daily_limit is not None and current_count >= daily_limit:
-        return False, f"\u26a0\ufe0f \u4eca\u65e5 AI \u751f\u6210\u6b21\u6570\u5df2\u8fbe\u4e0a\u9650 ({current_count}/{daily_limit})\uff0c\u660e\u65e5\u91cd\u7f6e\u6216\u5347\u7ea7\u5957\u9910"
+        return False, f"⚠️ 今日 AI 生成次数已达上限 ({current_count}/{daily_limit})，明日重置或升级套餐"
 
-    # Increment
     usage["count"] = current_count + 1
     usage["date"] = today_str
 
-    # Update 7-day usage history
     history = usage.get("history", [])
-    # Find or create today's entry in history
     today_entry = None
     for entry in history:
         if entry.get("date") == today_str:
@@ -105,12 +89,11 @@ def increment_usage(username: str) -> tuple[bool, str]:
         today_entry["count"] = usage["count"]
     else:
         history.append({"date": today_str, "count": usage["count"]})
-    # Keep only last 7 entries
     if len(history) > 7:
         history = history[-7:]
     usage["history"] = history
 
-    save_user_json(username, _USAGE_FILENAME, usage)
+    save_usage(username, usage)
     return True, ""
 
 
@@ -118,15 +101,9 @@ def increment_usage(username: str) -> tuple[bool, str]:
 # Display helpers
 # ---------------------------------------------------------------------------
 def decrement_usage(username: str) -> None:
-    """
-    Decrease today's usage count by 1 (minimum 0).
-
-    Used to rollback a usage increment when an API call fails.
-    """
+    """Decrease today's usage count by 1, used when an API call fails."""
     today_str = date.today().isoformat()
-    usage = load_user_json(username, _USAGE_FILENAME, default={})
-
-    # Only decrement if the usage is for today
+    usage = load_usage(username)
     if usage.get("date") != today_str:
         return
 
@@ -135,8 +112,6 @@ def decrement_usage(username: str) -> None:
         return
 
     usage["count"] = current_count - 1
-
-    # Update today's entry in history
     history = usage.get("history", [])
     for entry in history:
         if entry.get("date") == today_str:
@@ -144,20 +119,17 @@ def decrement_usage(username: str) -> None:
             break
     usage["history"] = history
 
-    save_user_json(username, _USAGE_FILENAME, usage)
+    save_usage(username, usage)
 
 
 def get_usage_display(username: str) -> str:
-    """
-    Return formatted usage string for sidebar display.
-    Examples: '5/20', '5/100', '5/\u65e0\u9650\u5236'
-    """
+    """Return formatted usage string for sidebar display."""
     count = get_daily_usage(username)
     tier = get_user_tier(username)
     config = TIER_CONFIG.get(tier, TIER_CONFIG["free"])
     daily_limit = config["daily_limit"]
     if daily_limit is None:
-        return f"{count}/\u65e0\u9650\u5236"
+        return f"{count}/无限制"
     return f"{count}/{daily_limit}"
 
 
@@ -175,20 +147,16 @@ def check_feature_access(username: str, feature: str) -> bool:
 # Tier management
 # ---------------------------------------------------------------------------
 def upgrade_user_tier(username: str, new_tier: str) -> bool:
-    """
-    Update the user's tier in users_db.json.
-
-    Returns True if successful, False if user not found or invalid tier.
-    """
+    """Update the user's tier through the active repository backend."""
     if new_tier not in TIER_CONFIG:
         return False
 
-    users = load_json(_USERS_DB_FILENAME, default={})
+    users = load_users()
     if username not in users:
         return False
 
     users[username]["tier"] = new_tier
-    save_json(_USERS_DB_FILENAME, users)
+    save_users(users)
     return True
 
 
@@ -196,13 +164,7 @@ def upgrade_user_tier(username: str, new_tier: str) -> bool:
 # Usage history
 # ---------------------------------------------------------------------------
 def get_usage_history(username: str) -> list[dict]:
-    """
-    Return the 7-day usage history for a user.
-
-    Returns a list of dicts: [{'date': 'YYYY-MM-DD', 'count': N}, ...]
-    Up to 7 entries, most recent last.
-    """
-    usage = load_user_json(username, _USAGE_FILENAME, default={})
+    """Return the user's 7-day AI usage history."""
+    usage = load_usage(username)
     history = usage.get("history", [])
-    # Return at most 7 entries
     return history[-7:]
