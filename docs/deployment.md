@@ -50,8 +50,10 @@ APP_PASSWORD = "your-admin-password"
 # Set only for local/demo deployments that should bypass login and registration.
 # AUTH_REQUIRED = "false"
 
-# Recommended for production/commercial deployments so users, usage, history,
-# payment state, and other per-user data survive app restarts and redeploys.
+# Simple single-instance demo persistence. Uses Python's built-in sqlite3 module.
+SQLITE_DB_PATH = "trade_ai_helper.sqlite3"
+
+# Production/commercial persistence option.
 # DATABASE_URL = "your-postgres-database-url"
 
 OPENAI_API_KEY = "sk-xxx"
@@ -83,10 +85,11 @@ By default, deployed users can self-register from the authentication screen:
 
 Logged-in user history is saved per account. AI generation history is stored in the configured `DatabaseBackend`:
 
-- With `DATABASE_URL`: per-user history is saved in PostgreSQL and survives app restarts/redeploys.
-- Without `DATABASE_URL`: per-user history is saved under the app's local `data/users/{username}/history.json` path. This works for local/dev usage, but hosted ephemeral file systems may lose data on restart or redeploy.
+- With `SQLITE_DB_PATH` or a SQLite `DATABASE_URL`: users, usage, payment state, and per-user history are saved in a single SQLite file. This is the recommended first step for a lightweight demo or single-instance deployment.
+- With a PostgreSQL `DATABASE_URL`: per-user data is saved in PostgreSQL and is better suited for commercial or multi-instance deployment.
+- Without either setting: per-user data falls back to JSON files under the app's local `data/` directory. This is fine for local development, but hosted ephemeral file systems may lose data on restart or redeploy.
 
-For any public demo where users expect their history to remain available later, configure a persistent PostgreSQL `DATABASE_URL`.
+For a public demo, start with SQLite. For production with multiple app instances or strict durability requirements, move to PostgreSQL.
 
 ## Railway / Render
 
