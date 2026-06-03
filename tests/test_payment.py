@@ -9,23 +9,19 @@ import sys
 import types
 from unittest.mock import MagicMock, patch
 
-# Add project root to path so imports work
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Mock streamlit before importing modules that use it
 _mock_st = types.ModuleType("streamlit")
 _mock_st.session_state = {}
 _mock_st.secrets = {}
 sys.modules["streamlit"] = _mock_st
 
-# Mock dotenv before importing modules that use it (not available in test env)
 _mock_dotenv = types.ModuleType("dotenv")
 _mock_dotenv.load_dotenv = lambda *a, **kw: None
 sys.modules["dotenv"] = _mock_dotenv
 
-# Import the module under test (must be after mocks are set up)
 import utils.payment  # noqa: E402
-from utils.payment import (
+from utils.payment import (  # noqa: E402
     complete_upgrade,
     create_checkout_session,
     is_payment_configured,
@@ -37,26 +33,29 @@ class TestPayment:
     """Tests for utils/payment.py Stripe payment functions."""
 
     def _setup(self):
-        """Reset mock state."""
         _mock_st.session_state.clear()
 
     def test_stripe_not_available(self):
-        """When STRIPE_AVAILABLE is False, create_checkout_session returns error."""
         self._setup()
-        with patch.object(utils.payment, "STRIPE_AVAILABLE", False):
+        with patch.object(utils.payment, "STRIPE_AVAILABLE", False), \
+             patch("utils.email_gate.require_verified_email", return_value=(True, "")):
             success, msg = create_checkout_session("testuser", "pro")
             assert success is False
             assert "Stripe not installed" in msg
 
+    def test_create_checkout_session_requires_verified_email(self):
+        self._setup()
+        with patch("utils.email_gate.require_verified_email", return_value=(False, "verify first")):
+            success, msg = create_checkout_session("testuser", "pro")
+            assert success is False
+            assert msg == "verify first"
+
     def test_is_payment_configured_false_when_not_set(self):
-        """is_payment_configured returns False when secrets are not set."""
         self._setup()
         with patch.object(utils.payment, "get_secret", return_value=""):
-            result = is_payment_configured()
-            assert result is False
+            assert is_payment_configured() is False
 
     def test_is_payment_configured_true_when_set(self):
-        """is_payment_configured returns True when key and at least one price ID are set."""
         self._setup()
 
         def mock_get_secret(key, default=""):
@@ -68,20 +67,18 @@ class TestPayment:
             return secrets.get(key, default)
 
         with patch.object(utils.payment, "get_secret", side_effect=mock_get_secret):
-            result = is_payment_configured()
-            assert result is True
+            assert is_payment_configured() is True
 
     def test_create_checkout_session_not_configured(self):
-        """When payment not configured, returns (False, error)."""
         self._setup()
         with patch.object(utils.payment, "STRIPE_AVAILABLE", True), \
-             patch.object(utils.payment, "is_payment_configured", return_value=False):
+             patch.object(utils.payment, "is_payment_configured", return_value=False), \
+             patch("utils.email_gate.require_verified_email", return_value=(True, "")):
             success, msg = create_checkout_session("testuser", "pro")
             assert success is False
             assert "not configured" in msg
 
     def test_create_checkout_session_success(self):
-        """With mocked stripe, create_checkout_session returns (True, url)."""
         self._setup()
         mock_stripe = MagicMock()
         mock_session = MagicMock()
@@ -98,14 +95,14 @@ class TestPayment:
 
         with patch.object(utils.payment, "STRIPE_AVAILABLE", True), \
              patch.object(utils.payment, "stripe", mock_stripe), \
-             patch.object(utils.payment, "get_secret", side_effect=mock_get_secret):
+             patch.object(utils.payment, "get_secret", side_effect=mock_get_secret), \
+             patch("utils.email_gate.require_verified_email", return_value=(True, "")):
             success, url = create_checkout_session("testuser", "pro")
             assert success is True
             assert "checkout.stripe.com" in url
             mock_stripe.checkout.Session.create.assert_called_once()
 
     def test_verify_checkout_session_paid(self):
-        """Mocked stripe returns paid session - verify returns (True, metadata)."""
         self._setup()
         mock_stripe = MagicMock()
         mock_session = MagicMock()
@@ -122,7 +119,6 @@ class TestPayment:
             assert metadata["target_tier"] == "pro"
 
     def test_verify_checkout_session_unpaid(self):
-        """Mocked stripe returns unpaid session - verify returns (False, {})."""
         self._setup()
         mock_stripe = MagicMock()
         mock_session = MagicMock()
@@ -136,13 +132,20 @@ class TestPayment:
             assert is_paid is False
             assert metadata == {}
 
+    def test_complete_upgrade_requires_verified_email(self):
+        self._setup()
+        with patch("utils.email_gate.require_verified_email", return_value=(False, "verify first")):
+            success, msg = complete_upgrade("testuser", "cs_test_123")
+            assert success is False
+            assert msg == "verify first"
+
     def test_complete_upgrade_success(self):
-        """complete_upgrade calls upgrade_user_tier when payment verified."""
         self._setup()
         with patch.object(utils.payment, "verify_checkout_session", return_value=(True, {"username": "testuser", "target_tier": "pro"})), \
              patch.object(utils.payment, "upgrade_user_tier", return_value=True) as mock_upgrade, \
              patch.object(utils.payment, "load_consumed_sessions", return_value=[]), \
-             patch.object(utils.payment, "save_consumed_sessions") as mock_save:
+             patch.object(utils.payment, "save_consumed_sessions") as mock_save, \
+             patch("utils.email_gate.require_verified_email", return_value=(True, "")):
             success, msg = complete_upgrade("testuser", "cs_test_123")
             assert success is True
             assert "pro" in msg.lower() or "Pro" in msg
@@ -150,17 +153,14 @@ class TestPayment:
             mock_save.assert_called_once_with("testuser", ["cs_test_123"])
 
     def test_complete_upgrade_username_mismatch(self):
-        """complete_upgrade fails if metadata username doesn't match."""
         self._setup()
-        with patch.object(utils.payment, "verify_checkout_session", return_value=(True, {"username": "otheruser", "target_tier": "pro"})):
+        with patch.object(utils.payment, "verify_checkout_session", return_value=(True, {"username": "otheruser", "target_tier": "pro"})), \
+             patch("utils.email_gate.require_verified_email", return_value=(True, "")):
             success, msg = complete_upgrade("testuser", "cs_test_123")
             assert success is False
             assert "mismatch" in msg.lower()
 
 
-# ---------------------------------------------------------------------------
-# Simple runner for sandbox validation (pytest not available)
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     import traceback
     cls = TestPayment()
