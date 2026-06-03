@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
+import re
 import secrets
 import time
 from datetime import datetime, timedelta, timezone
@@ -33,6 +34,7 @@ _PASSWORD_MIN_LENGTH = 8
 _LOGIN_FAILURE_LIMIT = 5
 _LOGIN_FAILURE_WINDOW_SECONDS = 15 * 60
 _USERS_DB_FILENAME = "users_db.json"
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
 def _get_users_db_path() -> Path:
@@ -48,12 +50,7 @@ def _get_users_dir() -> Path:
 
 
 def _hash_password(password: str, salt: str | None = None) -> str:
-    """
-    Hash a password using PBKDF2-HMAC-SHA256 with a per-user random salt.
-
-    Returns a string in the format 'salt_hex:hash_hex'.
-    If salt is not provided, generates a new random 16-byte salt.
-    """
+    """Hash a password using PBKDF2-HMAC-SHA256 with a per-user random salt."""
     if salt is None:
         salt = os.urandom(16).hex()
     hash_bytes = hashlib.pbkdf2_hmac(
@@ -66,11 +63,7 @@ def _hash_password(password: str, salt: str | None = None) -> str:
 
 
 def _verify_password(password: str, stored_hash: str) -> bool:
-    """
-    Verify a password against a stored hash string.
-
-    The stored_hash format is 'salt_hex:hash_hex'.
-    """
+    """Verify a password against a stored hash string."""
     if ":" not in stored_hash:
         return False
     salt = stored_hash.split(":")[0]
@@ -80,6 +73,11 @@ def _verify_password(password: str, stored_hash: str) -> bool:
 def _is_strong_password(password: str) -> bool:
     """Return True when a password meets the current minimum policy."""
     return bool(password) and len(password) >= _PASSWORD_MIN_LENGTH
+
+
+def _is_valid_email(email: str) -> bool:
+    """Return True when the email is present and roughly RFC-like."""
+    return bool(email and _EMAIL_RE.match(email.strip()))
 
 
 def _load_login_failures() -> dict:
@@ -155,14 +153,15 @@ def _build_public_user_info(user: dict) -> dict:
     }
 
 
-def register_user(username: str, password: str, email: str = "") -> tuple[bool, str]:
-    """
-    Register a new user.
+def _extract_token_data(token_data) -> tuple[str, str]:
+    """Support both legacy bare string tokens and dict token payloads."""
+    if isinstance(token_data, dict):
+        return token_data.get("token", ""), token_data.get("expires", "")
+    return str(token_data or ""), ""
 
-    Returns (success, message) tuple.
-    Validates input, checks uniqueness, creates user profile and data directory.
-    """
-    # Validate input
+
+def register_user(username: str, password: str, email: str = "") -> tuple[bool, str]:
+    """Register a new user. Email is required for password recovery and contact."""
     if not username or not username.strip():
         return False, "Username cannot be empty"
     username = username.strip().lower()
@@ -170,41 +169,41 @@ def register_user(username: str, password: str, email: str = "") -> tuple[bool, 
         return False, "Username must be at least 3 characters"
     if not username.isalnum():
         return False, "Username must contain only letters and numbers"
+    if not _is_valid_email(email):
+        return False, "Email is required for password recovery and account contact"
     if not _is_strong_password(password):
         return False, f"Password must be at least {_PASSWORD_MIN_LENGTH} characters"
 
-    # Check uniqueness
+    email = email.strip().lower()
     users = _load_users_db()
     if username in users:
         return False, "Username already exists"
+    for existing in users.values():
+        if existing.get("email", "").strip().lower() == email:
+            return False, "Email is already registered"
 
-    # Create user profile with per-user random salt
-    password_hash = _hash_password(password)
     verification_token = secrets.token_urlsafe(32)
     users[username] = {
         "username": username,
-        "email": email.strip(),
-        "password_hash": password_hash,
+        "email": email,
+        "password_hash": _hash_password(password),
         "tier": "free",
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "email_verified": False,
-        "verification_token": {"token": verification_token, "expires": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()},
+        "verification_token": {
+            "token": verification_token,
+            "expires": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat(),
+        },
     }
     _save_users_db(users)
 
-    # Create user data directory
     user_dir = get_user_data_dir(username)
     user_dir.mkdir(parents=True, exist_ok=True)
 
-    # Send verification email if email provided and SMTP configured
-    if email.strip():
-        from utils.email_service import is_email_configured, send_verification_email
-        if is_email_configured():
-            send_verification_email(email.strip(), verification_token)
+    from utils.email_service import is_email_configured, send_verification_email
+    if is_email_configured():
+        send_verification_email(email, verification_token)
 
-    # Registering through the Streamlit UI should land the user on the app home,
-    # not leave them on the auth screen. This is safe because the account was
-    # just created with the submitted password in the current session.
     st.session_state.authenticated = True
     st.session_state["current_user"] = _build_public_user_info(users[username])
     if users[username].get("language"):
@@ -215,11 +214,7 @@ def register_user(username: str, password: str, email: str = "") -> tuple[bool, 
 
 
 def authenticate_user(username: str, password: str) -> tuple[bool, dict | None]:
-    """
-    Authenticate a user by username and password.
-
-    Returns (success, user_dict or None).
-    """
+    """Authenticate a user by username and password."""
     if not username or not password:
         return False, None
 
@@ -229,7 +224,6 @@ def authenticate_user(username: str, password: str) -> tuple[bool, dict | None]:
         return False, None
 
     users = _load_users_db()
-
     if username not in users:
         _record_login_failure(username)
         return False, None
@@ -251,20 +245,14 @@ def get_current_user() -> dict | None:
 
 
 def change_password(username: str, old_password: str, new_password: str) -> tuple[bool, str]:
-    """
-    Change a user's password.
-
-    Returns (success, message) tuple.
-    """
+    """Change a user's password."""
     if not _is_strong_password(new_password):
         return False, f"New password must be at least {_PASSWORD_MIN_LENGTH} characters"
 
     username = username.strip().lower()
     users = _load_users_db()
-
     if username not in users:
         return False, "User not found"
-
     if not _verify_password(old_password, users[username]["password_hash"]):
         return False, "Current password is incorrect"
 
@@ -284,41 +272,22 @@ def get_user_data_dir(username: str) -> Path:
 
 
 def verify_email_token(username: str, token: str) -> tuple[bool, str]:
-    """
-    Verify an email verification token for a user.
-
-    Returns (success, message) tuple.
-    """
+    """Verify an email verification token for a user."""
     if not username or not token:
         return False, "Username and token are required"
 
     username = username.strip().lower()
     users = _load_users_db()
-
     if username not in users:
         return False, "User not found"
 
     user = users[username]
-    stored_token_data = user.get("verification_token", "")
-
-    if not stored_token_data:
-        return False, "No verification token found"
-
-    # Support both old format (bare string) and new format (dict with expiry)
-    if isinstance(stored_token_data, dict):
-        stored_token = stored_token_data.get("token", "")
-        expires_str = stored_token_data.get("expires", "")
-    else:
-        stored_token = stored_token_data
-        expires_str = ""
-
+    stored_token, expires_str = _extract_token_data(user.get("verification_token", ""))
     if not stored_token:
         return False, "No verification token found"
-
-    if token != stored_token:
+    if not hmac.compare_digest(token, stored_token):
         return False, "Invalid verification token"
 
-    # Check expiry if present
     if expires_str:
         try:
             expires_dt = datetime.fromisoformat(expires_str)
@@ -333,39 +302,34 @@ def verify_email_token(username: str, token: str) -> tuple[bool, str]:
     users[username]["email_verified"] = True
     users[username]["verification_token"] = ""
     _save_users_db(users)
-
     logger.info("Email verified for user: %s", username)
     return True, "Email verified successfully"
 
 
 def resend_verification_email(username: str) -> tuple[bool, str]:
-    """
-    Generate a new verification token and resend the verification email.
-
-    Returns (success, message) tuple.
-    """
+    """Generate a new verification token and resend the verification email."""
     if not username:
         return False, "Username is required"
 
     username = username.strip().lower()
     users = _load_users_db()
-
     if username not in users:
         return False, "User not found"
 
     user = users[username]
     email = user.get("email", "")
-
     if not email:
         return False, "No email address on file"
 
     from utils.email_service import is_email_configured, send_verification_email
-
     if not is_email_configured():
         return False, "Email service is not configured"
 
     new_token = secrets.token_urlsafe(32)
-    users[username]["verification_token"] = {"token": new_token, "expires": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()}
+    users[username]["verification_token"] = {
+        "token": new_token,
+        "expires": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat(),
+    }
     users[username]["email_verified"] = False
     _save_users_db(users)
 
@@ -376,11 +340,7 @@ def resend_verification_email(username: str) -> tuple[bool, str]:
 
 
 def find_user_by_email(email: str) -> str | None:
-    """
-    Scan users from the active database backend for a matching email field.
-
-    Returns username (str) or None if not found.
-    """
+    """Scan users from the active database backend for a matching email field."""
     if not email:
         return None
     email_lower = email.strip().lower()
@@ -392,22 +352,13 @@ def find_user_by_email(email: str) -> str | None:
 
 
 def request_password_reset(email_or_username: str) -> tuple[bool, str]:
-    """
-    Request a password reset for a user identified by email or username.
-
-    If input contains '@', tries find_user_by_email() first.
-    Otherwise looks up directly by username (lowercase).
-    Returns (success, message) tuple. Always returns True for security
-    (does not reveal whether user exists).
-    """
+    """Request a password reset for a user identified by email or username."""
     vague_message = "If an account exists with that email, a reset link has been sent"
-
     if not email_or_username or not email_or_username.strip():
         return True, vague_message
 
     identifier = email_or_username.strip()
     username = None
-
     if "@" in identifier:
         username = find_user_by_email(identifier)
     else:
@@ -423,20 +374,16 @@ def request_password_reset(email_or_username: str) -> tuple[bool, str]:
     user = users.get(username)
     if not user:
         return True, vague_message
-
     user_email = user.get("email", "").strip()
     if not user_email:
         return True, vague_message
 
-    # Generate token with 1-hour expiry
     token = secrets.token_urlsafe(32)
     expires = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
     users[username]["reset_token"] = {"token": token, "expires": expires}
     _save_users_db(users)
 
-    # Send the reset email
     from utils.email_service import is_email_configured, send_password_reset_email
-
     if is_email_configured():
         send_password_reset_email(user_email, token)
 
@@ -445,40 +392,28 @@ def request_password_reset(email_or_username: str) -> tuple[bool, str]:
 
 
 def reset_password(username: str, token: str, new_password: str) -> tuple[bool, str]:
-    """
-    Reset a user's password using a reset token.
-
-    Validates the token has not expired (1 hour) and matches stored token.
-    Returns (success, message) tuple.
-    """
+    """Reset a user's password using a reset token."""
     if not _is_strong_password(new_password):
         return False, f"Password must be at least {_PASSWORD_MIN_LENGTH} characters"
-
     if not username or not token:
         return False, "Username and token are required"
 
     username = username.strip().lower()
     users = _load_users_db()
-
     if username not in users:
         return False, "Invalid token"
 
     user = users[username]
     reset_token_data = user.get("reset_token")
-
     if not reset_token_data:
         return False, "Invalid token"
 
-    stored_token = reset_token_data.get("token", "")
-    expires_str = reset_token_data.get("expires", "")
-
-    if token != stored_token:
+    stored_token, expires_str = _extract_token_data(reset_token_data)
+    if not stored_token or not hmac.compare_digest(token, stored_token):
         return False, "Invalid token"
 
-    # Check expiry
     try:
         expires_dt = datetime.fromisoformat(expires_str)
-        # Ensure timezone-aware comparison
         now = datetime.now(timezone.utc)
         if expires_dt.tzinfo is None:
             expires_dt = expires_dt.replace(tzinfo=timezone.utc)
@@ -487,10 +422,8 @@ def reset_password(username: str, token: str, new_password: str) -> tuple[bool, 
     except (ValueError, TypeError):
         return False, "Invalid token"
 
-    # Update password and clear reset token
     users[username]["password_hash"] = _hash_password(new_password)
     users[username].pop("reset_token", None)
     _save_users_db(users)
-
     logger.info("Password reset completed for user: %s", username)
     return True, "Password reset successful"
