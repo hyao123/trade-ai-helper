@@ -55,10 +55,7 @@ def get_user_tier(username: str) -> str:
 # Daily usage tracking
 # ---------------------------------------------------------------------------
 def get_daily_usage(username: str) -> int:
-    """
-    Load usage state from the active database backend, return today's count.
-    Resets to 0 if the stored date differs from today.
-    """
+    """Load usage state from the active database backend, return today's count."""
     usage = load_user_usage(username)
     today_str = date.today().isoformat()
     if usage.get("date") != today_str:
@@ -67,13 +64,13 @@ def get_daily_usage(username: str) -> int:
 
 
 def increment_usage(username: str) -> tuple[bool, str]:
-    """
-    Increment daily usage count for the user.
+    """Increment daily usage count for the user if verified and within limits."""
+    from utils.email_gate import require_verified_email
 
-    Returns:
-        (True, '') if increment succeeded (within limit).
-        (False, error_message) if daily limit exceeded.
-    """
+    allowed, message = require_verified_email(username)
+    if not allowed:
+        return False, message
+
     tier = get_user_tier(username)
     config = TIER_CONFIG.get(tier, TIER_CONFIG["free"])
     daily_limit = config["daily_limit"]
@@ -81,23 +78,18 @@ def increment_usage(username: str) -> tuple[bool, str]:
     today_str = date.today().isoformat()
     usage = load_user_usage(username)
 
-    # Reset if date changed
     if usage.get("date") != today_str:
         usage = {"date": today_str, "count": 0}
 
     current_count = usage.get("count", 0)
 
-    # Check limit (None means unlimited)
     if daily_limit is not None and current_count >= daily_limit:
         return False, f"⚠️ 今日 AI 生成次数已达上限 ({current_count}/{daily_limit})，明日重置或升级套餐"
 
-    # Increment
     usage["count"] = current_count + 1
     usage["date"] = today_str
 
-    # Update 7-day usage history
     history = usage.get("history", [])
-    # Find or create today's entry in history
     today_entry = None
     for entry in history:
         if entry.get("date") == today_str:
@@ -107,7 +99,6 @@ def increment_usage(username: str) -> tuple[bool, str]:
         today_entry["count"] = usage["count"]
     else:
         history.append({"date": today_str, "count": usage["count"]})
-    # Keep only last 7 entries
     if len(history) > 7:
         history = history[-7:]
     usage["history"] = history
@@ -120,15 +111,10 @@ def increment_usage(username: str) -> tuple[bool, str]:
 # Display helpers
 # ---------------------------------------------------------------------------
 def decrement_usage(username: str) -> None:
-    """
-    Decrease today's usage count by 1 (minimum 0).
-
-    Used to rollback a usage increment when an API call fails.
-    """
+    """Decrease today's usage count by 1 (minimum 0)."""
     today_str = date.today().isoformat()
     usage = load_user_usage(username)
 
-    # Only decrement if the usage is for today
     if usage.get("date") != today_str:
         return
 
@@ -138,7 +124,6 @@ def decrement_usage(username: str) -> None:
 
     usage["count"] = current_count - 1
 
-    # Update today's entry in history
     history = usage.get("history", [])
     for entry in history:
         if entry.get("date") == today_str:
@@ -150,10 +135,7 @@ def decrement_usage(username: str) -> None:
 
 
 def get_usage_display(username: str) -> str:
-    """
-    Return formatted usage string for sidebar display.
-    Examples: '5/20', '5/100', '5/无限制'
-    """
+    """Return formatted usage string for sidebar display."""
     count = get_daily_usage(username)
     tier = get_user_tier(username)
     config = TIER_CONFIG.get(tier, TIER_CONFIG["free"])
@@ -167,7 +149,11 @@ def get_usage_display(username: str) -> str:
 # Feature gating
 # ---------------------------------------------------------------------------
 def check_feature_access(username: str, feature: str) -> bool:
-    """Check if the user's tier includes the given feature."""
+    """Check if the user's tier includes the given feature and email is verified."""
+    from utils.email_gate import is_verified_email_user
+
+    if not is_verified_email_user(username):
+        return False
     tier = get_user_tier(username)
     config = TIER_CONFIG.get(tier, TIER_CONFIG["free"])
     return feature in config["features"]
@@ -177,11 +163,7 @@ def check_feature_access(username: str, feature: str) -> bool:
 # Tier management
 # ---------------------------------------------------------------------------
 def upgrade_user_tier(username: str, new_tier: str) -> bool:
-    """
-    Update the user's tier through the active database backend.
-
-    Returns True if successful, False if user not found or invalid tier.
-    """
+    """Update the user's tier through the active database backend."""
     if new_tier not in TIER_CONFIG:
         return False
 
@@ -198,13 +180,7 @@ def upgrade_user_tier(username: str, new_tier: str) -> bool:
 # Usage history
 # ---------------------------------------------------------------------------
 def get_usage_history(username: str) -> list[dict]:
-    """
-    Return the 7-day usage history for a user.
-
-    Returns a list of dicts: [{'date': 'YYYY-MM-DD', 'count': N}, ...]
-    Up to 7 entries, most recent last.
-    """
+    """Return the 7-day usage history for a user."""
     usage = load_user_usage(username)
     history = usage.get("history", [])
-    # Return at most 7 entries
     return history[-7:]
