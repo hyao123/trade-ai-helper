@@ -34,19 +34,18 @@ def get_price_id(tier: str) -> str:
     """Return the Stripe price ID for a given tier."""
     if tier == "pro":
         return get_secret("STRIPE_PRICE_ID_PRO")
-    elif tier == "enterprise":
+    if tier == "enterprise":
         return get_secret("STRIPE_PRICE_ID_ENTERPRISE")
     return ""
 
 
 def create_checkout_session(username: str, target_tier: str) -> tuple[bool, str]:
-    """
-    Create a Stripe Checkout Session for tier upgrade.
+    """Create a Stripe Checkout Session for tier upgrade."""
+    from utils.email_gate import require_verified_email
 
-    Returns:
-        (True, session_url) on success.
-        (False, error_message) on failure.
-    """
+    allowed, message = require_verified_email(username)
+    if not allowed:
+        return (False, message)
     if not STRIPE_AVAILABLE:
         return (False, "Stripe not installed")
     if not is_payment_configured():
@@ -74,13 +73,7 @@ def create_checkout_session(username: str, target_tier: str) -> tuple[bool, str]
 
 
 def verify_checkout_session(session_id: str) -> tuple[bool, dict]:
-    """
-    Verify a Stripe Checkout Session payment status.
-
-    Returns:
-        (True, metadata) if payment_status is 'paid'.
-        (False, {}) otherwise.
-    """
+    """Return ``(True, metadata)`` only when Stripe reports a paid session."""
     if not STRIPE_AVAILABLE:
         return (False, {})
     try:
@@ -94,17 +87,13 @@ def verify_checkout_session(session_id: str) -> tuple[bool, dict]:
 
 
 def complete_upgrade(username: str, session_id: str) -> tuple[bool, str]:
-    """
-    Complete a tier upgrade after payment verification.
+    """Complete a tier upgrade after payment verification."""
+    from utils.email_gate import require_verified_email
 
-    Verifies the checkout session, checks username matches metadata,
-    checks that the session has not already been consumed,
-    and calls upgrade_user_tier.
+    allowed, message = require_verified_email(username)
+    if not allowed:
+        return (False, message)
 
-    Returns:
-        (True, success_message) on success.
-        (False, error_message) on failure.
-    """
     is_paid, metadata = verify_checkout_session(session_id)
     if not is_paid:
         return (False, "Payment not verified")
@@ -114,18 +103,15 @@ def complete_upgrade(username: str, session_id: str) -> tuple[bool, str]:
 
     if meta_username != username:
         return (False, "Username mismatch")
-
     if not target_tier:
         return (False, "No target tier in session metadata")
 
-    # Check if session was already consumed (prevent replay)
     consumed = load_consumed_sessions(username)
     if session_id in consumed:
         return (False, "Session already consumed")
 
     success = upgrade_user_tier(username, target_tier)
     if success:
-        # Mark session as consumed
         consumed.append(session_id)
         save_consumed_sessions(username, consumed)
         return (True, f"Upgraded to {target_tier}")
