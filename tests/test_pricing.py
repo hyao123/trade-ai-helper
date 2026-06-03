@@ -13,10 +13,8 @@ from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-# Add project root to path so imports work
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Mock streamlit before importing modules that use it
 _mock_st = types.ModuleType("streamlit")
 _mock_st.session_state = {}
 sys.modules["streamlit"] = _mock_st
@@ -26,11 +24,10 @@ class TestPricing:
     """Tests for utils/pricing.py pricing and usage functions."""
 
     def _setup(self):
-        """Reset mock state and create auto-cleaning temp dir."""
         _mock_st.session_state.clear()
         return tempfile.TemporaryDirectory()
 
-    def _create_user(self, tmp_dir: Path, username: str, tier: str = "free"):
+    def _create_user(self, tmp_dir: Path, username: str, tier: str = "free", verified: bool = True):
         """Helper: create a user entry in users_db.json."""
         db_path = tmp_dir / "users_db.json"
         users = {}
@@ -39,28 +36,36 @@ class TestPricing:
                 users = json.load(f)
         users[username] = {
             "username": username,
-            "email": "",
+            "email": f"{username}@example.com",
+            "email_verified": verified,
             "password_hash": "fakehash",
             "tier": tier,
             "created_at": "2026-01-01 00:00",
         }
         with open(db_path, "w", encoding="utf-8") as f:
             json.dump(users, f)
-        # Create user data dir
         user_dir = tmp_dir / "users" / username
         user_dir.mkdir(parents=True, exist_ok=True)
 
     def test_get_daily_usage_returns_zero_for_new_user(self):
-        """get_daily_usage returns 0 when no usage.json exists."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             with patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.pricing import get_daily_usage
-                result = get_daily_usage("newuser123")
-                assert result == 0
+                assert get_daily_usage("newuser123") == 0
+
+    def test_increment_usage_requires_verified_email(self):
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            self._create_user(tmp_dir, "unverified", "free", verified=False)
+            with patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.pricing import get_daily_usage, increment_usage
+                ok, msg = increment_usage("unverified")
+                assert ok is False
+                assert "验证邮箱" in msg
+                assert get_daily_usage("unverified") == 0
 
     def test_increment_usage_increments_count(self):
-        """increment_usage increments the daily count correctly."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "testuser", "free")
@@ -71,18 +76,15 @@ class TestPricing:
                 assert msg == ""
                 assert get_daily_usage("testuser") == 1
 
-                ok2, msg2 = increment_usage("testuser")
+                ok2, _ = increment_usage("testuser")
                 assert ok2 is True
                 assert get_daily_usage("testuser") == 2
 
     def test_increment_usage_returns_false_when_limit_exceeded(self):
-        """increment_usage returns (False, error) when daily limit is hit."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "freeuser", "free")
-            # Write usage.json with count at the limit (20)
             user_dir = tmp_dir / "users" / "freeuser"
-            user_dir.mkdir(parents=True, exist_ok=True)
             usage = {"date": date.today().isoformat(), "count": 20}
             with open(user_dir / "usage.json", "w", encoding="utf-8") as f:
                 json.dump(usage, f)
@@ -91,16 +93,13 @@ class TestPricing:
                 from utils.pricing import increment_usage
                 ok, msg = increment_usage("freeuser")
                 assert ok is False
-                assert "\u4e0a\u9650" in msg
+                assert "上限" in msg
 
     def test_usage_resets_on_new_day(self):
-        """Usage count resets to 0 when date changes."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "dayuser", "free")
-            # Write usage.json with yesterday's date
             user_dir = tmp_dir / "users" / "dayuser"
-            user_dir.mkdir(parents=True, exist_ok=True)
             yesterday = (date.today() - timedelta(days=1)).isoformat()
             usage = {"date": yesterday, "count": 15}
             with open(user_dir / "usage.json", "w", encoding="utf-8") as f:
@@ -108,11 +107,18 @@ class TestPricing:
 
             with patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.pricing import get_daily_usage
-                result = get_daily_usage("dayuser")
-                assert result == 0
+                assert get_daily_usage("dayuser") == 0
+
+    def test_check_feature_access_requires_verified_email(self):
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            self._create_user(tmp_dir, "unverified2", "enterprise", verified=False)
+            with patch("utils.storage.get_data_dir", return_value=tmp_dir):
+                from utils.pricing import check_feature_access
+                assert check_feature_access("unverified2", "basic") is False
+                assert check_feature_access("unverified2", "priority_support") is False
 
     def test_check_feature_access_free_tier(self):
-        """Free tier only has 'basic' feature access."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "freeuser2", "free")
@@ -124,7 +130,6 @@ class TestPricing:
                 assert check_feature_access("freeuser2", "priority_support") is False
 
     def test_check_feature_access_pro_tier(self):
-        """Pro tier has basic, logo_upload, and data_export."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "prouser", "pro")
@@ -136,7 +141,6 @@ class TestPricing:
                 assert check_feature_access("prouser", "priority_support") is False
 
     def test_check_feature_access_enterprise_tier(self):
-        """Enterprise tier has all features."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "entuser", "enterprise")
@@ -148,74 +152,60 @@ class TestPricing:
                 assert check_feature_access("entuser", "priority_support") is True
 
     def test_enterprise_unlimited_daily_access(self):
-        """Enterprise tier is never blocked by daily limit."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "entuser2", "enterprise")
             with patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.pricing import increment_usage
-                # Increment many times - should never be blocked
                 for i in range(50):
                     ok, msg = increment_usage("entuser2")
                     assert ok is True, f"Failed on iteration {i}: {msg}"
                     assert msg == ""
 
     def test_upgrade_user_tier(self):
-        """upgrade_user_tier updates the tier in users_db.json."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "upgradeuser", "free")
             with patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.pricing import get_user_tier, upgrade_user_tier
                 assert get_user_tier("upgradeuser") == "free"
-                result = upgrade_user_tier("upgradeuser", "pro")
-                assert result is True
+                assert upgrade_user_tier("upgradeuser", "pro") is True
                 assert get_user_tier("upgradeuser") == "pro"
 
     def test_upgrade_user_tier_invalid_tier(self):
-        """upgrade_user_tier returns False for invalid tier."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "badtier", "free")
             with patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.pricing import upgrade_user_tier
-                result = upgrade_user_tier("badtier", "platinum")
-                assert result is False
+                assert upgrade_user_tier("badtier", "platinum") is False
 
     def test_upgrade_user_tier_nonexistent_user(self):
-        """upgrade_user_tier returns False for nonexistent user."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             with patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.pricing import upgrade_user_tier
-                result = upgrade_user_tier("ghost", "pro")
-                assert result is False
+                assert upgrade_user_tier("ghost", "pro") is False
 
     def test_get_usage_display_free(self):
-        """get_usage_display returns correct format for free tier."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "displayuser", "free")
             with patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.pricing import get_usage_display, increment_usage
-                display = get_usage_display("displayuser")
-                assert display == "0/20"
+                assert get_usage_display("displayuser") == "0/20"
                 increment_usage("displayuser")
-                display = get_usage_display("displayuser")
-                assert display == "1/20"
+                assert get_usage_display("displayuser") == "1/20"
 
     def test_get_usage_display_enterprise(self):
-        """get_usage_display shows unlimited for enterprise."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "entdisplay", "enterprise")
             with patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.pricing import get_usage_display
-                display = get_usage_display("entdisplay")
-                assert "\u65e0\u9650\u5236" in display
+                assert "无限制" in get_usage_display("entdisplay")
 
     def test_get_user_tier_defaults_to_free(self):
-        """get_user_tier returns 'free' for unknown user."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             with patch("utils.storage.get_data_dir", return_value=tmp_dir):
@@ -223,16 +213,13 @@ class TestPricing:
                 assert get_user_tier("nobody") == "free"
 
     def test_get_usage_history_empty_for_new_user(self):
-        """get_usage_history returns empty list when no usage exists."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             with patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.pricing import get_usage_history
-                result = get_usage_history("newuser999")
-                assert result == []
+                assert get_usage_history("newuser999") == []
 
     def test_increment_usage_populates_history(self):
-        """increment_usage adds entries to the history list."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "histuser", "free")
@@ -250,13 +237,10 @@ class TestPricing:
                 assert history[0]["count"] == 2
 
     def test_usage_history_capped_at_7_entries(self):
-        """History list never exceeds 7 entries."""
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "capuser", "free")
-            # Write usage.json with 8 historical entries
             user_dir = tmp_dir / "users" / "capuser"
-            user_dir.mkdir(parents=True, exist_ok=True)
             today_str = date.today().isoformat()
             history = []
             for i in range(8):
@@ -268,15 +252,10 @@ class TestPricing:
 
             with patch("utils.storage.get_data_dir", return_value=tmp_dir):
                 from utils.pricing import get_usage_history, increment_usage
-                # Increment to trigger history update
                 increment_usage("capuser")
-                hist = get_usage_history("capuser")
-                assert len(hist) <= 7
+                assert len(get_usage_history("capuser")) <= 7
 
 
-# ---------------------------------------------------------------------------
-# Simple runner for sandbox validation (pytest not available)
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     import traceback
     cls = TestPricing()
