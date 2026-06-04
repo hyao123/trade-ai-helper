@@ -57,11 +57,16 @@ HOME_CSS = """
 .email-verify-banner { background: linear-gradient(135deg, #fff7ed 0%, #fffbeb 100%); border: 1px solid #fed7aa; border-left: 5px solid #f97316; border-radius: 16px; padding: 1rem 1.1rem; margin: 0.2rem 0 1.2rem; color: #7c2d12; box-shadow: 0 8px 24px rgba(249,115,22,0.10); }
 .email-verify-title { font-weight: 850; font-size: 1rem; color: #9a3412; margin-bottom: 0.25rem; }
 .email-verify-copy { font-size: 0.88rem; line-height: 1.65; color: #7c2d12; }
+.onboarding-banner { background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%); border: 1px solid #c7d2fe; border-left: 5px solid #6366f1; border-radius: 16px; padding: 1rem 1.1rem; margin: 0.2rem 0 1.2rem; color: #312e81; box-shadow: 0 8px 24px rgba(99,102,241,0.10); }
+.onboarding-title { font-weight: 850; font-size: 1rem; color: #312e81; margin-bottom: 0.25rem; }
+.onboarding-copy { font-size: 0.88rem; line-height: 1.65; color: #4338ca; }
+.onboarding-progress { margin-top: 0.6rem; font-size: 0.78rem; color: #4f46e5; font-weight: 700; }
 </style>
 """
 
 
 QUICK_ACCESS = [
+    ("🚀", "快速设置", "2分钟初始化资料", "pages/34_🚀_快速设置.py"),
     ("📧", "开发信", "AI 高转化冷邮件", "pages/1_📧_开发信.py"),
     ("📩", "询盘回复", "逐条回答+报价", "pages/2_📩_询盘回复.py"),
     ("📄", "报价单", "多SKU专业PDF", "pages/3_📄_报价单.py"),
@@ -114,6 +119,7 @@ NAV_SECTIONS = {
         ("💱", "汇率计算", "实时多币种换算", "pages/31_💱_汇率计算.py"),
     ],
     "⚙️ 设置": [
+        ("🚀", "快速设置", "2分钟初始化公司资料", "pages/34_🚀_快速设置.py"),
         ("⚙️", "AI偏好", "预填+风格+自定义模型", "pages/0_⚙️_AI偏好.py"),
         ("📋", "历史记录", "生成结果归档", "pages/9_📋_历史记录.py"),
         ("📈", "数据导出", "JSON/CSV备份", "pages/22_📈_数据导出.py"),
@@ -161,10 +167,42 @@ def _render_email_verification_banner(st) -> None:
         st.switch_page("pages/11_👤_账户管理.py")
 
 
+def _render_onboarding_banner(st) -> None:
+    """Guide new users to complete quick setup when business context is missing."""
+    from utils.user_auth import get_current_user
+    from utils.user_prefs import get_prefs
+
+    current_user = get_current_user()
+    if not current_user or current_user.get("username") in (None, "admin"):
+        return
+
+    prefs = get_prefs()
+    required_keys = ["company_name", "contact_name", "default_product", "main_products", "company_description"]
+    completed = sum(1 for key in required_keys if prefs.get(key, "").strip())
+    if prefs.get("onboarding_completed") == "true" and completed == len(required_keys):
+        return
+
+    st.markdown(
+        f"""
+        <div class="onboarding-banner">
+          <div class="onboarding-title">🚀 完成快速设置，让 AI 更懂你的业务</div>
+          <div class="onboarding-copy">
+            先填写公司名称、主营产品、目标市场和写作风格，后续开发信、询盘回复、报价和客户跟进会自动带入这些信息，减少重复输入。
+          </div>
+          <div class="onboarding-progress">当前资料完成度：{completed}/{len(required_keys)}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if st.button("开始 2 分钟快速设置", key="home_onboarding_btn", type="primary"):
+        st.switch_page("pages/34_🚀_快速设置.py")
+
+
 def _render_home(st) -> None:
     """Render the home page. ``st`` is injected to keep imports out of module scope."""
     st.markdown(HOME_CSS, unsafe_allow_html=True)
     _render_email_verification_banner(st)
+    _render_onboarding_banner(st)
 
     st.markdown(
         """
