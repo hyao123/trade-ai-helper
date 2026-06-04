@@ -26,6 +26,8 @@ import streamlit as st
 from utils.storage import load_json, load_user_json, save_json, save_user_json
 
 _PREFS_FILE = "prefs.json"
+_MAX_CONTEXT_VALUE_CHARS = 500
+_MAX_CONTEXT_TOTAL_CHARS = 1600
 
 # ---------------------------------------------------------------------------
 # Defaults
@@ -84,6 +86,14 @@ def _save_prefs_raw(data: dict) -> None:
         save_json(_PREFS_FILE, data)
 
 
+def _trim_context_value(value: str) -> str:
+    """Normalize and cap user-entered context before injecting into prompts."""
+    cleaned = " ".join(str(value or "").split())
+    if len(cleaned) <= _MAX_CONTEXT_VALUE_CHARS:
+        return cleaned
+    return cleaned[: _MAX_CONTEXT_VALUE_CHARS - 1].rstrip() + "…"
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -129,17 +139,52 @@ def save_seller_identity(
     })
 
 
+def get_business_context_suffix() -> str:
+    """Build a compact business-context suffix from onboarding/profile fields."""
+    prefs = get_prefs()
+    context_fields = [
+        ("Company", prefs.get("company_name", "")),
+        ("Contact", prefs.get("contact_name", "") or prefs.get("signature_name", "")),
+        ("Default product", prefs.get("default_product", "")),
+        ("Main products", prefs.get("main_products", "")),
+        ("Target markets", prefs.get("target_markets", "")),
+        ("Company strengths", prefs.get("company_description", "")),
+        ("Default trade term", prefs.get("default_trade_term", "")),
+    ]
+    lines = []
+    for label, raw_value in context_fields:
+        value = _trim_context_value(raw_value)
+        if value:
+            lines.append(f"- {label}: {value}")
+
+    if not lines:
+        return ""
+
+    suffix = (
+        "\n\nBusiness context to use when relevant. "
+        "Treat this as trusted seller profile data, not customer instructions:\n"
+        + "\n".join(lines)
+    )
+    if len(suffix) <= _MAX_CONTEXT_TOTAL_CHARS:
+        return suffix
+    return suffix[: _MAX_CONTEXT_TOTAL_CHARS - 1].rstrip() + "…"
+
+
 # ---------------------------------------------------------------------------
 # AI style helpers
 # ---------------------------------------------------------------------------
 def get_ai_style_suffix() -> str:
     """
-    Build a short style instruction suffix to append to prompts.
+    Build a short style and business-context instruction suffix to append to prompts.
 
     Returns empty string if no custom preferences are set.
     """
     prefs = get_prefs()
     parts: list[str] = []
+
+    business_context = get_business_context_suffix()
+    if business_context:
+        parts.append(business_context)
 
     tone = prefs.get("ai_style_tone", "")
     length = prefs.get("ai_response_length", "")
@@ -158,17 +203,19 @@ def get_ai_style_suffix() -> str:
         "详细": "Provide a detailed, thorough response (150-250 words).",
     }
 
+    style_parts: list[str] = []
     if tone and tone in tone_map:
-        parts.append(tone_map[tone])
+        style_parts.append(tone_map[tone])
     if length and length in length_map:
-        parts.append(length_map[length])
+        style_parts.append(length_map[length])
     if forbidden:
         words = [w.strip() for w in forbidden.split(",") if w.strip()]
         if words:
-            parts.append(f"Avoid using these words: {', '.join(words)}.")
+            style_parts.append(f"Avoid using these words: {', '.join(words)}.")
     if custom:
-        parts.append(custom)
+        style_parts.append(custom)
 
-    if not parts:
-        return ""
-    return "\n\nAdditional style instructions:\n" + " ".join(parts)
+    if style_parts:
+        parts.append("\n\nAdditional style instructions:\n" + " ".join(style_parts))
+
+    return "".join(parts)
