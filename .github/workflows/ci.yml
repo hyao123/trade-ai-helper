@@ -25,26 +25,20 @@ jobs:
         run: ruff check . --select E,F,I --ignore E501
 
       - name: Syntax check (all .py files)
-        run: python -c "
-          import ast, pathlib, sys
-          errors = []
-          for f in sorted(pathlib.Path('.').rglob('*.py')):
-              if '.git' in str(f): continue
-              try: ast.parse(f.read_text())
-              except SyntaxError as e: errors.append(f'{f}: {e}')
-          if errors:
-              print('\n'.join(errors)); sys.exit(1)
-          print(f'All {len(list(pathlib.Path(\".\").rglob(\"*.py\")))} files passed')
-          "
+        run: python -m compileall .
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
 
-  # ── Auto-merge: runs only on PRs targeting master, after lint-and-test passes ──
+  # Auto-merge is intentionally label-gated.
+  # Add an `automerge` label to low-risk PRs that may be squashed after CI passes.
   auto-merge:
-    name: Auto-merge to master
-    needs: lint-and-test                 # only runs when CI passes
-    if: github.event_name == 'pull_request' && github.base_ref == 'master'
+    name: Auto-merge labeled PRs to master
+    needs: lint-and-test
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.base_ref == 'master' &&
+      contains(github.event.pull_request.labels.*.name, 'automerge')
     runs-on: ubuntu-latest
     permissions:
       contents: write
