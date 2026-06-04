@@ -30,145 +30,33 @@ app = application
 
 HOME_CSS = """
 <style>
-/* ── Stat Bar: 浅色优雅配色 ── */
-.stat-bar {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 10px;
-    margin: 0.5rem 0 1.6rem;
-}
+.stat-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 0.5rem 0 1.6rem; }
 @media (max-width: 768px) { .stat-bar { grid-template-columns: repeat(3, 1fr); } }
-.stat-pill {
-    background: #ffffff;
-    border: 1px solid #e8ecf0;
-    border-radius: 12px;
-    padding: 14px 16px;
-    display: flex; align-items: center; gap: 12px;
-    transition: border-color .2s, box-shadow .2s;
-}
-.stat-pill:hover {
-    border-color: #a5b4fc;
-    box-shadow: 0 2px 10px rgba(99,102,241,0.08);
-}
-.stat-pill-icon {
-    width: 40px; height: 40px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.15rem; flex-shrink: 0;
-}
-.stat-pill-val {
-    font-size: 1.3rem; font-weight: 800; line-height: 1;
-    color: #1e293b;
-}
-.stat-pill-lbl {
-    font-size: 0.72rem; margin-top: 2px;
-    color: #64748b;
-    font-weight: 500;
-}
-
-/* ── Quick Access: 卡片=按钮，紧凑美观 ── */
-.qa-section .stButton > button {
-    background: #ffffff !important;
-    border: 1.5px solid #e2e8f0 !important;
-    border-radius: 14px !important;
-    padding: 18px 8px 14px !important;
-    min-height: 100px !important;
-    white-space: pre-line !important;
-    line-height: 1.5 !important;
-    font-size: 0.78rem !important;
-    color: #475569 !important;
-    font-weight: 500 !important;
-    transition: all .2s ease !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
-}
-.qa-section .stButton > button:hover {
-    border-color: #6366f1 !important;
-    box-shadow: 0 4px 16px rgba(99,102,241,0.12) !important;
-    transform: translateY(-2px) !important;
-    color: #312e81 !important;
-    background: linear-gradient(180deg, #ffffff 0%, #f5f3ff 100%) !important;
-}
-.qa-section .stButton > button:active {
-    transform: translateY(0px) !important;
-    box-shadow: 0 1px 4px rgba(99,102,241,0.1) !important;
-}
-
-/* ── Nav → button: Apple-style 长条按钮 ── */
-.nav-section .stButton > button {
-    background: #f8f8fa !important;
-    color: #1d1d1f !important;
-    border: none !important;
-    border-radius: 12px !important;
-    font-weight: 500 !important;
-    font-size: 0.92rem !important;
-    padding: 14px 20px !important;
-    text-align: left !important;
-    box-shadow: none !important;
-    transition: all .2s cubic-bezier(.4,0,.2,1) !important;
-    margin-bottom: 6px !important;
-    letter-spacing: -0.01em !important;
-    -webkit-font-smoothing: antialiased !important;
-}
-.nav-section .stButton > button:hover {
-    background: #f0eef5 !important;
-    color: #1d1d1f !important;
-    box-shadow: none !important;
-    transform: scale(0.985) !important;
-}
-.nav-section .stButton > button:active {
-    background: #e8e6ef !important;
-    transform: scale(0.975) !important;
-    transition: all .08s !important;
-}
-
-/* ── Tips row ── */
-.tips-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    margin: 0.6rem 0 1rem;
-}
+.stat-pill { background: #ffffff; border: 1px solid #e8ecf0; border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; transition: border-color .2s, box-shadow .2s; }
+.stat-pill:hover { border-color: #a5b4fc; box-shadow: 0 2px 10px rgba(99,102,241,0.08); }
+.stat-pill-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; flex-shrink: 0; }
+.stat-pill-val { font-size: 1.3rem; font-weight: 800; line-height: 1; color: #1e293b; }
+.stat-pill-lbl { font-size: 0.72rem; margin-top: 2px; color: #64748b; font-weight: 500; }
+.qa-section .stButton > button { background: #ffffff !important; border: 1.5px solid #e2e8f0 !important; border-radius: 14px !important; padding: 18px 8px 14px !important; min-height: 100px !important; white-space: pre-line !important; line-height: 1.5 !important; font-size: 0.78rem !important; color: #475569 !important; font-weight: 500 !important; transition: all .2s ease !important; box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important; }
+.qa-section .stButton > button:hover { border-color: #6366f1 !important; box-shadow: 0 4px 16px rgba(99,102,241,0.12) !important; transform: translateY(-2px) !important; color: #312e81 !important; background: linear-gradient(180deg, #ffffff 0%, #f5f3ff 100%) !important; }
+.qa-section .stButton > button:active { transform: translateY(0px) !important; box-shadow: 0 1px 4px rgba(99,102,241,0.1) !important; }
+.nav-section .stButton > button { background: #f8f8fa !important; color: #1d1d1f !important; border: none !important; border-radius: 12px !important; font-weight: 500 !important; font-size: 0.92rem !important; padding: 14px 20px !important; text-align: left !important; box-shadow: none !important; transition: all .2s cubic-bezier(.4,0,.2,1) !important; margin-bottom: 6px !important; letter-spacing: -0.01em !important; -webkit-font-smoothing: antialiased !important; }
+.nav-section .stButton > button:hover { background: #f0eef5 !important; color: #1d1d1f !important; box-shadow: none !important; transform: scale(0.985) !important; }
+.nav-section .stButton > button:active { background: #e8e6ef !important; transform: scale(0.975) !important; transition: all .08s !important; }
+.tips-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 0.6rem 0 1rem; }
 @media (max-width: 768px) { .tips-grid { grid-template-columns: repeat(2, 1fr); } }
-.tip-pill {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 16px 18px;
-    font-size: 0.88rem; line-height: 1.55;
-    color: #64748b;
-    border-top: 3px solid #6366f1;
-}
+.tip-pill { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 18px; font-size: 0.88rem; line-height: 1.55; color: #64748b; border-top: 3px solid #6366f1; }
 .tip-pill strong { color: #1e293b; display: block; margin-bottom: 5px; font-size: 0.92rem; }
-
-/* ── Hero: 深蓝紫渐变，白色文字高对比 ── */
-.hero-section {
-    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 30%, #4338ca 65%, #6366f1 100%) !important;
-    padding: 2.4rem 2.2rem 2rem !important;
-    margin-bottom: 1.4rem !important;
-    border-radius: 20px !important;
-}
-.hero-badge {
-    background: rgba(255,255,255,0.1) !important;
-    border: 1px solid rgba(255,255,255,0.2) !important;
-    color: #e0e7ff !important;
-}
-.hero-title {
-    font-size: 2.1rem !important;
-    color: #ffffff !important;
-}
+.hero-section { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 30%, #4338ca 65%, #6366f1 100%) !important; padding: 2.4rem 2.2rem 2rem !important; margin-bottom: 1.4rem !important; border-radius: 20px !important; }
+.hero-badge { background: rgba(255,255,255,0.1) !important; border: 1px solid rgba(255,255,255,0.2) !important; color: #e0e7ff !important; }
+.hero-title { font-size: 2.1rem !important; color: #ffffff !important; }
 .hero-title span { color: #a5b4fc !important; }
-.hero-subtitle {
-    font-size: 0.92rem !important;
-    color: #c7d2fe !important;
-    opacity: 1 !important;
-}
+.hero-subtitle { font-size: 0.92rem !important; color: #c7d2fe !important; opacity: 1 !important; }
 .hero-tags { margin-top: 1rem !important; gap: 6px !important; }
-.hero-tag {
-    font-size: 0.72rem !important;
-    padding: 4px 11px !important;
-    background: rgba(255,255,255,0.08) !important;
-    border: 1px solid rgba(255,255,255,0.15) !important;
-    color: #e0e7ff !important;
-}
+.hero-tag { font-size: 0.72rem !important; padding: 4px 11px !important; background: rgba(255,255,255,0.08) !important; border: 1px solid rgba(255,255,255,0.15) !important; color: #e0e7ff !important; }
+.email-verify-banner { background: linear-gradient(135deg, #fff7ed 0%, #fffbeb 100%); border: 1px solid #fed7aa; border-left: 5px solid #f97316; border-radius: 16px; padding: 1rem 1.1rem; margin: 0.2rem 0 1.2rem; color: #7c2d12; box-shadow: 0 8px 24px rgba(249,115,22,0.10); }
+.email-verify-title { font-weight: 850; font-size: 1rem; color: #9a3412; margin-bottom: 0.25rem; }
+.email-verify-copy { font-size: 0.88rem; line-height: 1.65; color: #7c2d12; }
 </style>
 """
 
@@ -235,9 +123,48 @@ NAV_SECTIONS = {
 }
 
 
+def _render_email_verification_banner(st) -> None:
+    """Show a clear home-page reminder when the current user's email is unverified."""
+    from utils.repositories import load_user
+    from utils.user_auth import get_current_user
+
+    current_user = get_current_user()
+    if not current_user or current_user.get("username") in (None, "admin"):
+        return
+
+    username = current_user.get("username", "")
+    latest_user = load_user(username) or current_user
+    if latest_user.get("email_verified") is True:
+        st.session_state["current_user"].update(
+            {
+                "email_verified": True,
+                "email": latest_user.get("email", current_user.get("email", "")),
+            }
+        )
+        return
+
+    email = latest_user.get("email") or current_user.get("email") or "你的邮箱"
+    st.markdown(
+        f"""
+        <div class="email-verify-banner">
+          <div class="email-verify-title">📮 请先验证邮箱，解锁 AI 生成与套餐升级</div>
+          <div class="email-verify-copy">
+            我们已为账号 <strong>{username}</strong> 绑定邮箱 <strong>{email}</strong>。
+            为确保密码找回和账户通知可用，AI 生成、付费升级和高级功能需要先完成邮箱验证。
+            请进入「账户管理」输入验证码，或重新发送验证邮件。
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if st.button("去账户管理验证邮箱", key="home_verify_email_btn", type="primary"):
+        st.switch_page("pages/11_👤_账户管理.py")
+
+
 def _render_home(st) -> None:
     """Render the home page. ``st`` is injected to keep imports out of module scope."""
     st.markdown(HOME_CSS, unsafe_allow_html=True)
+    _render_email_verification_banner(st)
 
     st.markdown(
         """
@@ -287,18 +214,12 @@ def _render_home(st) -> None:
 
     st.markdown('<div class="section-label">全功能导航</div>', unsafe_allow_html=True)
     st.markdown('<div class="nav-section">', unsafe_allow_html=True)
-
     tabs = st.tabs(list(NAV_SECTIONS.keys()))
     for tab, items in zip(tabs, NAV_SECTIONS.values()):
         with tab:
             for icon, title, desc, page in items:
-                if st.button(
-                    f"{icon}  {title}  —  {desc}",
-                    key=f"nav_{icon}_{title}",
-                    use_container_width=True,
-                ):
+                if st.button(f"{icon}  {title}  —  {desc}", key=f"nav_{icon}_{title}", use_container_width=True):
                     st.switch_page(page)
-
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown(
@@ -333,7 +254,6 @@ def main() -> None:
     from utils.ui_helpers import check_auth, inject_css
 
     configure_logging()
-
     st.set_page_config(
         page_title="外贸AI助手 | AI-Trade Pro",
         page_icon="💼",
