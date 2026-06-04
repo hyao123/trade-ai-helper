@@ -17,13 +17,19 @@ Stores per-user preferences:
   - ai_custom_instructions                    (free-text extra instructions)
   - ai_forbidden_words                        (comma-separated words to avoid)
 
-All values are read/written from data/users/{username}/prefs.json.
+All values are read/written through utils.repositories and the active
+DatabaseBackend. The default JSONBackend keeps the existing prefs.json layout.
 """
 from __future__ import annotations
 
 import streamlit as st
 
-from utils.storage import load_json, load_user_json, save_json, save_user_json
+from utils.repositories import (
+    load_shared_prefs,
+    load_user_prefs,
+    save_shared_prefs,
+    save_user_prefs,
+)
 
 _PREFS_FILE = "prefs.json"
 _MAX_CONTEXT_VALUE_CHARS = 500
@@ -74,16 +80,16 @@ def _get_username() -> str | None:
 def _load_prefs_raw() -> dict:
     username = _get_username()
     if username:
-        return load_user_json(username, _PREFS_FILE, default={})
-    return load_json(_PREFS_FILE, default={})
+        return load_user_prefs(username)
+    return load_shared_prefs()
 
 
 def _save_prefs_raw(data: dict) -> None:
     username = _get_username()
     if username:
-        save_user_json(username, _PREFS_FILE, data)
+        save_user_prefs(username, data)
     else:
-        save_json(_PREFS_FILE, data)
+        save_shared_prefs(data)
 
 
 def _trim_context_value(value: str) -> str:
