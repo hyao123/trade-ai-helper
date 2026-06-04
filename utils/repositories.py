@@ -1,8 +1,9 @@
 """Repository helpers built on top of the configured DatabaseBackend.
 
-This module is the narrow data-access seam for account, pricing, payment, and
-history state. The default backend remains JSON via ``utils.db.JSONBackend``, but
-callers no longer reach into ``utils.storage`` directly for core per-user data.
+This module is the narrow data-access seam for account, pricing, payment,
+history, and preference state. The default backend remains JSON via
+``utils.db.JSONBackend``, but callers no longer reach into ``utils.storage``
+directly for core per-user data.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ LOGIN_FAILURES_COLLECTION = "login_failures.json"
 USAGE_COLLECTION = "usage.json"
 CONSUMED_SESSIONS_COLLECTION = "consumed_sessions.json"
 HISTORY_COLLECTION = "history.json"
+PREFS_COLLECTION = "prefs.json"
 
 
 # ---------------------------------------------------------------------------
@@ -105,3 +107,28 @@ def load_shared_history() -> list[dict]:
 def save_shared_history(history: list[dict]) -> None:
     """Persist shared/admin generation history."""
     get_db().save_global_data(HISTORY_COLLECTION, history)
+
+
+# ---------------------------------------------------------------------------
+# User preferences / onboarding
+# ---------------------------------------------------------------------------
+def load_user_prefs(username: str) -> dict:
+    """Return persisted preferences for a user."""
+    data: Any = get_db().load_user_data(username, PREFS_COLLECTION, default={})
+    return data if isinstance(data, dict) else {}
+
+
+def save_user_prefs(username: str, prefs: dict) -> None:
+    """Persist preferences for a user."""
+    get_db().save_user_data(username, PREFS_COLLECTION, prefs)
+
+
+def load_shared_prefs() -> dict:
+    """Return shared/admin preferences."""
+    data: Any = get_db().load_global_data(PREFS_COLLECTION, default={})
+    return data if isinstance(data, dict) else {}
+
+
+def save_shared_prefs(prefs: dict) -> None:
+    """Persist shared/admin preferences."""
+    get_db().save_global_data(PREFS_COLLECTION, prefs)
