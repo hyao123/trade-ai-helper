@@ -7,6 +7,8 @@ Stores per-user preferences:
   - company_name, contact_name, email, phone  (seller identity)
   - signature_name                            (email signature)
   - default_product                           (last used product)
+  - main_products, target_markets             (business context)
+  - onboarding_completed                      (quick setup completion flag)
   - default_language                          (preferred output language)
   - default_trade_term                        (FOB/CIF/etc)
   - default_tone                              (email tone)
@@ -38,6 +40,8 @@ _DEFAULTS: dict[str, str] = {
     "company_industry": "",            # 企业所属行业 (electronics/automotive/...)
     "company_description": "",         # 企业简介 (用于自动推送时的公司介绍)
     "main_products": "",               # 主营产品概述 (逗号分隔或自由描述)
+    "target_markets": "",              # 主要目标市场 / 区域
+    "onboarding_completed": "false",   # 快速设置是否完成
     "default_language": "英语",
     "default_trade_term": "FOB",
     "default_tone": "简洁专业",
