@@ -1,6 +1,7 @@
 """Tests for user preference prompt suffix helpers."""
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tempfile
@@ -18,6 +19,35 @@ sys.modules["streamlit"] = _mock_st
 def _setup_user_session(username: str = "prefuser"):
     _mock_st.session_state.clear()
     _mock_st.session_state["current_user"] = {"username": username, "tier": "free"}
+
+
+def test_user_preferences_persist_to_existing_json_layout():
+    _setup_user_session("jsonuser")
+    with tempfile.TemporaryDirectory() as tmp_str:
+        tmp_dir = Path(tmp_str)
+        with patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            from utils.user_prefs import get_pref, update_prefs
+            update_prefs({"company_name": "Repository Export Ltd."})
+            assert get_pref("company_name") == "Repository Export Ltd."
+            prefs_path = tmp_dir / "users" / "jsonuser" / "prefs.json"
+            assert prefs_path.exists()
+            stored = json.loads(prefs_path.read_text(encoding="utf-8"))
+            assert stored["company_name"] == "Repository Export Ltd."
+
+
+def test_shared_preferences_persist_for_admin_or_anonymous_context():
+    _mock_st.session_state.clear()
+    _mock_st.session_state["current_user"] = {"username": "admin", "tier": "enterprise"}
+    with tempfile.TemporaryDirectory() as tmp_str:
+        tmp_dir = Path(tmp_str)
+        with patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            from utils.user_prefs import get_pref, update_prefs
+            update_prefs({"default_product": "Shared Default Product"})
+            assert get_pref("default_product") == "Shared Default Product"
+            prefs_path = tmp_dir / "prefs.json"
+            assert prefs_path.exists()
+            stored = json.loads(prefs_path.read_text(encoding="utf-8"))
+            assert stored["default_product"] == "Shared Default Product"
 
 
 def test_business_context_suffix_empty_without_profile_data():
