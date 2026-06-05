@@ -75,13 +75,18 @@ def create_tracking_record(
         "customer_id": customer_id,
         "campaign": campaign,
         "sent_at": datetime.now().isoformat(),
+        "delivered_at": None,
         "opened_at": None,
         "open_count": 0,
         "clicked_at": None,
         "click_count": 0,
         "clicked_links": [],
         "replied_at": None,
-        "status": "sent",  # sent / opened / clicked / replied / bounced
+        "bounced_at": None,
+        "spam_reported_at": None,
+        "unsubscribed_at": None,
+        "provider_events": [],
+        "status": "sent",  # sent / delivered / opened / clicked / replied / bounced / spamreport / unsubscribe
     }
 
     # Save to global tracking store
@@ -173,7 +178,7 @@ def generate_tracked_email_html(
         body_text: Plain text email body
         tracking_id: Tracking identifier
         include_pixel: Whether to add open tracking pixel
-        track_links: Whether to wrap links for click tracking
+        track_links: Whether to wrap links
 
     Returns:
         Complete tracked HTML email body
@@ -231,7 +236,7 @@ def record_open(tracking_id: str) -> bool:
             record["open_count"] = record.get("open_count", 0) + 1
             if not record.get("opened_at"):
                 record["opened_at"] = datetime.now().isoformat()
-            if record["status"] == "sent":
+            if record["status"] in ("sent", "delivered"):
                 record["status"] = "opened"
             save_json(_TRACKING_FILE, records)
             logger.info("Open recorded: %s (count=%d)", tracking_id, record["open_count"])
@@ -272,7 +277,7 @@ def record_click(tracking_id: str, url: str = "") -> bool:
                 clicked_links = record.get("clicked_links", [])
                 clicked_links.append({"url": url, "at": datetime.now().isoformat()})
                 record["clicked_links"] = clicked_links[-20:]  # Keep last 20
-            if record["status"] in ("sent", "opened"):
+            if record["status"] in ("sent", "delivered", "opened"):
                 record["status"] = "clicked"
             save_json(_TRACKING_FILE, records)
             logger.info("Click recorded: %s -> %s", tracking_id, url[:50])
@@ -298,6 +303,53 @@ def record_reply(tracking_id: str) -> bool:
             save_json(_TRACKING_FILE, records)
             logger.info("Reply recorded: %s", tracking_id)
             return True
+    return False
+
+
+def update_tracking_status(tracking_id: str, status: str, reason: str = "") -> bool:
+    """Update a tracking record from provider webhook events.
+
+    This is used by SendGrid/Mailgun webhooks to mirror delivery, bounce,
+    spam-report, and unsubscribe events into the existing tracking dashboard.
+    """
+    if not tracking_id:
+        return False
+
+    status = status.strip().lower()
+    now = datetime.now().isoformat()
+    status_field_map = {
+        "processed": "processed_at",
+        "delivered": "delivered_at",
+        "deferred": "deferred_at",
+        "bounce": "bounced_at",
+        "bounced": "bounced_at",
+        "dropped": "dropped_at",
+        "spamreport": "spam_reported_at",
+        "unsubscribe": "unsubscribed_at",
+        "group_unsubscribe": "unsubscribed_at",
+    }
+
+    records = load_json(_TRACKING_FILE, default=[])
+    for record in records:
+        if record.get("tracking_id") == tracking_id:
+            field = status_field_map.get(status)
+            if field and not record.get(field):
+                record[field] = now
+
+            # Preserve stronger engagement states over delivered/processed.
+            if status in {"processed", "delivered", "deferred"}:
+                if record.get("status") == "sent":
+                    record["status"] = status
+            else:
+                record["status"] = status
+
+            provider_events = record.get("provider_events", [])
+            provider_events.append({"type": status, "reason": reason, "at": now})
+            record["provider_events"] = provider_events[-50:]
+            save_json(_TRACKING_FILE, records)
+            logger.info("Tracking status updated: %s -> %s", tracking_id, status)
+            return True
+    logger.warning("Provider event for unknown tracking_id: %s", tracking_id)
     return False
 
 

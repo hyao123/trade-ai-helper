@@ -1,7 +1,7 @@
 """Repository helpers built on top of the configured DatabaseBackend.
 
 This module is the narrow data-access seam for account, pricing, payment,
-history, and preference state. The default backend remains JSON via
+history, preference, and email event state. The default backend remains JSON via
 ``utils.db.JSONBackend``, but callers no longer reach into ``utils.storage``
 directly for core per-user data.
 """
@@ -18,6 +18,7 @@ USAGE_COLLECTION = "usage.json"
 CONSUMED_SESSIONS_COLLECTION = "consumed_sessions.json"
 HISTORY_COLLECTION = "history.json"
 PREFS_COLLECTION = "prefs.json"
+EMAIL_EVENTS_COLLECTION = "email_events.json"
 
 
 # ---------------------------------------------------------------------------
@@ -132,3 +133,17 @@ def load_shared_prefs() -> dict:
 def save_shared_prefs(prefs: dict) -> None:
     """Persist shared/admin preferences."""
     get_db().save_global_data(PREFS_COLLECTION, prefs)
+
+
+# ---------------------------------------------------------------------------
+# Provider email events / webhooks
+# ---------------------------------------------------------------------------
+def load_email_events() -> list[dict]:
+    """Return normalized SendGrid/Mailgun email webhook events."""
+    data: Any = get_db().load_global_data(EMAIL_EVENTS_COLLECTION, default=[])
+    return data if isinstance(data, list) else []
+
+
+def save_email_events(events: list[dict]) -> None:
+    """Persist normalized SendGrid/Mailgun email webhook events."""
+    get_db().save_global_data(EMAIL_EVENTS_COLLECTION, events)
