@@ -29,12 +29,26 @@ from utils.storage import get_data_dir
 
 logger = get_logger("user_auth")
 
-_PBKDF2_ITERATIONS = 100_000
-_PASSWORD_MIN_LENGTH = 8
+_PASSWORD_HASH_ALGORITHM = "pbkdf2_sha256"
+_PASSWORD_HASH_VERSION = "v2"
+_PBKDF2_ITERATIONS = 310_000
+_LEGACY_PBKDF2_ITERATIONS = 100_000
+_PASSWORD_MIN_LENGTH = 10
 _LOGIN_FAILURE_LIMIT = 5
 _LOGIN_FAILURE_WINDOW_SECONDS = 15 * 60
 _USERS_DB_FILENAME = "users_db.json"
 _EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+_COMMON_WEAK_PASSWORDS = {
+    "password",
+    "password1",
+    "password123",
+    "12345678",
+    "123456789",
+    "1234567890",
+    "qwerty123",
+    "admin12345",
+    "letmein123",
+}
 
 
 def _get_users_db_path() -> Path:
@@ -49,30 +63,82 @@ def _get_users_dir() -> Path:
     return users_dir
 
 
-def _hash_password(password: str, salt: str | None = None) -> str:
-    """Hash a password using PBKDF2-HMAC-SHA256 with a per-user random salt."""
-    if salt is None:
-        salt = os.urandom(16).hex()
-    hash_bytes = hashlib.pbkdf2_hmac(
+def _pbkdf2_hex(password: str, salt: str, iterations: int) -> str:
+    """Return PBKDF2-HMAC-SHA256 hex digest."""
+    return hashlib.pbkdf2_hmac(
         "sha256",
         password.encode("utf-8"),
         salt.encode("utf-8"),
-        _PBKDF2_ITERATIONS,
-    )
-    return f"{salt}:{hash_bytes.hex()}"
+        iterations,
+    ).hex()
+
+
+def _hash_password(password: str, salt: str | None = None, iterations: int = _PBKDF2_ITERATIONS) -> str:
+    """Hash a password using a versioned PBKDF2-HMAC-SHA256 format.
+
+    New format:
+        pbkdf2_sha256$v2$310000$salt$hash
+
+    Legacy ``salt:hash`` records are still verified by ``_verify_password`` and
+    are upgraded automatically after successful login.
+    """
+    if salt is None:
+        salt = os.urandom(16).hex()
+    digest = _pbkdf2_hex(password, salt, iterations)
+    return f"{_PASSWORD_HASH_ALGORITHM}${_PASSWORD_HASH_VERSION}${iterations}${salt}${digest}"
 
 
 def _verify_password(password: str, stored_hash: str) -> bool:
-    """Verify a password against a stored hash string."""
+    """Verify a password against either versioned or legacy stored hash strings."""
+    if not stored_hash:
+        return False
+
+    if stored_hash.startswith(f"{_PASSWORD_HASH_ALGORITHM}$"):
+        try:
+            algorithm, _version, iterations_str, salt, digest = stored_hash.split("$", 4)
+            if algorithm != _PASSWORD_HASH_ALGORITHM:
+                return False
+            iterations = int(iterations_str)
+        except (ValueError, TypeError):
+            return False
+        expected = f"{algorithm}${_PASSWORD_HASH_VERSION}${iterations}${salt}${_pbkdf2_hex(password, salt, iterations)}"
+        # Compare only the digest portion through an equivalently-shaped string.
+        return hmac.compare_digest(expected.rsplit("$", 1)[-1], digest)
+
+    # Legacy format: salt:hash using 100k PBKDF2 iterations.
     if ":" not in stored_hash:
         return False
-    salt = stored_hash.split(":")[0]
-    return hmac.compare_digest(_hash_password(password, salt), stored_hash)
+    salt, legacy_digest = stored_hash.split(":", 1)
+    return hmac.compare_digest(_pbkdf2_hex(password, salt, _LEGACY_PBKDF2_ITERATIONS), legacy_digest)
+
+
+def _password_needs_rehash(stored_hash: str) -> bool:
+    """Return True when a stored hash should be upgraded to the current policy."""
+    if not stored_hash.startswith(f"{_PASSWORD_HASH_ALGORITHM}$"):
+        return True
+    try:
+        algorithm, version, iterations_str, _salt, _digest = stored_hash.split("$", 4)
+        return (
+            algorithm != _PASSWORD_HASH_ALGORITHM
+            or version != _PASSWORD_HASH_VERSION
+            or int(iterations_str) < _PBKDF2_ITERATIONS
+        )
+    except (ValueError, TypeError):
+        return True
 
 
 def _is_strong_password(password: str) -> bool:
     """Return True when a password meets the current minimum policy."""
-    return bool(password) and len(password) >= _PASSWORD_MIN_LENGTH
+    if not password or len(password) < _PASSWORD_MIN_LENGTH:
+        return False
+    if password.strip().lower() in _COMMON_WEAK_PASSWORDS:
+        return False
+    return True
+
+
+def _password_policy_message() -> str:
+    """Return user-facing password policy guidance."""
+    return f"Password must be at least {_PASSWORD_MIN_LENGTH} characters and not be a common weak password"
 
 
 def _is_valid_email(email: str) -> bool:
@@ -172,7 +238,7 @@ def register_user(username: str, password: str, email: str = "") -> tuple[bool, 
     if not _is_valid_email(email):
         return False, "Email is required for password recovery and account contact"
     if not _is_strong_password(password):
-        return False, f"Password must be at least {_PASSWORD_MIN_LENGTH} characters"
+        return False, _password_policy_message()
 
     email = email.strip().lower()
     users = _load_users_db()
@@ -230,6 +296,11 @@ def authenticate_user(username: str, password: str) -> tuple[bool, dict | None]:
 
     user = users[username]
     if _verify_password(password, user["password_hash"]):
+        if _password_needs_rehash(user.get("password_hash", "")):
+            users[username]["password_hash"] = _hash_password(password)
+            _save_users_db(users)
+            user = users[username]
+            logger.info("Password hash upgraded for user: %s", username)
         _clear_login_failures(username)
         user_info = _build_public_user_info(user)
         logger.info("User authenticated: %s", username)
@@ -247,7 +318,7 @@ def get_current_user() -> dict | None:
 def change_password(username: str, old_password: str, new_password: str) -> tuple[bool, str]:
     """Change a user's password."""
     if not _is_strong_password(new_password):
-        return False, f"New password must be at least {_PASSWORD_MIN_LENGTH} characters"
+        return False, _password_policy_message()
 
     username = username.strip().lower()
     users = _load_users_db()
@@ -394,7 +465,7 @@ def request_password_reset(email_or_username: str) -> tuple[bool, str]:
 def reset_password(username: str, token: str, new_password: str) -> tuple[bool, str]:
     """Reset a user's password using a reset token."""
     if not _is_strong_password(new_password):
-        return False, f"Password must be at least {_PASSWORD_MIN_LENGTH} characters"
+        return False, _password_policy_message()
     if not username or not token:
         return False, "Username and token are required"
 
