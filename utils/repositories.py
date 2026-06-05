@@ -1,9 +1,9 @@
 """Repository helpers built on top of the configured DatabaseBackend.
 
 This module is the narrow data-access seam for account, pricing, payment,
-history, preference, and email event state. The default backend remains JSON via
-``utils.db.JSONBackend``, but callers no longer reach into ``utils.storage``
-directly for core per-user data.
+history, preference, email event, and inbound email state. The default backend
+remains JSON via ``utils.db.JSONBackend``, but callers no longer reach into
+``utils.storage`` directly for core per-user data.
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ CONSUMED_SESSIONS_COLLECTION = "consumed_sessions.json"
 HISTORY_COLLECTION = "history.json"
 PREFS_COLLECTION = "prefs.json"
 EMAIL_EVENTS_COLLECTION = "email_events.json"
+INBOUND_EMAILS_COLLECTION = "inbound_emails.json"
 
 
 # ---------------------------------------------------------------------------
@@ -147,3 +148,17 @@ def load_email_events() -> list[dict]:
 def save_email_events(events: list[dict]) -> None:
     """Persist normalized SendGrid/Mailgun email webhook events."""
     get_db().save_global_data(EMAIL_EVENTS_COLLECTION, events)
+
+
+# ---------------------------------------------------------------------------
+# Inbound email intake
+# ---------------------------------------------------------------------------
+def load_inbound_emails(username: str) -> list[dict]:
+    """Return inbound emails imported by a user."""
+    data: Any = get_db().load_user_data(username, INBOUND_EMAILS_COLLECTION, default=[])
+    return data if isinstance(data, list) else []
+
+
+def save_inbound_emails(username: str, emails: list[dict]) -> None:
+    """Persist inbound emails imported by a user."""
+    get_db().save_user_data(username, INBOUND_EMAILS_COLLECTION, emails)
