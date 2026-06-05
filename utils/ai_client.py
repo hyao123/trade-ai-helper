@@ -20,6 +20,7 @@ Multi-model routing:
 
 from __future__ import annotations
 
+import hashlib
 import time
 from collections import defaultdict
 from typing import Generator
@@ -183,17 +184,37 @@ def _check_preconditions(user_id: str = "default") -> str | None:
     return None
 
 
+def _error_code(e: Exception) -> str:
+    """Build a short deterministic error code without exposing provider details."""
+    raw = f"{type(e).__name__}:{str(e)[:200]}".encode("utf-8", errors="ignore")
+    return hashlib.sha256(raw).hexdigest()[:8].upper()
+
+
 def _handle_api_error(e: Exception) -> str:
-    logger.error("API error: %s: %s", type(e).__name__, e)
+    """Return a sanitized user-facing AI error while logging full details."""
+    code = _error_code(e)
+    logger.exception("AI provider error code=%s type=%s", code, type(e).__name__)
     if isinstance(e, AuthenticationError):
-        return "⚠️ API Key 无效，请检查 API Key 配置。"
+        return f"⚠️ AI 服务认证失败，请联系管理员检查 API Key 配置。错误码：{code}"
     if isinstance(e, RateLimitError):
-        return "⚠️ API 调用超出平台限额，请稍后重试或升级套餐。"
+        return f"⚠️ AI 服务当前限流，请稍后重试。错误码：{code}"
     if isinstance(e, APITimeoutError):
-        return "⚠️ 请求超时，请检查网络连接后重试。"
+        return f"⚠️ AI 请求超时，请稍后重试。错误码：{code}"
     if isinstance(e, APIStatusError):
-        return f"⚠️ AI 服务器错误 ({e.status_code})，请稍后重试。"
-    return f"⚠️ 调用失败: {e}"
+        return f"⚠️ AI 服务暂时不可用，请稍后重试。错误码：{code}"
+    return f"⚠️ AI 服务暂时不可用，请稍后重试。错误码：{code}"
+
+
+def _log_gateway_fallback(e: Exception, *, stream: bool = False) -> None:
+    """Log gateway fallback without showing provider exception text to users."""
+    code = _error_code(e)
+    logger.warning(
+        "%s failed, falling back to direct provider. error_code=%s type=%s",
+        "Gateway stream" if stream else "Gateway call",
+        code,
+        type(e).__name__,
+        exc_info=True,
+    )
 
 
 def _should_use_gateway() -> bool:
@@ -266,7 +287,7 @@ def call_llm(
                 _rollback_tier_usage()
             return result
         except Exception as e:
-            logger.warning("Gateway call failed, falling back to direct: %s", e)
+            _log_gateway_fallback(e)
             _rate_limit_rollback(user_id)
             # Fall through to direct NVIDIA call below
 
@@ -349,7 +370,7 @@ def stream_llm(
                 _rollback_tier_usage()
             return
         except Exception as e:
-            logger.warning("Gateway stream failed, falling back to direct: %s", e)
+            _log_gateway_fallback(e, stream=True)
             # Fall through to direct NVIDIA call below
 
     # ── Direct NVIDIA NIM call (original path) ──
@@ -429,227 +450,34 @@ def reply_inquiry(
     return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
 
 
-def generate_product_intro(
-    product: str,
+def product_intro(
+    product_name: str,
     features: str,
-    target: str,
-    languages: list[str],
+    target_customer: str,
+    language: str = "英语",
     stream: bool = False,
     user_id: str = "default",
 ) -> str | Generator[str, None, None]:
-    prompt, system = build_product_intro_prompt(product, features, target, languages)
+    from utils.user_prefs import get_ai_style_suffix
+    prompt, system = build_product_intro_prompt(product_name, features, target_customer, language)
+    suffix = get_ai_style_suffix()
+    if suffix:
+        prompt = prompt + suffix
     return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
 
 
-def generate_followup(
-    customer: str,
-    stage: str,
-    product: str = "",
-    stream: bool = False,
-    user_id: str = "default",
-) -> str | Generator[str, None, None]:
-    prompt, system = build_followup_prompt(customer, stage, product)
-    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
-
-def generate_listing(
-    product: str,
-    keywords: str,
-    features: str,
-    platform: str = "Amazon",
-    category: str = "",
-    stream: bool = False,
-    user_id: str = "default",
-) -> str | Generator[str, None, None]:
-    from config.prompts import build_listing_prompt
-    prompt, system = build_listing_prompt(product, keywords, features, platform, category)
-    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
-
-def generate_social_post(
-    product: str,
-    features: str,
-    platform: str = "All Platforms",
-    audience: str = "",
-    promo: str = "",
-    stream: bool = False,
-    user_id: str = "default",
-) -> str | Generator[str, None, None]:
-    from config.prompts import build_social_post_prompt
-    prompt, system = build_social_post_prompt(product, features, platform, audience, promo)
-    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
-
-def generate_bulk_email(
-    company: str,
-    contact_name: str,
-    product: str,
-    industry: str = "",
-    country: str = "",
-    stream: bool = False,
-    user_id: str = "default",
-) -> str | Generator[str, None, None]:
-    from config.prompts import build_bulk_email_prompt
-    prompt, system = build_bulk_email_prompt(company, contact_name, product, industry, country)
-    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
-
-def generate_negotiation(
-    scenario: str,
-    product: str,
-    current_offer: str,
-    bottom_line: str,
-    stream: bool = False,
-    user_id: str = "default",
-) -> str | Generator[str, None, None]:
-    from config.prompts import build_negotiation_prompt
-    prompt, system = build_negotiation_prompt(scenario, product, current_offer, bottom_line)
-    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
-
-def generate_holiday_greeting(
-    holiday: str,
+def followup_email(
     customer_name: str,
-    company: str,
-    relationship_level: str,
-    product_mention: str = "",
+    last_contact: str,
+    purpose: str,
+    tone: str = "简洁专业",
+    language: str = "英语",
     stream: bool = False,
     user_id: str = "default",
 ) -> str | Generator[str, None, None]:
-    from config.prompts import build_holiday_greeting_prompt
-    prompt, system = build_holiday_greeting_prompt(holiday, customer_name, company, relationship_level, product_mention)
-    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
-
-def generate_email_polish(
-    content: str,
-    source_lang: str,
-    target_lang: str,
-    mode: str,
-    stream: bool = False,
-    user_id: str = "default",
-) -> str | Generator[str, None, None]:
-    from config.prompts import build_email_polish_prompt
-    prompt, system = build_email_polish_prompt(content, source_lang, target_lang, mode)
-    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
-
-def generate_complaint_response(
-    complaint_type: str,
-    severity: str,
-    relationship: str,
-    proposed_solution: str,
-    customer_complaint: str = "",
-    stream: bool = False,
-    user_id: str = "default",
-) -> str | Generator[str, None, None]:
-    from config.prompts import build_complaint_response_prompt
-    prompt, system = build_complaint_response_prompt(complaint_type, severity, relationship, proposed_solution, customer_complaint)
-    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
-
-def generate_smart_quote(
-    product: str,
-    target_market: str,
-    order_quantity: int,
-    production_cost: str = "",
-    competitor_info: str = "",
-    trade_term: str = "FOB",
-    stream: bool = False,
-    user_id: str = "default",
-) -> str | Generator[str, None, None]:
-    from config.prompts import build_smart_quote_prompt
-    prompt, system = build_smart_quote_prompt(
-        product, target_market, order_quantity,
-        production_cost, competitor_info, trade_term,
-    )
-    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
-
-def generate_ab_variants(
-    product: str,
-    customer_type: str,
-    num_variants: int = 3,
-    focus: str = "subject_line",
-    stream: bool = False,
-    user_id: str = "default",
-) -> str | Generator[str, None, None]:
-    from config.prompts import build_ab_variant_prompt
-    prompt, system = build_ab_variant_prompt(product, customer_type, num_variants, focus)
-    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
-
-
-def lookup_hs_code(
-    product: str,
-    description: str = "",
-    target_country: str = "",
-    stream: bool = False,
-    user_id: str = "default",
-) -> str | Generator[str, None, None]:
-    from config.prompts import build_hs_code_prompt
-    prompt, system = build_hs_code_prompt(product, description, target_country)
-    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
-
-def recognize_email_intent(
-    email_content: str,
-    context: str = "",
-    stream: bool = False,
-    user_id: str = "default",
-) -> str | Generator[str, None, None]:
-    from config.prompts import build_intent_recognition_prompt
-    prompt, system = build_intent_recognition_prompt(email_content, context)
-    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
-
-
-
-def analyze_customer_profile(
-    company_name: str,
-    website: str = "",
-    industry: str = "",
-    additional_info: str = "",
-    stream: bool = False,
-    user_id: str = "default",
-) -> str | Generator[str, None, None]:
-    from config.prompts import build_customer_profile_prompt
-    prompt, system = build_customer_profile_prompt(company_name, website, industry, additional_info)
-    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
-
-def generate_contract_template(
-    contract_type: str,
-    seller_info: str,
-    buyer_info: str,
-    product: str,
-    terms: str = "",
-    stream: bool = False,
-    user_id: str = "default",
-) -> str | Generator[str, None, None]:
-    from config.prompts import build_contract_template_prompt
-    prompt, system = build_contract_template_prompt(contract_type, seller_info, buyer_info, product, terms)
-    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
-
-def interpret_bill_of_lading(
-    bl_content: str,
-    stream: bool = False,
-    user_id: str = "default",
-) -> str | Generator[str, None, None]:
-    from config.prompts import build_bl_interpretation_prompt
-    prompt, system = build_bl_interpretation_prompt(bl_content)
-    return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
-
-
-def analyze_competitor(
-    your_product: str,
-    competitor_info: str,
-    your_advantages: str = "",
-    target_market: str = "",
-    stream: bool = False,
-    user_id: str = "default",
-) -> str | Generator[str, None, None]:
-    from config.prompts import build_competitor_analysis_prompt
-    prompt, system = build_competitor_analysis_prompt(your_product, competitor_info, your_advantages, target_market)
+    from utils.user_prefs import get_ai_style_suffix
+    prompt, system = build_followup_prompt(customer_name, last_contact, purpose, tone, language)
+    suffix = get_ai_style_suffix()
+    if suffix:
+        prompt = prompt + suffix
     return stream_llm(prompt, system, user_id) if stream else call_llm(prompt, system, user_id)
