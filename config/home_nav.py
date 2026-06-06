@@ -1,15 +1,9 @@
-"""Small home navigation extensions.
-
-Keep newly added homepage entries here so app.py does not need frequent edits.
-"""
+"""Small home navigation extensions."""
 from __future__ import annotations
 
 NavItem = tuple[str, str, str, str]
 
-INBOUND_PAGE = "pages/35_\U0001f4e5_入站邮件.py"
-
-EXTRA_QUICK_ACCESS: list[NavItem] = [
-    ("\U0001f4e5", "入站邮件", "导入客户邮件", INBOUND_PAGE),
-]
-
-EXTRA_MAIL_NAV: list[NavItem
+INBOUND_ICON = "\U0001f4e5"
+INBOUND_TITLE = "\u5165\u7ad9\u90ae\u4ef6"
+INBOUND_QUICK_DESC = "\u5bfc\u5165\u5ba2\u6237\u90ae\u4ef6"
+INBOUND_NAV_DESC = "\u5bfc\u5165\u5ba2\u6237\u90ae\u4ef6\u751f\u6210\u56de\u
