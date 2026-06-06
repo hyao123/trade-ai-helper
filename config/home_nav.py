@@ -6,9 +6,10 @@ from __future__ import annotations
 
 NavItem = tuple[str, str, str, str]
 
+INBOUND_PAGE = "pages/35_\U0001f4e5_入站邮件.py"
+
 EXTRA_QUICK_ACCESS: list[NavItem] = [
-    ("📥", "入站邮件", "导入客户邮件", "pages/35_📥_入站邮件.py"),
+    ("\U0001f4e5", "入站邮件", "导入客户邮件", INBOUND_PAGE),
 ]
 
-EXTRA_MAIL_NAV: list[NavItem] = [
-    ("📥", "入站邮件", "导入客户邮件生成回复草稿", "pages/35_📥_入
+EXTRA_MAIL_NAV: list[NavItem
