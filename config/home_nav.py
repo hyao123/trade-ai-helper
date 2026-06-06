@@ -3,11 +3,10 @@ from __future__ import annotations
 
 NavItem = tuple[str, str, str, str]
 
-INBOUND_PAGE = "pages/35_\U0001f4e5_\u5165\u7ad9\u90ae\u4ef6.py"
+_INBOX = chr(0x1F4E5)
+_INBOUND_ZH = "\u5165\u7ad9\u90ae\u4ef6"
+INBOUND_PAGE = f"pages/35_{_INBOX}_{_INBOUND_ZH}.py"
 
 EXTRA_QUICK_ACCESS: list[NavItem] = [
-    ("\U0001f4e5", "Inbound Email", "Import customer email", INBOUND_PAGE),
+    (_INBOX, "Inbound Email", "Import customer email", INBOUND_PAGE),
 ]
-
-EXTRA_MAIL_NAV: list[NavItem] = [
-    ("\U0001f4
