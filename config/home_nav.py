@@ -10,4 +10,4 @@ EXTRA_QUICK_ACCESS: list[NavItem] = [
 ]
 
 EXTRA_MAIL_NAV: list[NavItem] = [
-    ("\U0001f4e5", "Inbound Email", "Import email and draft reply", INBOUND_PAGE),
+    ("\U0001f4
