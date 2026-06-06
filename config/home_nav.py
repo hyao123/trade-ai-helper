@@ -9,5 +9,4 @@ from __future__ import annotations
 NavItem = tuple[str, str, str, str]
 
 QUICK_ACCESS: list[NavItem] = [
-    ("🚀", "快速设置", "2分钟初始化资料", "pages/34_🚀_快速设置.py"),
-    ("📥", "入站邮件", "导入客户邮件生成
+    ("🚀", "快速设置", "2分钟初始化资料", "pages/34_🚀
