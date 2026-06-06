@@ -11,4 +11,4 @@ PROBE_BODY = "AI-Trade Pro Streamlit app. Start with: streamlit run app.py"
 
 
 def application(environ, start_response):
-    """Minimal W
+    """Minimal WSGI fallback
