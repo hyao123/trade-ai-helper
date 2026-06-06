@@ -10,3 +10,5 @@ INBOUND_PAGE = f"pages/35_{_INBOX}_{_INBOUND_ZH}.py"
 EXTRA_QUICK_ACCESS: list[NavItem] = [
     (_INBOX, "Inbound Email", "Import customer email", INBOUND_PAGE),
 ]
+
+EXTRA_MAIL_NAV: list[NavItem] = EXTRA_QUICK_ACCESS
