@@ -11,4 +11,4 @@ EXTRA_QUICK_ACCESS: list[NavItem] = [
 ]
 
 EXTRA_MAIL_NAV: list[NavItem] = [
-    ("📥", "入站邮件", "导入客户邮件生成回复草稿", "pages/35_📥_入站邮件.py
+    ("📥", "入站邮件", "导入客户邮件生成回复草稿", "pages/35_📥_入
