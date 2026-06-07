@@ -10,4 +10,13 @@ def application(environ, start_response):
     return [PROBE_BODY.encode("utf-8")]
 
 
-def handler
+def handler(event=None, context=None):
+    """Minimal serverless-style fallback for app export probes."""
+    return {
+        "statusCode": 200,
+        "headers": {"Content-Type": "text/plain; charset=utf-8"},
+        "body": PROBE_BODY,
+    }
+
+
+app = application
