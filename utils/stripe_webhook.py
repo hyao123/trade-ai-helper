@@ -22,8 +22,15 @@ from __future__ import annotations
 from utils.analytics import track_event
 from utils.logger import get_logger
 from utils.pricing import upgrade_user_tier
+from utils.repositories import (
+    load_consumed_sessions,
+    load_user_subscription,
+    load_users,
+    save_consumed_sessions,
+    save_user_subscription,
+)
 from utils.secrets import get_secret
-from utils.storage import load_json
+from utils.security_audit import audit_event
 
 logger = get_logger("stripe_webhook")
 
@@ -54,9 +61,11 @@ def verify_and_process(payload: bytes, signature: str) -> tuple[bool, str]:
         )
     except stripe.error.SignatureVerificationError:
         logger.warning("Webhook signature verification failed")
+        audit_event("stripe_webhook_verification_failed", "invalid_signature", severity="warning")
         return False, "Invalid signature"
     except Exception as e:
         logger.error("Webhook parsing failed: %s", e)
+        audit_event("stripe_webhook_parse_failed", "parse_error", severity="warning")
         return False, f"Parse error: {e}"
 
     # Route to handler
@@ -89,17 +98,42 @@ def _handle_checkout_completed(session: dict) -> tuple[bool, str]:
     metadata = session.get("metadata", {})
     username = metadata.get("username")
     target_tier = metadata.get("target_tier")
+    session_id = session.get("id", "")
     customer_id = session.get("customer")
     subscription_id = session.get("subscription")
 
     if not username or not target_tier:
         logger.warning("Checkout completed but missing metadata: %s", metadata)
+        audit_event(
+            "stripe_checkout_completed",
+            "missing_metadata",
+            severity="warning",
+            metadata={"has_username": bool(username), "has_target_tier": bool(target_tier)},
+        )
         return False, "Missing username or target_tier in metadata"
+
+    consumed_sessions = load_consumed_sessions(username)
+    if session_id and session_id in consumed_sessions:
+        logger.info("Duplicate checkout webhook ignored: session=%s user=%s", session_id, username)
+        audit_event(
+            "stripe_checkout_completed",
+            "duplicate",
+            user_id=username,
+            metadata={"target_tier": target_tier, "session_id": session_id},
+        )
+        return True, f"Checkout session already processed for {username}"
 
     # Upgrade the user
     success = upgrade_user_tier(username, target_tier)
     if not success:
         logger.error("Failed to upgrade user %s to %s", username, target_tier)
+        audit_event(
+            "stripe_checkout_completed",
+            "upgrade_failed",
+            user_id=username,
+            severity="warning",
+            metadata={"target_tier": target_tier, "session_id": session_id},
+        )
         return False, f"Upgrade failed for {username}"
 
     # Store subscription info for future management
@@ -108,8 +142,12 @@ def _handle_checkout_completed(session: dict) -> tuple[bool, str]:
         "stripe_subscription_id": subscription_id,
         "tier": target_tier,
         "status": "active",
-        "checkout_session_id": session.get("id"),
+        "checkout_session_id": session_id,
     })
+
+    if session_id:
+        consumed_sessions.append(session_id)
+        save_consumed_sessions(username, consumed_sessions)
 
     track_event("subscription_created", {
         "username": username,
@@ -118,6 +156,12 @@ def _handle_checkout_completed(session: dict) -> tuple[bool, str]:
     })
 
     logger.info("User %s upgraded to %s (subscription=%s)", username, target_tier, subscription_id)
+    audit_event(
+        "stripe_checkout_completed",
+        "success",
+        user_id=username,
+        metadata={"target_tier": target_tier, "session_id": session_id},
+    )
     return True, f"Upgraded {username} to {target_tier}"
 
 
@@ -129,6 +173,7 @@ def _handle_subscription_updated(subscription: dict) -> tuple[bool, str]:
     username = _find_username_by_customer_id(customer_id)
     if not username:
         logger.warning("No user found for customer %s", customer_id)
+        audit_event("stripe_subscription_updated", "unknown_customer", severity="warning")
         return True, "No matching user"
 
     # Determine new tier from the price
@@ -140,6 +185,12 @@ def _handle_subscription_updated(subscription: dict) -> tuple[bool, str]:
             upgrade_user_tier(username, new_tier)
             track_event("subscription_updated", {"username": username, "tier": new_tier})
             logger.info("Subscription updated: %s -> %s", username, new_tier)
+            audit_event(
+                "stripe_subscription_updated",
+                "success",
+                user_id=username,
+                metadata={"new_tier": new_tier, "status": status},
+            )
 
     return True, "Subscription updated"
 
@@ -150,11 +201,13 @@ def _handle_subscription_deleted(subscription: dict) -> tuple[bool, str]:
     username = _find_username_by_customer_id(customer_id)
 
     if not username:
+        audit_event("stripe_subscription_deleted", "unknown_customer", severity="warning")
         return True, "No matching user"
 
     upgrade_user_tier(username, "free")
     track_event("subscription_cancelled", {"username": username})
     logger.info("Subscription cancelled, user %s downgraded to free", username)
+    audit_event("stripe_subscription_deleted", "success", user_id=username, metadata={"new_tier": "free"})
     return True, f"Downgraded {username} to free"
 
 
@@ -166,6 +219,7 @@ def _handle_payment_failed(invoice: dict) -> tuple[bool, str]:
     if username:
         track_event("payment_failed", {"username": username})
         logger.warning("Payment failed for user %s", username)
+        audit_event("stripe_payment_failed", "recorded", user_id=username, severity="warning")
         # TODO: Send notification email to user
 
     return True, "Payment failure recorded"
@@ -177,8 +231,7 @@ def _handle_payment_failed(invoice: dict) -> tuple[bool, str]:
 
 def _save_subscription_info(username: str, info: dict) -> None:
     """Save Stripe subscription info to user's data."""
-    from utils.storage import save_user_json
-    save_user_json(username, "subscription.json", info)
+    save_user_subscription(username, info)
 
 
 def _find_username_by_customer_id(customer_id: str) -> str | None:
@@ -186,11 +239,9 @@ def _find_username_by_customer_id(customer_id: str) -> str | None:
     if not customer_id:
         return None
 
-    users = load_json("users_db.json", default={})
+    users = load_users()
     for username, _data in users.items():
-        # Check subscription file
-        from utils.storage import load_user_json
-        sub_info = load_user_json(username, "subscription.json", default={})
+        sub_info = load_user_subscription(username)
         if sub_info.get("stripe_customer_id") == customer_id:
             return username
     return None

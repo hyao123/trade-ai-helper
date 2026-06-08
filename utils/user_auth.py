@@ -20,22 +20,32 @@ import streamlit as st
 
 from utils.logger import get_logger
 from utils.repositories import (
+    load_email_verification_requests,
     load_login_failures,
+    load_password_reset_requests,
     load_users,
+    save_email_verification_requests,
     save_login_failures,
+    save_password_reset_requests,
     save_users,
 )
+from utils.security_audit import audit_event
 from utils.storage import get_data_dir
 
 logger = get_logger("user_auth")
 
 _PASSWORD_HASH_ALGORITHM = "pbkdf2_sha256"
 _PASSWORD_HASH_VERSION = "v2"
+_TOKEN_HASH_ALGORITHM = "sha256"
 _PBKDF2_ITERATIONS = 310_000
 _LEGACY_PBKDF2_ITERATIONS = 100_000
 _PASSWORD_MIN_LENGTH = 10
 _LOGIN_FAILURE_LIMIT = 5
 _LOGIN_FAILURE_WINDOW_SECONDS = 15 * 60
+_PASSWORD_RESET_REQUEST_LIMIT = 3
+_PASSWORD_RESET_REQUEST_WINDOW_SECONDS = 15 * 60
+_EMAIL_VERIFICATION_REQUEST_LIMIT = 3
+_EMAIL_VERIFICATION_REQUEST_WINDOW_SECONDS = 15 * 60
 _USERS_DB_FILENAME = "users_db.json"
 _EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 _COMMON_WEAK_PASSWORDS = {
@@ -156,16 +166,54 @@ def _save_login_failures(failures: dict) -> None:
     save_login_failures(failures)
 
 
+def _load_password_reset_requests() -> dict:
+    """Load password reset request counters keyed by hashed identifier."""
+    return load_password_reset_requests()
+
+
+def _save_password_reset_requests(requests: dict) -> None:
+    """Persist password reset request counters."""
+    save_password_reset_requests(requests)
+
+
+def _load_email_verification_requests() -> dict:
+    """Load verification email request counters keyed by hashed username."""
+    return load_email_verification_requests()
+
+
+def _save_email_verification_requests(requests: dict) -> None:
+    """Persist verification email request counters."""
+    save_email_verification_requests(requests)
+
+
+def _prune_timestamp_counters(counters: dict, *, window_seconds: int, now: float) -> dict[str, list[float]]:
+    """Return counters with only valid timestamps inside the active window."""
+    pruned: dict[str, list[float]] = {}
+    for key, timestamps in counters.items():
+        if not isinstance(timestamps, list):
+            continue
+        active: list[float] = []
+        for ts in timestamps:
+            try:
+                ts_float = float(ts)
+            except (TypeError, ValueError):
+                continue
+            if now - ts_float < window_seconds:
+                active.append(ts_float)
+        if active:
+            pruned[str(key)] = active
+    return pruned
+
+
 def _active_failures(username: str, now: float | None = None) -> list[float]:
     """Return recent failed-login timestamps for a username."""
     current_time = time.time() if now is None else now
-    failures = _load_login_failures()
-    active = [
-        float(ts)
-        for ts in failures.get(username, [])
-        if current_time - float(ts) < _LOGIN_FAILURE_WINDOW_SECONDS
-    ]
-    failures[username] = active
+    failures = _prune_timestamp_counters(
+        _load_login_failures(),
+        window_seconds=_LOGIN_FAILURE_WINDOW_SECONDS,
+        now=current_time,
+    )
+    active = failures.get(username, [])
     _save_login_failures(failures)
     return active
 
@@ -177,13 +225,13 @@ def _is_login_locked(username: str) -> bool:
 
 def _record_login_failure(username: str) -> None:
     """Record a failed login attempt for rate limiting."""
-    failures = _load_login_failures()
     now = time.time()
-    active = [
-        float(ts)
-        for ts in failures.get(username, [])
-        if now - float(ts) < _LOGIN_FAILURE_WINDOW_SECONDS
-    ]
+    failures = _prune_timestamp_counters(
+        _load_login_failures(),
+        window_seconds=_LOGIN_FAILURE_WINDOW_SECONDS,
+        now=now,
+    )
+    active = failures.get(username, [])
     active.append(now)
     failures[username] = active
     _save_login_failures(failures)
@@ -195,6 +243,63 @@ def _clear_login_failures(username: str) -> None:
     if username in failures:
         failures.pop(username, None)
         _save_login_failures(failures)
+
+
+def _password_reset_request_key(identifier: str) -> str:
+    """Return a non-reversible key for password reset rate limiting."""
+    return _hash_token(identifier.strip().lower())
+
+
+def _consume_windowed_request(
+    requests: dict,
+    key: str,
+    *,
+    limit: int,
+    window_seconds: int,
+    now: float | None = None,
+) -> tuple[bool, dict]:
+    """Record a request in a sliding window and return updated counters."""
+    current_time = time.time() if now is None else now
+    requests = _prune_timestamp_counters(requests, window_seconds=window_seconds, now=current_time)
+    active = requests.get(key, [])
+    if len(active) >= limit:
+        requests[key] = active
+        return False, requests
+
+    active.append(current_time)
+    requests[key] = active
+    return True, requests
+
+
+def _consume_password_reset_request(identifier: str, now: float | None = None) -> bool:
+    """Record a password reset request and return False when rate limited."""
+    allowed, requests = _consume_windowed_request(
+        _load_password_reset_requests(),
+        _password_reset_request_key(identifier),
+        limit=_PASSWORD_RESET_REQUEST_LIMIT,
+        window_seconds=_PASSWORD_RESET_REQUEST_WINDOW_SECONDS,
+        now=now,
+    )
+    _save_password_reset_requests(requests)
+    return allowed
+
+
+def _email_verification_request_key(username: str) -> str:
+    """Return a non-reversible key for verification email rate limiting."""
+    return _hash_token(username.strip().lower())
+
+
+def _consume_email_verification_request(username: str, now: float | None = None) -> bool:
+    """Record a verification resend request and return False when rate limited."""
+    allowed, requests = _consume_windowed_request(
+        _load_email_verification_requests(),
+        _email_verification_request_key(username),
+        limit=_EMAIL_VERIFICATION_REQUEST_LIMIT,
+        window_seconds=_EMAIL_VERIFICATION_REQUEST_WINDOW_SECONDS,
+        now=now,
+    )
+    _save_email_verification_requests(requests)
+    return allowed
 
 
 def _load_users_db() -> dict:
@@ -219,11 +324,36 @@ def _build_public_user_info(user: dict) -> dict:
     }
 
 
-def _extract_token_data(token_data) -> tuple[str, str]:
-    """Support both legacy bare string tokens and dict token payloads."""
+def _hash_token(token: str) -> str:
+    """Return a one-way hash for account recovery and verification tokens."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _build_token_record(token: str, expires: str) -> dict:
+    """Build a persisted token record without storing the raw token."""
+    return {
+        "algorithm": _TOKEN_HASH_ALGORITHM,
+        "token_hash": _hash_token(token),
+        "expires": expires,
+    }
+
+
+def _extract_token_data(token_data) -> tuple[str, str, bool]:
+    """Support current hashed tokens plus legacy raw-token payloads."""
     if isinstance(token_data, dict):
-        return token_data.get("token", ""), token_data.get("expires", "")
-    return str(token_data or ""), ""
+        if token_data.get("token_hash"):
+            return token_data.get("token_hash", ""), token_data.get("expires", ""), True
+        return token_data.get("token", ""), token_data.get("expires", ""), False
+    return str(token_data or ""), "", False
+
+
+def _token_matches(token: str, token_data) -> tuple[bool, str]:
+    """Return whether a provided token matches stored data and its expiry."""
+    stored_token, expires_str, is_hashed = _extract_token_data(token_data)
+    if not stored_token:
+        return False, expires_str
+    candidate = _hash_token(token) if is_hashed else token
+    return hmac.compare_digest(candidate, stored_token), expires_str
 
 
 def register_user(username: str, password: str, email: str = "") -> tuple[bool, str]:
@@ -249,6 +379,7 @@ def register_user(username: str, password: str, email: str = "") -> tuple[bool, 
             return False, "Email is already registered"
 
     verification_token = secrets.token_urlsafe(32)
+    verification_expires = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
     users[username] = {
         "username": username,
         "email": email,
@@ -256,10 +387,7 @@ def register_user(username: str, password: str, email: str = "") -> tuple[bool, 
         "tier": "free",
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "email_verified": False,
-        "verification_token": {
-            "token": verification_token,
-            "expires": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat(),
-        },
+        "verification_token": _build_token_record(verification_token, verification_expires),
     }
     _save_users_db(users)
 
@@ -270,12 +398,13 @@ def register_user(username: str, password: str, email: str = "") -> tuple[bool, 
     if is_email_configured():
         send_verification_email(email, verification_token)
 
-    st.session_state.authenticated = True
+    st.session_state["authenticated"] = True
     st.session_state["current_user"] = _build_public_user_info(users[username])
     if users[username].get("language"):
         st.session_state["language"] = users[username]["language"]
 
     logger.info("User registered and authenticated: %s", username)
+    audit_event("user_registered", "success", user_id=username)
     return True, "Registration successful"
 
 
@@ -287,11 +416,13 @@ def authenticate_user(username: str, password: str) -> tuple[bool, dict | None]:
     username = username.strip().lower()
     if _is_login_locked(username):
         logger.warning("Login temporarily locked for user: %s", username)
+        audit_event("login_locked", "blocked", user_id=username, severity="warning")
         return False, None
 
     users = _load_users_db()
     if username not in users:
         _record_login_failure(username)
+        audit_event("login_failed", "unknown_user", user_id=username, severity="warning")
         return False, None
 
     user = users[username]
@@ -304,15 +435,37 @@ def authenticate_user(username: str, password: str) -> tuple[bool, dict | None]:
         _clear_login_failures(username)
         user_info = _build_public_user_info(user)
         logger.info("User authenticated: %s", username)
+        audit_event("login_succeeded", "success", user_id=username)
         return True, user_info
 
     _record_login_failure(username)
+    locked_after_failure = _is_login_locked(username)
+    audit_event(
+        "login_failed",
+        "invalid_password",
+        user_id=username,
+        severity="warning",
+        metadata={"locked_after_failure": locked_after_failure},
+    )
+    if locked_after_failure:
+        audit_event("login_locked", "threshold_reached", user_id=username, severity="warning")
     return False, None
 
 
 def get_current_user() -> dict | None:
     """Get the currently logged-in user from session state."""
     return st.session_state.get("current_user", None)
+
+
+def is_current_admin() -> bool:
+    """Return True only for an authenticated admin session."""
+    current_user = get_current_user()
+    return bool(
+        st.session_state.get("authenticated")
+        and current_user
+        and current_user.get("username") == "admin"
+        and current_user.get("tier") == "enterprise"
+    )
 
 
 def change_password(username: str, old_password: str, new_password: str) -> tuple[bool, str]:
@@ -323,13 +476,16 @@ def change_password(username: str, old_password: str, new_password: str) -> tupl
     username = username.strip().lower()
     users = _load_users_db()
     if username not in users:
+        audit_event("password_change_failed", "unknown_user", user_id=username, severity="warning")
         return False, "User not found"
     if not _verify_password(old_password, users[username]["password_hash"]):
+        audit_event("password_change_failed", "invalid_current_password", user_id=username, severity="warning")
         return False, "Current password is incorrect"
 
     users[username]["password_hash"] = _hash_password(new_password)
     _save_users_db(users)
     logger.info("Password changed for user: %s", username)
+    audit_event("password_changed", "success", user_id=username)
     return True, "Password changed successfully"
 
 
@@ -350,13 +506,16 @@ def verify_email_token(username: str, token: str) -> tuple[bool, str]:
     username = username.strip().lower()
     users = _load_users_db()
     if username not in users:
+        audit_event("email_verification_failed", "unknown_user", user_id=username, severity="warning")
         return False, "User not found"
 
     user = users[username]
-    stored_token, expires_str = _extract_token_data(user.get("verification_token", ""))
-    if not stored_token:
+    token_matches, expires_str = _token_matches(token, user.get("verification_token", ""))
+    if not user.get("verification_token"):
+        audit_event("email_verification_failed", "missing_token", user_id=username, severity="warning")
         return False, "No verification token found"
-    if not hmac.compare_digest(token, stored_token):
+    if not token_matches:
+        audit_event("email_verification_failed", "invalid_token", user_id=username, severity="warning")
         return False, "Invalid verification token"
 
     if expires_str:
@@ -366,6 +525,7 @@ def verify_email_token(username: str, token: str) -> tuple[bool, str]:
             if expires_dt.tzinfo is None:
                 expires_dt = expires_dt.replace(tzinfo=timezone.utc)
             if now > expires_dt:
+                audit_event("email_verification_failed", "expired_token", user_id=username, severity="warning")
                 return False, "Token expired"
         except (ValueError, TypeError):
             pass
@@ -374,6 +534,7 @@ def verify_email_token(username: str, token: str) -> tuple[bool, str]:
     users[username]["verification_token"] = ""
     _save_users_db(users)
     logger.info("Email verified for user: %s", username)
+    audit_event("email_verified", "success", user_id=username)
     return True, "Email verified successfully"
 
 
@@ -392,21 +553,25 @@ def resend_verification_email(username: str) -> tuple[bool, str]:
     if not email:
         return False, "No email address on file"
 
+    if not _consume_email_verification_request(username):
+        audit_event("email_verification_resend", "rate_limited", user_id=username, severity="warning")
+        return True, "Verification email sent"
+
     from utils.email_service import is_email_configured, send_verification_email
     if not is_email_configured():
         return False, "Email service is not configured"
 
     new_token = secrets.token_urlsafe(32)
-    users[username]["verification_token"] = {
-        "token": new_token,
-        "expires": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat(),
-    }
+    expires = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+    users[username]["verification_token"] = _build_token_record(new_token, expires)
     users[username]["email_verified"] = False
     _save_users_db(users)
 
     success, msg = send_verification_email(email, new_token)
     if success:
+        audit_event("email_verification_resend", "success", user_id=username)
         return True, "Verification email sent"
+    audit_event("email_verification_resend", "send_failed", user_id=username, severity="warning")
     return False, f"Failed to send email: {msg}"
 
 
@@ -429,6 +594,15 @@ def request_password_reset(email_or_username: str) -> tuple[bool, str]:
         return True, vague_message
 
     identifier = email_or_username.strip()
+    if not _consume_password_reset_request(identifier):
+        audit_event(
+            "password_reset_requested",
+            "rate_limited",
+            severity="warning",
+            metadata={"identifier_type": "email" if "@" in identifier else "username"},
+        )
+        return True, vague_message
+
     username = None
     if "@" in identifier:
         username = find_user_by_email(identifier)
@@ -439,19 +613,26 @@ def request_password_reset(email_or_username: str) -> tuple[bool, str]:
             username = candidate
 
     if username is None:
+        audit_event(
+            "password_reset_requested",
+            "unknown_account",
+            metadata={"identifier_type": "email" if "@" in identifier else "username"},
+        )
         return True, vague_message
 
     users = _load_users_db()
     user = users.get(username)
     if not user:
+        audit_event("password_reset_requested", "unknown_account", user_id=username)
         return True, vague_message
     user_email = user.get("email", "").strip()
     if not user_email:
+        audit_event("password_reset_requested", "missing_email", user_id=username, severity="warning")
         return True, vague_message
 
     token = secrets.token_urlsafe(32)
     expires = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
-    users[username]["reset_token"] = {"token": token, "expires": expires}
+    users[username]["reset_token"] = _build_token_record(token, expires)
     _save_users_db(users)
 
     from utils.email_service import is_email_configured, send_password_reset_email
@@ -459,7 +640,8 @@ def request_password_reset(email_or_username: str) -> tuple[bool, str]:
         send_password_reset_email(user_email, token)
 
     logger.info("Password reset requested for user: %s", username)
-    return True, "Reset email sent"
+    audit_event("password_reset_requested", "success", user_id=username)
+    return True, vague_message
 
 
 def reset_password(username: str, token: str, new_password: str) -> tuple[bool, str]:
@@ -472,15 +654,18 @@ def reset_password(username: str, token: str, new_password: str) -> tuple[bool, 
     username = username.strip().lower()
     users = _load_users_db()
     if username not in users:
+        audit_event("password_reset_failed", "unknown_user", user_id=username, severity="warning")
         return False, "Invalid token"
 
     user = users[username]
     reset_token_data = user.get("reset_token")
     if not reset_token_data:
+        audit_event("password_reset_failed", "missing_token", user_id=username, severity="warning")
         return False, "Invalid token"
 
-    stored_token, expires_str = _extract_token_data(reset_token_data)
-    if not stored_token or not hmac.compare_digest(token, stored_token):
+    token_matches, expires_str = _token_matches(token, reset_token_data)
+    if not token_matches:
+        audit_event("password_reset_failed", "invalid_token", user_id=username, severity="warning")
         return False, "Invalid token"
 
     try:
@@ -489,12 +674,15 @@ def reset_password(username: str, token: str, new_password: str) -> tuple[bool, 
         if expires_dt.tzinfo is None:
             expires_dt = expires_dt.replace(tzinfo=timezone.utc)
         if now > expires_dt:
+            audit_event("password_reset_failed", "expired_token", user_id=username, severity="warning")
             return False, "Token expired"
     except (ValueError, TypeError):
+        audit_event("password_reset_failed", "invalid_token", user_id=username, severity="warning")
         return False, "Invalid token"
 
     users[username]["password_hash"] = _hash_password(new_password)
     users[username].pop("reset_token", None)
     _save_users_db(users)
     logger.info("Password reset completed for user: %s", username)
+    audit_event("password_reset_completed", "success", user_id=username)
     return True, "Password reset successful"

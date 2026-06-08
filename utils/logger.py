@@ -31,7 +31,8 @@ def configure_logging() -> logging.Logger:
     level = getattr(logging, level_name)
 
     # Create logs directory
-    log_dir = Path(__file__).resolve().parent.parent / "logs"
+    log_dir = Path(__file__).parent.parent / "logs"
+    (Path(__file__).resolve().parent.parent / "logs").mkdir(parents=True, exist_ok=True)
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "app.log"
 
@@ -39,9 +40,16 @@ def configure_logging() -> logging.Logger:
     logger = logging.getLogger("trade_ai")
     logger.setLevel(logging.DEBUG)  # Capture all, let handlers filter
 
-    # Avoid adding duplicate handlers on reload
+    # Avoid adding duplicate handlers on reload, but release stale file handlers
+    # when tests or runtime config point logging at a different path.
     if logger.handlers:
-        return logger
+        existing_file = next((h for h in logger.handlers if hasattr(h, "baseFilename")), None)
+        if existing_file and Path(existing_file.baseFilename) != log_file:
+            for handler in logger.handlers[:]:
+                logger.removeHandler(handler)
+                handler.close()
+        else:
+            return logger
 
     # Format
     fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")

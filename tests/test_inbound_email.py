@@ -58,7 +58,11 @@ def test_create_inbound_record_is_idempotent_and_lists_pending():
     with tempfile.TemporaryDirectory() as tmp_str:
         tmp_dir = Path(tmp_str)
         with patch("utils.storage.get_data_dir", return_value=tmp_dir):
-            from utils.inbound_email import create_inbound_record, list_inbound_emails, parse_raw_email_text
+            from utils.inbound_email import (
+                create_inbound_record,
+                list_inbound_emails,
+                parse_raw_email_text,
+            )
 
             parsed = parse_raw_email_text("From: Buyer <buyer@example.com>\nSubject: Need quote\n\nPlease quote MOQ.")
             created1, record1 = create_inbound_record("seller", parsed, customer_id="cust1")

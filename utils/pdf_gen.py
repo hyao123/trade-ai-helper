@@ -10,6 +10,7 @@ utils/pdf_gen.py — 报价单 PDF 生成（支持多产品 SKU）
 from __future__ import annotations
 
 import datetime
+import io
 import os
 from pathlib import Path
 
@@ -91,13 +92,13 @@ def _font_candidates() -> list[tuple[str, Path, Path | None, Path | None, Path |
 def _setup_font(pdf: FPDF) -> str:
     """
     注册字体并返回字体名称。
-    优先级：项目 fonts/ 中的 NotoSansSC > 常见系统 DejaVu > Arial（ASCII兜底）
+    优先级：项目 fonts/ 中的 NotoSansSC > 常见系统 DejaVu > Helvetica（ASCII兜底）
     """
     for family, regular, bold, italic, bold_italic in _font_candidates():
         if _register_font_family(pdf, family, regular, bold, italic, bold_italic):
             return family
 
-    return "Arial"
+    return "Helvetica"
 
 
 def _uses_core_font(font_name: str) -> bool:
@@ -122,18 +123,30 @@ def _pdf_text(font_name: str, value: object, fallback: str | None = None) -> str
 # PDF 类
 # ---------------------------------------------------------------------------
 class QuotePDF(FPDF):
-    def __init__(self, font_name: str = "Arial", company: str = "", logo_path: str | None = None):
+    def __init__(
+        self,
+        font_name: str = "Helvetica",
+        company: str = "",
+        logo_path: str | None = None,
+        logo_bytes: bytes | None = None,
+    ):
         super().__init__()
         self._font_name = font_name
         self._company   = company
         self._logo_path = logo_path
+        self._logo_bytes = logo_bytes
 
     def header(self):
         # 渐变色装饰条（用矩形模拟）
         self.set_fill_color(30, 58, 95)
         self.rect(0, 0, 210, 18, "F")
         # Logo (if available) - constrain to 45x14mm box to prevent overflow
-        if self._logo_path and os.path.exists(self._logo_path):
+        if self._logo_bytes:
+            try:
+                self.image(io.BytesIO(self._logo_bytes), x=5, y=2, w=45, h=14, keep_aspect_ratio=True)
+            except Exception:
+                pass  # Gracefully handle corrupted/unreadable image data
+        elif self._logo_path and os.path.exists(self._logo_path):
             try:
                 self.image(self._logo_path, x=5, y=2, w=45, h=14, keep_aspect_ratio=True)
             except Exception:
@@ -148,7 +161,10 @@ class QuotePDF(FPDF):
         if self._company:
             self.set_font(self._font_name, "", 8)
             self.set_y(3)
-            self.cell(0, 12, _pdf_text(self._font_name, self._company), 0, 0, "R")
+            self.cell(
+                0, 12, _pdf_text(self._font_name, self._company),
+                border=0, align="R", new_x=XPos.RIGHT, new_y=YPos.TOP,
+            )
         self.set_text_color(0, 0, 0)
         self.ln(18)
 
@@ -172,7 +188,10 @@ def _section(pdf: FPDF, font_name: str, title: str) -> None:
     pdf.set_fill_color(239, 246, 255)
     pdf.set_font(font_name, "B", 11)
     pdf.set_text_color(30, 58, 95)
-    pdf.cell(0, 8, _pdf_text(font_name, f"  {title}"), 0, 1, "L", fill=True)
+    pdf.cell(
+        0, 8, _pdf_text(font_name, f"  {title}"),
+        border=0, align="L", fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT,
+    )
     pdf.set_text_color(0, 0, 0)
     pdf.ln(1)
 
@@ -204,7 +223,10 @@ def _row(pdf: FPDF, font_name: str, label: str, value: str,
     pdf.cell(label_w, row_h, label, border=0, align="L", new_x=XPos.RIGHT, new_y=YPos.TOP)
     pdf.set_font(font_name, "", 9)
     pdf.set_text_color(17, 24, 39)
-    pdf.cell(0, row_h, _pdf_text(font_name, value), 0, 1, "L")
+    pdf.cell(
+        0, row_h, _pdf_text(font_name, value),
+        border=0, align="L", new_x=XPos.LMARGIN, new_y=YPos.NEXT,
+    )
     pdf.set_text_color(0, 0, 0)
 
 
@@ -233,14 +255,23 @@ def generate_quote_pdf(
     buyer_*: 可选的客户（收单方）信息
     logo_path: 可选的公司 Logo 图片路径
     """
-    # Guard against invalid logo_path
+    logo_bytes = None
+    # Guard against invalid logo_path and avoid keeping the source file open on Windows.
     if logo_path and not os.path.exists(logo_path):
         logger.warning("Logo file not found: %s", logo_path)
         logo_path = None
+    elif logo_path:
+        try:
+            with open(logo_path, "rb") as logo_file:
+                logo_bytes = logo_file.read()
+            logo_path = None
+        except OSError as exc:
+            logger.warning("Unable to read logo file %s: %s", logo_path, exc)
+            logo_path = None
 
     logger.info("Generating PDF: %d SKUs", len(skus))
 
-    pdf = QuotePDF(company=company_name, logo_path=logo_path)
+    pdf = QuotePDF(company=company_name, logo_path=logo_path, logo_bytes=logo_bytes)
     font_name = _setup_font(pdf)
     pdf._font_name = font_name
 
@@ -295,7 +326,14 @@ def generate_quote_pdf(
             f"${amount:,.2f}",
         ]
         for w, val in zip(COL, row_data):
-            pdf.cell(w, 7, _pdf_text(font_name, val), 0, 0, "C" if w <= 35 else "L", fill=True)
+            pdf.cell(
+                w, 7, _pdf_text(font_name, val),
+                border=0,
+                align="C" if w <= 35 else "L",
+                fill=True,
+                new_x=XPos.RIGHT,
+                new_y=YPos.TOP,
+            )
         pdf.ln()
         fill = not fill
 

@@ -9,6 +9,7 @@ Unit tests for Tier 2 features:
 """
 from __future__ import annotations
 
+import datetime
 import sys
 import types
 import unittest
@@ -179,7 +180,7 @@ class TestAnalytics(unittest.TestCase):
         self.assertEqual(top_countries[0][1], 2)
 
     def test_activity_metrics_active_count(self):
-        activity = compute_activity_metrics(self._sample_customers())
+        activity = compute_activity_metrics(self._sample_customers(), today=datetime.date(2026, 5, 14))
         # last_contact in 2026-05 should be within 30 days of today (2026-05-14)
         self.assertGreaterEqual(activity["active_count"], 2)
         self.assertGreaterEqual(activity["never_contacted"], 1)
@@ -368,7 +369,7 @@ class TestTier2PageFiles(unittest.TestCase):
     def test_page17_exists_with_cost_calc(self):
         p = pathlib.Path("pages/17_💰_智能报价.py")
         self.assertTrue(p.exists())
-        content = p.read_text()
+        content = p.read_text(encoding="utf-8")
         self.assertIn("成本计算", content)
         self.assertIn("generate_smart_quote", content)
 
@@ -389,7 +390,7 @@ class TestTier2PageFiles(unittest.TestCase):
         old = pathlib.Path("pages/20_📊_客户分析.py")
         self.assertTrue(new.exists())
         self.assertFalse(old.exists())
-        content = new.read_text()
+        content = new.read_text(encoding="utf-8")
         self.assertIn("analyze_customer_profile", content)
 
     def test_page21_renamed(self):
@@ -451,7 +452,7 @@ class TestPage20Integration(unittest.TestCase):
     def test_page20_imports_and_structure(self):
         p = pathlib.Path("pages/20_🔍_客户分析.py")
         self.assertTrue(p.exists(), "Page 20 file does not exist")
-        content = p.read_text()
+        content = p.read_text(encoding="utf-8")
         self.assertIn("from utils.ai_client import analyze_customer_profile", content)
         self.assertIn("show_result", content)
         self.assertIn("company_name", content)

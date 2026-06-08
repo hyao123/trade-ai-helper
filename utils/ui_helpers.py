@@ -315,7 +315,7 @@ def check_auth() -> None:
     """
     app_password = get_secret("APP_PASSWORD")
     if not app_password:
-        st.session_state.authenticated = True
+        st.session_state["authenticated"] = True
         return
     if st.session_state.get("authenticated"):
         return
@@ -354,13 +354,13 @@ def check_auth() -> None:
                 if st.form_submit_button(t("login_button"), use_container_width=True, type="primary"):
                     login_name_lower = login_username.strip().lower()
                     if hmac.compare_digest(login_password, app_password) and login_name_lower in ("admin", ""):
-                        st.session_state.authenticated = True
+                        st.session_state["authenticated"] = True
                         st.session_state["current_user"] = {"username": "admin", "tier": "enterprise"}
                         st.rerun()
                     else:
                         success, user_info = authenticate_user(login_username, login_password)
                         if success:
-                            st.session_state.authenticated = True
+                            st.session_state["authenticated"] = True
                             st.session_state["current_user"] = user_info
                             saved_lang = user_info.get("language")
                             if saved_lang:

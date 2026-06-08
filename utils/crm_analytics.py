@@ -56,9 +56,9 @@ def compute_funnel(customers: list[dict]) -> list[dict]:
     return funnel
 
 
-def compute_activity_metrics(customers: list[dict]) -> dict:
+def compute_activity_metrics(customers: list[dict], today: datetime.date | None = None) -> dict:
     """Compute activity-based metrics."""
-    today = datetime.date.today()
+    today = today or datetime.date.today()
     active = dormant = never_contacted = 0
     days_list = []
     for c in customers:

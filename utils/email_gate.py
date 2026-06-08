@@ -18,7 +18,8 @@ def is_verified_email_user(username: str | None) -> bool:
     if username == "admin":
         return True
     user = load_user(username.strip().lower())
-    return bool(user and user.get("email") and user.get("email_verified") is True)
+    email = str(user.get("email", "")).strip() if user else ""
+    return bool(email and user.get("email_verified") is True)
 
 
 def verified_email_error_message() -> str:

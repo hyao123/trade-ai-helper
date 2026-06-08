@@ -22,6 +22,7 @@ from utils.repositories import (
     save_shared_history,
     save_user_history,
 )
+from utils.storage import get_storage_scope
 
 logger = get_logger("history")
 
@@ -52,7 +53,8 @@ def _history_scope_key(username: str | None = None) -> str:
 
 
 def _scope(username: str | None = None) -> str:
-    return f"user:{username}" if username else "shared"
+    owner_scope = f"user:{username}" if username else "shared"
+    return f"{owner_scope}|storage:{get_storage_scope()}"
 
 
 def _load_persisted_history(username: str | None) -> list[dict]:

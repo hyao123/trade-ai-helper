@@ -14,8 +14,11 @@ from utils.db import get_db
 
 USERS_COLLECTION = "users_db.json"
 LOGIN_FAILURES_COLLECTION = "login_failures.json"
+PASSWORD_RESET_REQUESTS_COLLECTION = "password_reset_requests.json"
+EMAIL_VERIFICATION_REQUESTS_COLLECTION = "email_verification_requests.json"
 USAGE_COLLECTION = "usage.json"
 CONSUMED_SESSIONS_COLLECTION = "consumed_sessions.json"
+SUBSCRIPTION_COLLECTION = "subscription.json"
 HISTORY_COLLECTION = "history.json"
 PREFS_COLLECTION = "prefs.json"
 EMAIL_EVENTS_COLLECTION = "email_events.json"
@@ -61,6 +64,28 @@ def save_login_failures(failures: dict) -> None:
     get_db().save_global_data(LOGIN_FAILURES_COLLECTION, failures)
 
 
+def load_password_reset_requests() -> dict:
+    """Return password reset request counters keyed by hashed identifier."""
+    data = get_db().load_global_data(PASSWORD_RESET_REQUESTS_COLLECTION, default={})
+    return data if isinstance(data, dict) else {}
+
+
+def save_password_reset_requests(requests: dict) -> None:
+    """Persist password reset request counters through the active backend."""
+    get_db().save_global_data(PASSWORD_RESET_REQUESTS_COLLECTION, requests)
+
+
+def load_email_verification_requests() -> dict:
+    """Return verification email request counters keyed by hashed username."""
+    data = get_db().load_global_data(EMAIL_VERIFICATION_REQUESTS_COLLECTION, default={})
+    return data if isinstance(data, dict) else {}
+
+
+def save_email_verification_requests(requests: dict) -> None:
+    """Persist verification email request counters through the active backend."""
+    get_db().save_global_data(EMAIL_VERIFICATION_REQUESTS_COLLECTION, requests)
+
+
 # ---------------------------------------------------------------------------
 # Per-user billing/payment state
 # ---------------------------------------------------------------------------
@@ -84,6 +109,17 @@ def load_consumed_sessions(username: str) -> list[str]:
 def save_consumed_sessions(username: str, sessions: list[str]) -> None:
     """Persist consumed Stripe checkout session IDs for a user."""
     get_db().save_user_data(username, CONSUMED_SESSIONS_COLLECTION, sessions)
+
+
+def load_user_subscription(username: str) -> dict:
+    """Return a user's Stripe subscription state."""
+    data: Any = get_db().load_user_data(username, SUBSCRIPTION_COLLECTION, default={})
+    return data if isinstance(data, dict) else {}
+
+
+def save_user_subscription(username: str, subscription: dict) -> None:
+    """Persist a user's Stripe subscription state."""
+    get_db().save_user_data(username, SUBSCRIPTION_COLLECTION, subscription)
 
 
 # ---------------------------------------------------------------------------

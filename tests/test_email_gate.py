@@ -22,7 +22,7 @@ class TestEmailGate:
             users = json.loads(users_path.read_text(encoding="utf-8"))
         users[username] = {
             "username": username,
-            "email": email or f"{username}@example.com",
+            "email": email if email is not None else f"{username}@example.com",
             "email_verified": verified,
             "password_hash": "fakehash",
             "tier": "free",

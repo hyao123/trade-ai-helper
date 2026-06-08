@@ -13,7 +13,6 @@ from datetime import datetime, timezone
 from email import policy
 from email.parser import BytesParser, Parser
 from email.utils import parseaddr
-from typing import Any
 
 from utils.repositories import load_inbound_emails, save_inbound_emails
 

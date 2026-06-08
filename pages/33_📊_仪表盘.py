@@ -24,8 +24,8 @@ st.markdown("""
 uid = get_user_id()
 
 # ── Tab 布局 ──────────────────────────────────────────
-tab_email, tab_score, tab_notify, tab_referral = st.tabs([
-    "📧 邮件追踪", "🔥 客户评分", "🔔 通知中心", "🎁 邀请奖励"
+tab_email, tab_score, tab_notify, tab_referral, tab_readiness, tab_audit = st.tabs([
+    "📧 邮件追踪", "🔥 客户评分", "🔔 通知中心", "🎁 邀请奖励", "🛡️ 上线体检", "🔐 安全审计"
 ])
 
 # ══════════════════════════════════════════════════════
@@ -283,6 +283,117 @@ with tab_referral:
         st.warning("⚠️ 邀请模块未安装")
     except Exception as e:
         st.error(f"加载邀请数据失败: {e}")
+
+# ══════════════════════════════════════════════════════
+# Tab 5: 上线体检
+# ══════════════════════════════════════════════════════
+with tab_readiness:
+    st.markdown("### 🛡️ 商业化上线体检")
+
+    try:
+        from utils.production_readiness import run_readiness_checks, summarize_readiness
+        from utils.user_auth import is_current_admin
+
+        if not is_current_admin():
+            st.info("🔒 上线体检仅管理员可见，用于检查生产配置、支付、邮件和持久化风险。")
+        else:
+            checks = run_readiness_checks()
+            summary = summarize_readiness(checks)
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("通过", summary["passed"])
+            c2.metric("警告", summary["warnings"])
+            c3.metric("失败", summary["failed"])
+            c4.metric("状态", "Ready" if summary["ready"] else "Blocked")
+
+            for check in checks:
+                icon = {"pass": "✅", "warn": "⚠️", "fail": "❌"}.get(check.status, "•")
+                if check.status == "pass":
+                    st.success(f"{icon} {check.title}：{check.detail}")
+                elif check.status == "warn":
+                    st.warning(f"{icon} {check.title}：{check.detail}")
+                else:
+                    st.error(f"{icon} {check.title}：{check.detail}")
+                st.caption(check.recommendation)
+
+    except Exception as e:
+        st.error(f"加载上线体检失败: {e}")
+
+# ══════════════════════════════════════════════════════
+# Tab 6: 安全审计
+# ══════════════════════════════════════════════════════
+with tab_audit:
+    st.markdown("### 🔐 安全审计")
+
+    try:
+        from utils.security_audit import (
+            detect_audit_risks,
+            export_audit_events_csv,
+            get_audit_events,
+            summarize_audit_events,
+        )
+        from utils.user_auth import is_current_admin
+
+        if not is_current_admin():
+            st.info("🔒 安全审计仅管理员可见，用于排查登录、密码、邮箱验证和支付回调风险。")
+        else:
+            col_filter_a, col_filter_b = st.columns([1, 1])
+            with col_filter_a:
+                days = st.selectbox("时间范围", [1, 7, 30, 90], index=1, format_func=lambda d: f"最近 {d} 天")
+            with col_filter_b:
+                severity = st.selectbox("严重级别", ["全部", "info", "warning", "critical"], index=0)
+
+            severity_filter = None if severity == "全部" else severity
+            audit_events = get_audit_events(days=days, severity=severity_filter, limit=100)
+            audit_summary = summarize_audit_events(audit_events)
+            audit_risks = detect_audit_risks(audit_events)
+
+            c1, c2, c3 = st.columns(3)
+            c1.metric("审计事件", audit_summary["total"])
+            c2.metric("风险事件", audit_summary["warnings"])
+            c3.metric("失败/异常", audit_summary["failures"])
+
+            if audit_risks:
+                st.markdown("#### 风险提示")
+                for risk in audit_risks[:5]:
+                    message = f"{risk['title']}：{risk['detail']} {risk['recommendation']}"
+                    if risk["severity"] == "high":
+                        st.error(message)
+                    else:
+                        st.warning(message)
+
+            if audit_summary["top_actions"]:
+                st.markdown("#### 高频动作")
+                for action, count in audit_summary["top_actions"][:5]:
+                    st.caption(f"{action}: {count}")
+
+            st.markdown("#### 最近审计事件")
+            if not audit_events:
+                st.info("暂无安全审计事件。")
+            else:
+                st.download_button(
+                    "导出当前审计 CSV",
+                    export_audit_events_csv(audit_events),
+                    file_name=f"security_audit_{days}d.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                )
+                st.dataframe(
+                    [
+                        {
+                            "时间": event["timestamp"][:19].replace("T", " "),
+                            "用户": event["user_id"],
+                            "动作": event["action"],
+                            "结果": event["outcome"],
+                            "级别": event["severity"],
+                        }
+                        for event in audit_events
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
+    except Exception as e:
+        st.error(f"加载安全审计失败: {e}")
 
 # ── Footer ──────────────────────────────────────────────
 st.markdown("---")

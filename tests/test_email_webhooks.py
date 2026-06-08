@@ -60,10 +60,11 @@ def test_mailgun_signature_and_event_normalization():
         tmp_dir = Path(tmp_str)
         with patch("utils.storage.get_data_dir", return_value=tmp_dir), \
              patch("utils.email_webhooks.get_secret", return_value="test-signing-key"):
+            import hashlib
+            import hmac
+
             from utils.email_events import get_events_for_tracking_id
             from utils.email_webhooks import handle_mailgun_webhook
-            import hmac
-            import hashlib
 
             timestamp = "1760000000"
             token = "mailgun-token"

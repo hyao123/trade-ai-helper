@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import abc
 import json
+import shutil
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -91,7 +92,13 @@ class JSONBackend(DatabaseBackend):
         return load_json("users_db.json", default={})
 
     def save_all_users(self, users: dict) -> None:
-        from utils.storage import save_json
+        from utils.storage import get_data_dir, save_json
+        users_dir = get_data_dir() / "users"
+        if users_dir.exists():
+            valid_usernames = set(users)
+            for child in users_dir.iterdir():
+                if child.is_dir() and child.name not in valid_usernames:
+                    shutil.rmtree(child)
         save_json("users_db.json", users)
 
     def get_user(self, username: str) -> dict | None:
@@ -184,6 +191,15 @@ class SQLiteBackend(DatabaseBackend):
 
     def save_all_users(self, users: dict) -> None:
         with self._get_conn() as conn:
+            usernames = list(users)
+            if usernames:
+                placeholders = ",".join("?" for _ in usernames)
+                conn.execute(f"DELETE FROM user_data WHERE username NOT IN ({placeholders})", usernames)
+                conn.execute(f"DELETE FROM users_db WHERE username NOT IN ({placeholders})", usernames)
+            else:
+                conn.execute("DELETE FROM user_data")
+                conn.execute("DELETE FROM users_db")
+
             for username, data in users.items():
                 conn.execute(
                     """
@@ -306,7 +322,21 @@ class PostgreSQLBackend(DatabaseBackend):
     def save_all_users(self, users: dict) -> None:
         conn = self._get_conn()
         with conn.cursor() as cur:
-            # Upsert all users
+            usernames = list(users)
+            if usernames:
+                placeholders = ", ".join(["%s"] * len(usernames))
+                cur.execute(
+                    f"DELETE FROM user_data WHERE username NOT IN ({placeholders})",
+                    tuple(usernames),
+                )
+                cur.execute(
+                    f"DELETE FROM users_db WHERE username NOT IN ({placeholders})",
+                    tuple(usernames),
+                )
+            else:
+                cur.execute("DELETE FROM user_data")
+                cur.execute("DELETE FROM users_db")
+
             for username, data in users.items():
                 cur.execute("""
                     INSERT INTO users_db (username, data, updated_at)
@@ -373,6 +403,7 @@ class PostgreSQLBackend(DatabaseBackend):
 # Singleton factory
 # ---------------------------------------------------------------------------
 _db_instance: DatabaseBackend | None = None
+_db_signature: tuple[str, str, str] | None = None
 
 
 def _sqlite_path_from_database_url(database_url: str) -> str:
@@ -397,12 +428,13 @@ def get_db() -> DatabaseBackend:
     Returns SQLiteBackend if SQLITE_DB_PATH or sqlite DATABASE_URL is configured.
     Returns PostgreSQLBackend if DATABASE_URL starts with postgres.
     """
-    global _db_instance
-    if _db_instance is not None:
-        return _db_instance
-
+    global _db_instance, _db_signature
     database_url = get_secret("DATABASE_URL")
     sqlite_path = get_secret("SQLITE_DB_PATH")
+    signature = (database_url or "", sqlite_path or "", str(get_data_dir().resolve()))
+    if _db_instance is not None and _db_signature == signature:
+        return _db_instance
+
     if database_url and database_url.startswith("postgres"):
         try:
             _db_instance = PostgreSQLBackend(database_url)
@@ -428,4 +460,5 @@ def get_db() -> DatabaseBackend:
         _db_instance = JSONBackend()
         logger.info("Using JSON file backend")
 
+    _db_signature = signature
     return _db_instance

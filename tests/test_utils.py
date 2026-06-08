@@ -486,6 +486,7 @@ class TestPdfLogoGeneration:
         from utils.pdf_gen import generate_quote_pdf
         tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
         try:
+            tmp.close()
             self._create_minimal_png(tmp.name)
             skus = [{"product": "Test", "model": "T1", "price": 10.0, "quantity": 1, "unit": "PCS"}]
             result = generate_quote_pdf(skus=skus, logo_path=tmp.name)

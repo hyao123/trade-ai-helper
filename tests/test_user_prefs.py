@@ -17,6 +17,7 @@ sys.modules["streamlit"] = _mock_st
 
 
 def _setup_user_session(username: str = "prefuser"):
+    sys.modules["streamlit"] = _mock_st
     _mock_st.session_state.clear()
     _mock_st.session_state["current_user"] = {"username": username, "tier": "free"}
 

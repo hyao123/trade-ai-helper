@@ -22,7 +22,7 @@ DatabaseBackend. The default JSONBackend keeps the existing prefs.json layout.
 """
 from __future__ import annotations
 
-import streamlit as st
+import importlib
 
 from utils.repositories import (
     load_shared_prefs,
@@ -71,7 +71,8 @@ _DEFAULTS: dict[str, str] = {
 # Internal helpers
 # ---------------------------------------------------------------------------
 def _get_username() -> str | None:
-    user = st.session_state.get("current_user")
+    active_st = importlib.import_module("streamlit")
+    user = active_st.session_state.get("current_user")
     if user and user.get("username") and user["username"] != "admin":
         return user["username"]
     return None
@@ -147,6 +148,7 @@ def save_seller_identity(
 
 def get_business_context_suffix() -> str:
     """Build a compact business-context suffix from onboarding/profile fields."""
+    raw_prefs = _load_prefs_raw()
     prefs = get_prefs()
     context_fields = [
         ("Company", prefs.get("company_name", "")),
@@ -155,7 +157,7 @@ def get_business_context_suffix() -> str:
         ("Main products", prefs.get("main_products", "")),
         ("Target markets", prefs.get("target_markets", "")),
         ("Company strengths", prefs.get("company_description", "")),
-        ("Default trade term", prefs.get("default_trade_term", "")),
+        ("Default trade term", raw_prefs.get("default_trade_term", "")),
     ]
     lines = []
     for label, raw_value in context_fields:
