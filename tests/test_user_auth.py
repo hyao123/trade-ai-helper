@@ -338,6 +338,10 @@ class TestUserAuth:
                 users = _load_users_db()
                 assert users["tokenuser"]["email_verified"] is True
                 assert users["tokenuser"]["verification_token"] == ""
+                assert _mock_st.session_state["current_user"]["email_verified"] is True
+                assert _mock_st.session_state["current_user"]["email"] == "token@example.com"
+                assert "verification_token" not in _mock_st.session_state["current_user"]
+                assert "password_hash" not in _mock_st.session_state["current_user"]
 
     def test_verify_email_token_accepts_legacy_raw_token_record(self):
         with self._setup() as tmp_str:

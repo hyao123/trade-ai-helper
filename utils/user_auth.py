@@ -575,6 +575,8 @@ def verify_email_token(username: str, token: str) -> tuple[bool, str]:
     users[username]["email_verified"] = True
     users[username]["verification_token"] = ""
     _save_users_db(users)
+    if st.session_state.get("current_user", {}).get("username") == username:
+        st.session_state["current_user"] = _build_public_user_info(users[username])
     logger.info("Email verified for user: %s", username)
     audit_event("email_verified", "success", user_id=username)
     return True, "Email verified successfully"
