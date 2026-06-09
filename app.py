@@ -221,16 +221,19 @@ def _render_payment_return_banner(st) -> None:
 def _render_onboarding_banner(st) -> None:
     """Guide new users to complete quick setup when business context is missing."""
     from utils.user_auth import get_current_user
-    from utils.user_prefs import get_prefs
+    from utils.user_prefs import (
+        get_prefs,
+        is_onboarding_complete,
+        onboarding_completion_counts,
+    )
 
     current_user = get_current_user()
     if not current_user or current_user.get("username") in (None, "admin"):
         return
 
     prefs = get_prefs()
-    required_keys = ["company_name", "contact_name", "default_product", "main_products", "company_description"]
-    completed = sum(1 for key in required_keys if prefs.get(key, "").strip())
-    if prefs.get("onboarding_completed") == "true" and completed == len(required_keys):
+    completed, total = onboarding_completion_counts(prefs)
+    if is_onboarding_complete(prefs):
         return
 
     st.markdown(
@@ -240,7 +243,7 @@ def _render_onboarding_banner(st) -> None:
           <div class="onboarding-copy">
             先填写公司名称、主营产品、目标市场和写作风格，后续开发信、询盘回复、报价和客户跟进会自动带入这些信息，减少重复输入。
           </div>
-          <div class="onboarding-progress">当前资料完成度：{completed}/{len(required_keys)}</div>
+          <div class="onboarding-progress">当前资料完成度：{completed}/{total}</div>
         </div>
         """,
         unsafe_allow_html=True,

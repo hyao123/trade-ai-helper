@@ -34,6 +34,13 @@ from utils.repositories import (
 _PREFS_FILE = "prefs.json"
 _MAX_CONTEXT_VALUE_CHARS = 500
 _MAX_CONTEXT_TOTAL_CHARS = 1600
+ONBOARDING_REQUIRED_KEYS = (
+    "company_name",
+    "contact_name",
+    "default_product",
+    "main_products",
+    "company_description",
+)
 
 # ---------------------------------------------------------------------------
 # Defaults
@@ -128,6 +135,20 @@ def update_prefs(updates: dict[str, str]) -> None:
     raw = _load_prefs_raw()
     raw.update(updates)
     _save_prefs_raw(raw)
+
+
+def onboarding_completion_counts(prefs: dict[str, str] | None = None) -> tuple[int, int]:
+    """Return completed and required onboarding field counts."""
+    current_prefs = prefs or get_prefs()
+    completed = sum(1 for key in ONBOARDING_REQUIRED_KEYS if current_prefs.get(key, "").strip())
+    return completed, len(ONBOARDING_REQUIRED_KEYS)
+
+
+def is_onboarding_complete(prefs: dict[str, str] | None = None) -> bool:
+    """Return True when the seller profile has enough context for app-wide reuse."""
+    current_prefs = prefs or get_prefs()
+    completed, total = onboarding_completion_counts(current_prefs)
+    return completed == total
 
 
 def save_seller_identity(

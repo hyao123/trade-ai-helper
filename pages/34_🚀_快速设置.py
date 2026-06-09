@@ -10,7 +10,7 @@ import streamlit as st
 
 from utils.ui_helpers import check_auth, inject_css
 from utils.user_auth import get_current_user, update_account_email
-from utils.user_prefs import get_prefs, update_prefs
+from utils.user_prefs import get_prefs, onboarding_completion_counts, update_prefs
 
 st.set_page_config(page_title="快速设置 | 外贸AI助手", page_icon="🚀", layout="wide")
 inject_css()
@@ -33,13 +33,12 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-required_keys = ["company_name", "contact_name", "default_product", "main_products", "company_description"]
-completed = sum(1 for key in required_keys if prefs.get(key, "").strip())
-progress = completed / len(required_keys)
+completed, total_required = onboarding_completion_counts(prefs)
+progress = completed / total_required
 
 st.markdown("### 设置进度")
 st.progress(progress)
-st.caption(f"已完成 {completed}/{len(required_keys)} 项。资料越完整，AI 输出越贴近你的真实业务。")
+st.caption(f"已完成 {completed}/{total_required} 项。资料越完整，AI 输出越贴近你的真实业务。")
 
 st.markdown("---")
 
@@ -134,10 +133,7 @@ with st.form("onboarding_quick_setup"):
             if prefs.get("ai_response_length", "中等") in ["简短", "中等", "详细"] else 1,
             horizontal=True,
         )
-        onboarding_done = st.checkbox(
-            "完成后不再提示我进行快速设置",
-            value=prefs.get("onboarding_completed", "false") == "true",
-        )
+        st.caption("保存必填资料后，首页将不再重复提示快速设置。")
 
     submitted = st.form_submit_button("保存并完成快速设置", type="primary", use_container_width=True)
 
@@ -180,7 +176,7 @@ if submitted:
             "default_tone": default_tone,
             "ai_style_tone": ai_style_tone,
             "ai_response_length": ai_response_length,
-            "onboarding_completed": "true" if onboarding_done else "false",
+            "onboarding_completed": "true",
         })
         st.success("✅ 快速设置已保存！后续开发信、询盘回复、报价和客户跟进会自动复用这些资料。")
         if email_update_message:

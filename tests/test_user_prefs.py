@@ -81,6 +81,27 @@ def test_business_context_suffix_includes_onboarding_fields():
             assert "trusted seller profile data" in suffix
 
 
+def test_onboarding_completion_counts_required_profile_fields():
+    from utils.user_prefs import is_onboarding_complete, onboarding_completion_counts
+
+    partial = {
+        "company_name": "ABC Export Ltd.",
+        "contact_name": "Ada",
+        "default_product": "Industrial pumps",
+    }
+    assert onboarding_completion_counts(partial) == (3, 5)
+    assert is_onboarding_complete(partial) is False
+
+    complete = {
+        **partial,
+        "main_products": "Pumps, motors",
+        "company_description": "ISO-certified exporter.",
+        "onboarding_completed": "false",
+    }
+    assert onboarding_completion_counts(complete) == (5, 5)
+    assert is_onboarding_complete(complete) is True
+
+
 def test_ai_style_suffix_combines_business_context_and_style():
     _setup_user_session()
     with tempfile.TemporaryDirectory() as tmp_str:
