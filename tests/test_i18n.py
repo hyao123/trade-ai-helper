@@ -63,6 +63,16 @@ class TestI18n:
         assert missing_in_en == set(), f"Keys in zh but not en: {missing_in_en}"
         assert missing_in_zh == set(), f"Keys in en but not zh: {missing_in_zh}"
 
+    def test_account_policy_copy_matches_current_requirements(self):
+        """Registration and password hints match required email and 10-char password policy."""
+        for lang in ("zh", "en"):
+            copy = TRANSLATIONS[lang]
+            assert "10" in copy["choose_password_placeholder"]
+            assert "10" in copy["new_password_placeholder"]
+            assert "4" not in copy["new_password_placeholder"]
+            assert "required" in copy["email_optional"].lower() or "必填" in copy["email_optional"]
+            assert "optional" not in copy["email_optional"].lower()
+
     def test_get_lang_returns_zh_by_default(self):
         """get_lang() returns 'zh' when no language is set in session state."""
         self._setup()

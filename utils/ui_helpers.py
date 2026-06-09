@@ -378,8 +378,8 @@ def check_auth() -> None:
         with register_tab:
             with st.form("register_form"):
                 reg_username = st.text_input(t("username"), placeholder=t("choose_username_placeholder"), key="reg_username")
-                reg_email = st.text_input("邮箱（必填）", placeholder="用于密码找回和账户联系", key="reg_email")
-                st.caption("邮箱是必填项：用于密码找回、账户通知和必要的用户联系。")
+                reg_email = st.text_input(t("email_optional"), placeholder=t("email_required_placeholder"), key="reg_email")
+                st.caption(t("email_required_help"))
                 reg_password = st.text_input(t("password"), type="password", placeholder=t("choose_password_placeholder"), key="reg_password")
                 reg_confirm = st.text_input(t("confirm"), type="password", placeholder=t("confirm_password_placeholder"), key="reg_confirm")
                 _ref_default = st.query_params.get("ref", "") if hasattr(st, "query_params") else ""
@@ -391,9 +391,9 @@ def check_auth() -> None:
                 )
                 if st.form_submit_button(t("register_button"), use_container_width=True, type="primary"):
                     if not reg_email or not reg_email.strip():
-                        st.error("❌ 请填写邮箱。邮箱用于密码找回和账户联系。")
+                        st.error(f"❌ {t('email_required_error')}")
                     elif "@" not in reg_email or "." not in reg_email.split("@")[-1]:
-                        st.error("❌ 请填写有效的邮箱地址。")
+                        st.error(f"❌ {t('email_invalid_error')}")
                     elif reg_password != reg_confirm:
                         st.error(f"❌ {t('passwords_not_match')}")
                     else:
