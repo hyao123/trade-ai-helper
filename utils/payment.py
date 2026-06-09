@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from utils.pricing import upgrade_user_tier
+from utils.pricing import get_user_tier, upgrade_user_tier
 from utils.repositories import load_consumed_sessions, save_consumed_sessions
 from utils.secrets import get_secret
 
@@ -19,6 +19,8 @@ try:
 except ImportError:
     stripe = None  # type: ignore[assignment]
     STRIPE_AVAILABLE = False
+
+_TIER_ORDER = {"free": 0, "pro": 1, "enterprise": 2}
 
 
 def is_payment_configured() -> bool:
@@ -89,6 +91,11 @@ def verify_checkout_session(session_id: str) -> tuple[bool, dict]:
         return (False, {})
 
 
+def _tier_at_least(current_tier: str, target_tier: str) -> bool:
+    """Return True when current_tier already includes target_tier access."""
+    return _TIER_ORDER.get(current_tier, -1) >= _TIER_ORDER.get(target_tier, 999)
+
+
 def complete_upgrade(username: str, session_id: str) -> tuple[bool, str]:
     """Complete a tier upgrade after payment verification."""
     from utils.email_gate import require_verified_email
@@ -111,7 +118,10 @@ def complete_upgrade(username: str, session_id: str) -> tuple[bool, str]:
 
     consumed = load_consumed_sessions(username)
     if session_id in consumed:
-        return (False, "Session already consumed")
+        current_tier = get_user_tier(username)
+        if _tier_at_least(current_tier, target_tier):
+            return (True, f"Already upgraded to {current_tier}")
+        return (False, "Session already consumed but tier is not active")
 
     success = upgrade_user_tier(username, target_tier)
     if success:

@@ -154,6 +154,36 @@ class TestPayment:
             mock_upgrade.assert_called_once_with("testuser", "pro")
             mock_save.assert_called_once_with("testuser", ["cs_test_123"])
 
+    def test_complete_upgrade_consumed_session_is_success_when_tier_already_active(self):
+        self._setup()
+        with patch.object(utils.payment, "verify_checkout_session", return_value=(True, {"username": "testuser", "target_tier": "pro"})), \
+             patch.object(utils.payment, "load_consumed_sessions", return_value=["cs_test_123"]), \
+             patch.object(utils.payment, "get_user_tier", return_value="pro"), \
+             patch.object(utils.payment, "upgrade_user_tier") as mock_upgrade, \
+             patch.object(utils.payment, "save_consumed_sessions") as mock_save, \
+             patch("utils.email_gate.require_verified_email", return_value=(True, "")):
+            success, msg = complete_upgrade("testuser", "cs_test_123")
+
+        assert success is True
+        assert "already upgraded" in msg.lower()
+        mock_upgrade.assert_not_called()
+        mock_save.assert_not_called()
+
+    def test_complete_upgrade_consumed_session_fails_when_tier_not_active(self):
+        self._setup()
+        with patch.object(utils.payment, "verify_checkout_session", return_value=(True, {"username": "testuser", "target_tier": "pro"})), \
+             patch.object(utils.payment, "load_consumed_sessions", return_value=["cs_test_123"]), \
+             patch.object(utils.payment, "get_user_tier", return_value="free"), \
+             patch.object(utils.payment, "upgrade_user_tier") as mock_upgrade, \
+             patch.object(utils.payment, "save_consumed_sessions") as mock_save, \
+             patch("utils.email_gate.require_verified_email", return_value=(True, "")):
+            success, msg = complete_upgrade("testuser", "cs_test_123")
+
+        assert success is False
+        assert "not active" in msg.lower()
+        mock_upgrade.assert_not_called()
+        mock_save.assert_not_called()
+
     def test_complete_upgrade_username_mismatch(self):
         self._setup()
         with patch.object(utils.payment, "verify_checkout_session", return_value=(True, {"username": "otheruser", "target_tier": "pro"})), \
