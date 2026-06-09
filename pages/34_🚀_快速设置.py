@@ -9,7 +9,7 @@ from __future__ import annotations
 import streamlit as st
 
 from utils.ui_helpers import check_auth, inject_css
-from utils.user_auth import get_current_user
+from utils.user_auth import get_current_user, update_account_email
 from utils.user_prefs import get_prefs, update_prefs
 
 st.set_page_config(page_title="快速设置 | 外贸AI助手", page_icon="🚀", layout="wide")
@@ -157,6 +157,14 @@ if submitted:
     if missing:
         st.error("请先补充必填项：" + "、".join(missing))
     else:
+        email_update_message = ""
+        normalized_email = email_addr.strip()
+        if normalized_email and normalized_email.lower() != current_user.get("email", "").strip().lower():
+            email_updated, email_update_message = update_account_email(current_user["username"], normalized_email)
+            if not email_updated:
+                st.error(f"邮箱更新失败：{email_update_message}")
+                st.stop()
+
         update_prefs({
             "company_name": company_name.strip(),
             "contact_name": contact_name.strip(),
@@ -175,6 +183,8 @@ if submitted:
             "onboarding_completed": "true" if onboarding_done else "false",
         })
         st.success("✅ 快速设置已保存！后续开发信、询盘回复、报价和客户跟进会自动复用这些资料。")
+        if email_update_message:
+            st.info("邮箱已同步到账户，请到「账户管理」完成新邮箱验证。")
         st.balloons()
 
         col_next1, col_next2 = st.columns(2)

@@ -220,6 +220,72 @@ class TestUserAuth:
                 auth_old, _ = authenticate_user("chguser", GOOD_PASSWORD)
                 assert auth_old is False
 
+    def test_update_account_email_requires_new_verification(self):
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 self._patch_storage(tmp_dir), \
+                 patch("utils.user_auth.secrets.token_urlsafe", side_effect=["initial-token", "new-email-token"]), \
+                 patch("utils.email_service.is_email_configured", return_value=True), \
+                 patch("utils.email_service.send_verification_email", return_value=(True, "sent")) as send_email:
+                from utils.user_auth import (
+                    _load_users_db,
+                    register_user,
+                    update_account_email,
+                )
+
+                register_user("emailuser", GOOD_PASSWORD, email="old@example.com")
+                users = _load_users_db()
+                users["emailuser"]["email_verified"] = True
+                users["emailuser"]["verification_token"] = ""
+                from utils.user_auth import _save_users_db
+                _save_users_db(users)
+                _mock_st.session_state["current_user"]["email_verified"] = True
+
+                success, msg = update_account_email("emailuser", "New@Example.COM")
+
+                assert success is True
+                assert "verification" in msg.lower()
+                users = _load_users_db()
+                assert users["emailuser"]["email"] == "new@example.com"
+                assert users["emailuser"]["email_verified"] is False
+                assert users["emailuser"]["verification_token"]["token_hash"] != "new-email-token"
+                assert _mock_st.session_state["current_user"]["email"] == "new@example.com"
+                assert _mock_st.session_state["current_user"]["email_verified"] is False
+
+        assert send_email.call_count == 2
+
+    def test_update_account_email_rejects_duplicate_email(self):
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), self._patch_storage(tmp_dir):
+                from utils.user_auth import (
+                    _load_users_db,
+                    register_user,
+                    update_account_email,
+                )
+
+                register_user("firstuser", GOOD_PASSWORD, email="first@example.com")
+                register_user("seconduser", ALT_PASSWORD, email="second@example.com")
+                success, msg = update_account_email("firstuser", "SECOND@example.com")
+
+                assert success is False
+                assert "email" in msg.lower()
+                users = _load_users_db()
+                assert users["firstuser"]["email"] == "first@example.com"
+
+    def test_update_account_email_rejects_invalid_email(self):
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), self._patch_storage(tmp_dir):
+                from utils.user_auth import register_user, update_account_email
+
+                register_user("invalidmail", GOOD_PASSWORD, email="valid@example.com")
+                success, msg = update_account_email("invalidmail", "not-an-email")
+
+                assert success is False
+                assert "email" in msg.lower()
+
     def test_verify_email_token_success(self):
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)

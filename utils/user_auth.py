@@ -489,6 +489,48 @@ def change_password(username: str, old_password: str, new_password: str) -> tupl
     return True, "Password changed successfully"
 
 
+def update_account_email(username: str, email: str) -> tuple[bool, str]:
+    """Update the account email and require verification for the new address."""
+    if not username:
+        return False, "Username is required"
+    if not _is_valid_email(email):
+        return False, "Email is required for password recovery and account contact"
+
+    username = username.strip().lower()
+    email = email.strip().lower()
+    users = _load_users_db()
+    if username not in users:
+        audit_event("account_email_change_failed", "unknown_user", user_id=username, severity="warning")
+        return False, "User not found"
+
+    for existing_username, existing in users.items():
+        if existing_username != username and existing.get("email", "").strip().lower() == email:
+            audit_event("account_email_change_failed", "duplicate_email", user_id=username, severity="warning")
+            return False, "Email is already registered"
+
+    user = users[username]
+    current_email = user.get("email", "").strip().lower()
+    if current_email == email:
+        return True, "Email unchanged"
+
+    verification_token = secrets.token_urlsafe(32)
+    verification_expires = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+    user["email"] = email
+    user["email_verified"] = False
+    user["verification_token"] = _build_token_record(verification_token, verification_expires)
+    _save_users_db(users)
+
+    if st.session_state.get("current_user", {}).get("username") == username:
+        st.session_state["current_user"] = _build_public_user_info(user)
+
+    from utils.email_service import is_email_configured, send_verification_email
+    if is_email_configured():
+        send_verification_email(email, verification_token)
+
+    audit_event("account_email_changed", "success", user_id=username)
+    return True, "Email updated; verification required"
+
+
 def get_user_data_dir(username: str) -> Path:
     """Return the data directory for a specific user. Creates it if needed."""
     if not username.isalnum():
