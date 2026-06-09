@@ -96,7 +96,7 @@ def _handle_checkout_completed(session: dict) -> tuple[bool, str]:
       - target_tier: 'pro' or 'team'
     """
     metadata = session.get("metadata", {})
-    username = metadata.get("username")
+    username = metadata.get("username") or session.get("client_reference_id")
     target_tier = metadata.get("target_tier")
     session_id = session.get("id", "")
     customer_id = session.get("customer")
@@ -304,6 +304,7 @@ def create_subscription_checkout(
             "line_items": [{"price": price_id, "quantity": 1}],
             "mode": "subscription",
             "metadata": {"username": username, "target_tier": target_tier},
+            "client_reference_id": username,
             "success_url": f"{base_url}/?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
             "cancel_url": f"{base_url}/?payment=cancelled",
         }
