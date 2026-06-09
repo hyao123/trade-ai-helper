@@ -286,6 +286,36 @@ class TestUserAuth:
                 assert success is False
                 assert "email" in msg.lower()
 
+    def test_update_account_email_unchanged_preserves_verification(self):
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            with patch("utils.user_auth.st", _mock_st), \
+                 self._patch_storage(tmp_dir), \
+                 patch("utils.email_service.is_email_configured", return_value=True), \
+                 patch("utils.email_service.send_verification_email", return_value=(True, "sent")) as send_email:
+                from utils.user_auth import (
+                    _load_users_db,
+                    _save_users_db,
+                    register_user,
+                    update_account_email,
+                )
+
+                register_user("sameemail", GOOD_PASSWORD, email="same@example.com")
+                users = _load_users_db()
+                users["sameemail"]["email_verified"] = True
+                users["sameemail"]["verification_token"] = ""
+                _save_users_db(users)
+
+                success, msg = update_account_email("sameemail", "Same@Example.COM")
+
+                assert success is True
+                assert "unchanged" in msg.lower()
+                users = _load_users_db()
+                assert users["sameemail"]["email_verified"] is True
+                assert users["sameemail"]["verification_token"] == ""
+
+        assert send_email.call_count == 1
+
     def test_verify_email_token_success(self):
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)

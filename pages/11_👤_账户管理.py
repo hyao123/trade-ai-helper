@@ -21,6 +21,7 @@ from utils.user_auth import (
     change_password,
     get_current_user,
     resend_verification_email,
+    update_account_email,
     verify_email_token,
 )
 
@@ -87,6 +88,31 @@ st.markdown(f"""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
+if st.session_state.pop("account_email_updated", False):
+    st.success(t("account_email_updated"))
+
+st.markdown(f"### {t('account_email')}")
+st.caption(t("account_email_help"))
+with st.form("account_email_form"):
+    account_email = st.text_input(
+        t("account_email_input"),
+        value=email,
+        placeholder=t("email_placeholder"),
+    )
+    if st.form_submit_button(t("save_account_email"), use_container_width=True):
+        if not account_email.strip():
+            st.error(t("account_email_required"))
+        else:
+            success, msg = update_account_email(username, account_email.strip())
+            if success:
+                if msg == "Email unchanged":
+                    st.info(t("account_email_unchanged"))
+                else:
+                    st.session_state["account_email_updated"] = True
+                    st.rerun()
+            else:
+                st.error(f"{t('account_email_update_failed')}: {msg}")
 
 # Email verification section (if email is set but not verified)
 if email and not email_verified:
