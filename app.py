@@ -61,6 +61,10 @@ HOME_CSS = """
 .onboarding-title { font-weight: 850; font-size: 1rem; color: #312e81; margin-bottom: 0.25rem; }
 .onboarding-copy { font-size: 0.88rem; line-height: 1.65; color: #4338ca; }
 .onboarding-progress { margin-top: 0.6rem; font-size: 0.78rem; color: #4f46e5; font-weight: 700; }
+.next-action-band { margin: 0.1rem 0 1.4rem; }
+.next-action-title { font-size: 0.82rem; color: #475569; font-weight: 850; margin-bottom: 0.55rem; }
+.next-action-band .stButton > button { min-height: 76px !important; border-radius: 12px !important; border: 1px solid #dbe3ef !important; background: #ffffff !important; color: #1e293b !important; white-space: pre-line !important; line-height: 1.35 !important; font-size: 0.82rem !important; font-weight: 700 !important; box-shadow: 0 1px 3px rgba(15,23,42,0.05) !important; }
+.next-action-band .stButton > button:hover { border-color: #6366f1 !important; box-shadow: 0 6px 18px rgba(99,102,241,0.12) !important; transform: translateY(-1px) !important; }
 </style>
 """
 
@@ -169,6 +173,7 @@ def _render_email_verification_banner(st) -> None:
 
 def _render_onboarding_banner(st) -> None:
     """Guide new users to complete quick setup when business context is missing."""
+    from utils.onboarding import profile_completion
     from utils.user_auth import get_current_user
     from utils.user_prefs import get_prefs
 
@@ -177,9 +182,8 @@ def _render_onboarding_banner(st) -> None:
         return
 
     prefs = get_prefs()
-    required_keys = ["company_name", "contact_name", "default_product", "main_products", "company_description"]
-    completed = sum(1 for key in required_keys if prefs.get(key, "").strip())
-    if prefs.get("onboarding_completed") == "true" and completed == len(required_keys):
+    completion = profile_completion(prefs)
+    if prefs.get("onboarding_completed") == "true" and completion["complete"]:
         return
 
     st.markdown(
@@ -189,7 +193,7 @@ def _render_onboarding_banner(st) -> None:
           <div class="onboarding-copy">
             先填写公司名称、主营产品、目标市场和写作风格，后续开发信、询盘回复、报价和客户跟进会自动带入这些信息，减少重复输入。
           </div>
-          <div class="onboarding-progress">当前资料完成度：{completed}/{len(required_keys)}</div>
+          <div class="onboarding-progress">当前资料完成度：{completion['completed']}/{completion['total']}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -198,11 +202,51 @@ def _render_onboarding_banner(st) -> None:
         st.switch_page("pages/34_🚀_快速设置.py")
 
 
+def _render_next_actions(st) -> None:
+    """Render prioritized actions for the current user's setup state."""
+    from utils.customers import get_customers
+    from utils.onboarding import build_home_next_actions
+    from utils.user_auth import get_current_user
+    from utils.user_prefs import get_prefs
+
+    current_user = get_current_user()
+    if not current_user or current_user.get("username") in (None, "admin"):
+        return
+
+    try:
+        customer_count = len(get_customers())
+    except Exception:
+        customer_count = 0
+
+    actions = build_home_next_actions(
+        user=current_user,
+        prefs=get_prefs(),
+        customer_count=customer_count,
+    )
+    if not actions:
+        return
+
+    st.markdown('<div class="next-action-band"><div class="next-action-title">下一步建议</div>', unsafe_allow_html=True)
+    cols = st.columns(len(actions))
+    for col, action in zip(cols, actions):
+        with col:
+            button_type = "primary" if action.get("priority") == "primary" else "secondary"
+            if st.button(
+                f"{action['label']}\n{action['detail']}",
+                key=f"next_action_{action['id']}",
+                type=button_type,
+                use_container_width=True,
+            ):
+                st.switch_page(action["page"])
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 def _render_home(st) -> None:
     """Render the home page. ``st`` is injected to keep imports out of module scope."""
     st.markdown(HOME_CSS, unsafe_allow_html=True)
     _render_email_verification_banner(st)
     _render_onboarding_banner(st)
+    _render_next_actions(st)
 
     st.markdown(
         """
