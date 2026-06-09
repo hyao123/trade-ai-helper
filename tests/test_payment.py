@@ -22,7 +22,9 @@ sys.modules["dotenv"] = _mock_dotenv
 
 import utils.payment  # noqa: E402
 from utils.payment import (  # noqa: E402
+    checkout_session_id_from_query,
     complete_upgrade,
+    complete_upgrade_from_query,
     create_checkout_session,
     is_payment_configured,
     verify_checkout_session,
@@ -159,6 +161,31 @@ class TestPayment:
             success, msg = complete_upgrade("testuser", "cs_test_123")
             assert success is False
             assert "mismatch" in msg.lower()
+
+    def test_checkout_session_id_from_query_accepts_streamlit_values(self):
+        assert checkout_session_id_from_query({"payment": "success", "session_id": "cs_test_123"}) == "cs_test_123"
+        assert checkout_session_id_from_query({"payment": ["success"], "session_id": ["cs_test_456"]}) == "cs_test_456"
+
+    def test_checkout_session_id_from_query_ignores_non_success_returns(self):
+        assert checkout_session_id_from_query({"payment": "cancelled", "session_id": "cs_test_123"}) == ""
+        assert checkout_session_id_from_query({"payment": "success"}) == ""
+
+    def test_complete_upgrade_from_query_only_handles_success_session(self):
+        with patch.object(utils.payment, "complete_upgrade", return_value=(True, "Upgraded to pro")) as complete:
+            handled, success, msg = complete_upgrade_from_query(
+                "testuser",
+                {"payment": "success", "session_id": "cs_test_123"},
+            )
+
+        assert handled is True
+        assert success is True
+        assert msg == "Upgraded to pro"
+        complete.assert_called_once_with("testuser", "cs_test_123")
+
+        handled, success, msg = complete_upgrade_from_query("testuser", {"payment": "cancelled"})
+        assert handled is False
+        assert success is False
+        assert msg == ""
 
 
 if __name__ == "__main__":

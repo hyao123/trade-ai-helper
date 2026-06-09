@@ -57,6 +57,12 @@ HOME_CSS = """
 .email-verify-banner { background: linear-gradient(135deg, #fff7ed 0%, #fffbeb 100%); border: 1px solid #fed7aa; border-left: 5px solid #f97316; border-radius: 16px; padding: 1rem 1.1rem; margin: 0.2rem 0 1.2rem; color: #7c2d12; box-shadow: 0 8px 24px rgba(249,115,22,0.10); }
 .email-verify-title { font-weight: 850; font-size: 1rem; color: #9a3412; margin-bottom: 0.25rem; }
 .email-verify-copy { font-size: 0.88rem; line-height: 1.65; color: #7c2d12; }
+.payment-return-banner { background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%); border: 1px solid #bbf7d0; border-left: 5px solid #22c55e; border-radius: 16px; padding: 1rem 1.1rem; margin: 0.2rem 0 1.2rem; color: #14532d; box-shadow: 0 8px 24px rgba(34,197,94,0.10); }
+.payment-return-title { font-weight: 850; font-size: 1rem; color: #166534; margin-bottom: 0.25rem; }
+.payment-return-copy { font-size: 0.88rem; line-height: 1.65; color: #14532d; }
+.payment-return-error { background: linear-gradient(135deg, #fff7ed 0%, #fffbeb 100%); border-color: #fed7aa; border-left-color: #f97316; color: #7c2d12; }
+.payment-return-error .payment-return-title { color: #9a3412; }
+.payment-return-error .payment-return-copy { color: #7c2d12; }
 .onboarding-banner { background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%); border: 1px solid #c7d2fe; border-left: 5px solid #6366f1; border-radius: 16px; padding: 1rem 1.1rem; margin: 0.2rem 0 1.2rem; color: #312e81; box-shadow: 0 8px 24px rgba(99,102,241,0.10); }
 .onboarding-title { font-weight: 850; font-size: 1rem; color: #312e81; margin-bottom: 0.25rem; }
 .onboarding-copy { font-size: 0.88rem; line-height: 1.65; color: #4338ca; }
@@ -167,6 +173,51 @@ def _render_email_verification_banner(st) -> None:
         st.switch_page("pages/11_👤_账户管理.py")
 
 
+def _render_payment_return_banner(st) -> None:
+    """Complete Stripe upgrades when Checkout redirects back to the home page."""
+    from utils.payment import complete_upgrade_from_query
+    from utils.repositories import load_user
+    from utils.user_auth import get_current_user
+
+    current_user = get_current_user()
+    if not current_user or current_user.get("username") in (None, "admin"):
+        return
+
+    handled, success, message = complete_upgrade_from_query(current_user["username"], st.query_params)
+    if not handled:
+        return
+
+    st.query_params.clear()
+    if success:
+        latest_user = load_user(current_user["username"]) or current_user
+        st.session_state["current_user"].update(
+            {
+                "tier": latest_user.get("tier", current_user.get("tier", "free")),
+                "email_verified": latest_user.get("email_verified", current_user.get("email_verified", False)),
+            }
+        )
+        st.markdown(
+            f"""
+            <div class="payment-return-banner">
+              <div class="payment-return-title">💳 套餐升级已生效</div>
+              <div class="payment-return-copy">{message}。你现在可以继续使用对应套餐额度和高级功能。</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    st.markdown(
+        f"""
+        <div class="payment-return-banner payment-return-error">
+          <div class="payment-return-title">💳 支付返回已收到，但套餐未自动激活</div>
+          <div class="payment-return-copy">原因：{message}。请进入「套餐升级」页面重试验证，或联系管理员处理。</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _render_onboarding_banner(st) -> None:
     """Guide new users to complete quick setup when business context is missing."""
     from utils.user_auth import get_current_user
@@ -201,6 +252,7 @@ def _render_onboarding_banner(st) -> None:
 def _render_home(st) -> None:
     """Render the home page. ``st`` is injected to keep imports out of module scope."""
     st.markdown(HOME_CSS, unsafe_allow_html=True)
+    _render_payment_return_banner(st)
     _render_email_verification_banner(st)
     _render_onboarding_banner(st)
 

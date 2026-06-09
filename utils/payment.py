@@ -6,6 +6,9 @@ Wraps stripe in try/except since it may not be installed locally.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 from utils.pricing import upgrade_user_tier
 from utils.repositories import load_consumed_sessions, save_consumed_sessions
 from utils.secrets import get_secret
@@ -116,3 +119,32 @@ def complete_upgrade(username: str, session_id: str) -> tuple[bool, str]:
         save_consumed_sessions(username, consumed)
         return (True, f"Upgraded to {target_tier}")
     return (False, "Upgrade failed")
+
+
+def _first_query_value(value: Any) -> str:
+    """Return a normalized first value from Streamlit-style query params."""
+    if isinstance(value, (list, tuple)):
+        value = value[0] if value else ""
+    return str(value or "").strip()
+
+
+def checkout_session_id_from_query(query_params: Mapping[str, Any]) -> str:
+    """Extract a paid-checkout session ID from a Stripe success return URL."""
+    payment_status = _first_query_value(query_params.get("payment")).lower()
+    session_id = _first_query_value(query_params.get("session_id"))
+    if payment_status != "success" or not session_id:
+        return ""
+    return session_id
+
+
+def complete_upgrade_from_query(username: str, query_params: Mapping[str, Any]) -> tuple[bool, bool, str]:
+    """Complete a Stripe upgrade from return query params.
+
+    Returns ``(handled, success, message)``. ``handled`` is False when the
+    current URL does not contain a Stripe success session.
+    """
+    session_id = checkout_session_id_from_query(query_params)
+    if not session_id:
+        return (False, False, "")
+    success, message = complete_upgrade(username, session_id)
+    return (True, success, message)

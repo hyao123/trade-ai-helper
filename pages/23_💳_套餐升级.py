@@ -202,7 +202,7 @@ st.markdown("---")
 # ══════════════════════════════════════════════════════
 if tier != "enterprise":
     with st.expander("🔍 已付款？验证支付并升级", expanded=False):
-        st.markdown("完成 Stripe 支付后，将支付会话 ID 粘贴到下方进行验证。")
+        st.markdown("正常情况下，Stripe 支付完成后会自动返回首页并激活套餐。若自动激活失败，可将支付会话 ID 粘贴到下方手动验证。")
         session_id = st.text_input("Stripe 支付会话 ID", placeholder="cs_live_xxxxxxxxxxxx", key="payment_session_id_upgrade")
         if st.button("✅ 验证并升级", type="primary", use_container_width=True, key="verify_upgrade_btn"):
             if not session_id.strip():
@@ -223,7 +223,7 @@ if tier != "enterprise":
 st.markdown("### ❓ 常见问题")
 
 with st.expander("💬 支付后多久生效？"):
-    st.markdown("支付完成后，在本页面输入 **Stripe 支付会话 ID** 即可立即生效，无需等待。")
+    st.markdown("支付完成后会自动返回首页并立即激活套餐。若浏览器跳转被拦截，可回到本页输入 **Stripe 支付会话 ID** 手动验证。")
 
 with st.expander("💬 可以随时取消吗？"):
     st.markdown("套餐为一次性购买（按月），到期后不会自动续费。如需继续使用，到期前手动续费即可。")
