@@ -113,18 +113,14 @@ else:
 
     import json as _json
 
+    from utils.backup import build_backup_bundle
     from utils.customers import import_customers
-    from utils.history import _get_history, import_history
-    from utils.templates import _get_store, import_templates
+    from utils.history import import_history
+    from utils.templates import import_templates
     from utils.workflow import import_workflows
 
     # 收集所有可导出数据
-    export_data = {
-        "history": _get_history(),
-        "templates": _get_store(),
-        "customers": st.session_state.get("customers", []),
-        "workflows": st.session_state.get("email_workflows", []),
-    }
+    export_data = build_backup_bundle()
 
     col_exp, col_imp = st.columns(2)
     with col_exp:

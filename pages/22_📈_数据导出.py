@@ -10,6 +10,7 @@ import json
 
 import streamlit as st
 
+from utils.backup import build_backup_bundle
 from utils.customers import get_customers, import_customers
 from utils.history import _get_history, get_history_count, import_history
 from utils.pricing import check_feature_access
@@ -67,13 +68,12 @@ exp_tab1, exp_tab2, exp_tab3 = st.tabs(["🗄️ 完整备份 (JSON)", "👥 客
 
 with exp_tab1:
     st.markdown("将所有数据打包为一个 JSON 文件，适合完整备份和账户迁移。")
-    export_data = {
-        "version": "1.0",
-        "customers": customers,
-        "history": history,
-        "templates": templates,
-        "workflows": workflows,
-    }
+    export_data = build_backup_bundle(
+        customers=customers,
+        history=history,
+        templates=templates,
+        workflows=workflows,
+    )
     export_json = json.dumps(export_data, ensure_ascii=False, indent=2)
     st.metric("备份大小", f"{len(export_json.encode('utf-8')) / 1024:.1f} KB")
     st.download_button(
