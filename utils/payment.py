@@ -10,7 +10,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from utils.pricing import get_user_tier, upgrade_user_tier
-from utils.repositories import load_consumed_sessions, save_consumed_sessions
+from utils.repositories import load_consumed_sessions, load_user, save_consumed_sessions
 from utils.secrets import get_secret
 
 try:
@@ -64,14 +64,20 @@ def create_checkout_session(username: str, target_tier: str) -> tuple[bool, str]
         stripe.api_key = get_secret("STRIPE_SECRET_KEY")
         base_url = get_secret("APP_BASE_URL") or "https://localhost:8501"
         base_url = base_url.rstrip("/")
-        session = stripe.checkout.Session.create(
-            payment_method_types=["card"],
-            line_items=[{"price": price_id, "quantity": 1}],
-            mode="payment",
-            metadata={"username": username, "target_tier": target_tier},
-            success_url=f"{base_url}/?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{base_url}/?payment=cancelled",
-        )
+        session_params = {
+            "payment_method_types": ["card"],
+            "line_items": [{"price": price_id, "quantity": 1}],
+            "mode": "payment",
+            "metadata": {"username": username, "target_tier": target_tier},
+            "client_reference_id": username,
+            "success_url": f"{base_url}/?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
+            "cancel_url": f"{base_url}/?payment=cancelled",
+        }
+        user = load_user(username) or {}
+        customer_email = user.get("email", "").strip()
+        if customer_email:
+            session_params["customer_email"] = customer_email
+        session = stripe.checkout.Session.create(**session_params)
         return (True, session.url)
     except Exception as e:
         return (False, str(e))

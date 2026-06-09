@@ -98,11 +98,42 @@ class TestPayment:
         with patch.object(utils.payment, "STRIPE_AVAILABLE", True), \
              patch.object(utils.payment, "stripe", mock_stripe), \
              patch.object(utils.payment, "get_secret", side_effect=mock_get_secret), \
+             patch.object(utils.payment, "load_user", return_value={"email": "buyer@example.com"}), \
              patch("utils.email_gate.require_verified_email", return_value=(True, "")):
             success, url = create_checkout_session("testuser", "pro")
             assert success is True
             assert "checkout.stripe.com" in url
             mock_stripe.checkout.Session.create.assert_called_once()
+            create_kwargs = mock_stripe.checkout.Session.create.call_args.kwargs
+            assert create_kwargs["customer_email"] == "buyer@example.com"
+            assert create_kwargs["client_reference_id"] == "testuser"
+            assert create_kwargs["metadata"] == {"username": "testuser", "target_tier": "pro"}
+
+    def test_create_checkout_session_omits_blank_customer_email(self):
+        self._setup()
+        mock_stripe = MagicMock()
+        mock_session = MagicMock()
+        mock_session.url = "https://checkout.stripe.com/pay/cs_test_123"
+        mock_stripe.checkout.Session.create.return_value = mock_session
+
+        def mock_get_secret(key, default=""):
+            secrets = {
+                "STRIPE_SECRET_KEY": "sk_test_abc123",
+                "STRIPE_PRICE_ID_PRO": "price_pro_123",
+            }
+            return secrets.get(key, default)
+
+        with patch.object(utils.payment, "STRIPE_AVAILABLE", True), \
+             patch.object(utils.payment, "stripe", mock_stripe), \
+             patch.object(utils.payment, "get_secret", side_effect=mock_get_secret), \
+             patch.object(utils.payment, "load_user", return_value={"email": ""}), \
+             patch("utils.email_gate.require_verified_email", return_value=(True, "")):
+            success, _url = create_checkout_session("testuser", "pro")
+
+        assert success is True
+        create_kwargs = mock_stripe.checkout.Session.create.call_args.kwargs
+        assert "customer_email" not in create_kwargs
+        assert create_kwargs["client_reference_id"] == "testuser"
 
     def test_verify_checkout_session_paid(self):
         self._setup()
