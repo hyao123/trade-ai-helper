@@ -75,6 +75,10 @@ HOME_CSS = """
 .engagement-metric { border-left: 1px solid #e2e8f0; padding-left: 0.75rem; }
 .engagement-value { color: #1e293b; font-weight: 900; font-size: 1.15rem; line-height: 1; }
 .engagement-label { color: #64748b; font-size: 0.72rem; margin-top: 0.25rem; }
+.daily-plan { margin: -0.45rem 0 1.35rem; padding: 0.9rem 1rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }
+.daily-plan-title { color: #0f172a; font-size: 0.86rem; font-weight: 900; margin-bottom: 0.6rem; }
+.daily-plan .stButton > button { min-height: 58px !important; border-radius: 8px !important; border: 1px solid #dbe3ef !important; background: #ffffff !important; color: #1e293b !important; white-space: pre-line !important; line-height: 1.28 !important; font-size: 0.78rem !important; font-weight: 760 !important; box-shadow: none !important; }
+.daily-plan .stButton > button:hover { border-color: #0ea5e9 !important; box-shadow: 0 5px 14px rgba(14,165,233,0.11) !important; }
 @media (max-width: 900px) { .engagement-signal { grid-template-columns: 1fr 1fr; } .engagement-copy { grid-column: 1 / -1; } }
 </style>
 """
@@ -217,6 +221,7 @@ def _render_next_actions(st) -> None:
     """Render prioritized actions for the current user's setup state."""
     from utils.customers import get_customers
     from utils.onboarding import (
+        build_home_daily_plan,
         build_home_engagement_summary,
         build_home_next_actions,
         count_customers_needing_attention,
@@ -294,6 +299,26 @@ def _render_next_actions(st) -> None:
         """,
         unsafe_allow_html=True,
     )
+    daily_plan = build_home_daily_plan(
+        prefs=prefs,
+        customer_count=customer_count,
+        due_followup_count=due_followup_count,
+        attention_customer_count=attention_customer_count,
+    )
+    if daily_plan:
+        st.markdown('<div class="daily-plan"><div class="daily-plan-title">今日行动清单</div>', unsafe_allow_html=True)
+        plan_cols = st.columns(len(daily_plan))
+        for col, item in zip(plan_cols, daily_plan):
+            with col:
+                if st.button(
+                    f"{item['label']}\n{item['detail']}",
+                    key=f"daily_plan_{item['id']}",
+                    use_container_width=True,
+                ):
+                    for key, value in item.get("state_updates", {}).items():
+                        st.session_state[key] = value
+                    st.switch_page(item["page"])
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _render_home(st) -> None:

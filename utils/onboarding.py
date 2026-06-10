@@ -47,6 +47,15 @@ class EngagementSummary(TypedDict):
     metrics: list[dict[str, str]]
 
 
+class DailyPlanItem(TypedDict):
+    id: str
+    label: str
+    detail: str
+    page: str
+    tone: str
+    state_updates: NotRequired[dict[str, object]]
+
+
 def _has_value(value: object) -> bool:
     return bool(str(value or "").strip())
 
@@ -168,6 +177,59 @@ def build_home_engagement_summary(
             {"label": "资料状态", "value": "完整" if profile_ready else "待完善"},
         ],
     }
+
+
+def build_home_daily_plan(
+    *,
+    prefs: dict,
+    customer_count: int = 0,
+    due_followup_count: int = 0,
+    attention_customer_count: int = 0,
+) -> list[DailyPlanItem]:
+    """Build a short prioritized work plan for the user's next session."""
+    plan: list[DailyPlanItem] = []
+    if not is_quick_setup_complete(prefs):
+        plan.append({
+            "id": "quick_setup",
+            "label": "完善业务资料",
+            "detail": "先补齐公司、联系人和主营产品，让生成内容更像真实业务。",
+            "page": "pages/34_🚀_快速设置.py",
+            "tone": "setup",
+        })
+    if customer_count <= 0:
+        plan.append({
+            "id": "add_customer",
+            "label": "建立客户资产",
+            "detail": "添加第一个潜在客户，后续才能沉淀跟进、报价和客户画像。",
+            "page": "pages/7_📇_客户管理.py",
+            "tone": "setup",
+        })
+    if due_followup_count > 0:
+        plan.append({
+            "id": "due_followups",
+            "label": "处理今日跟进",
+            "detail": f"{due_followup_count} 个客户已到跟进节点，优先保住正在推进的商机。",
+            "page": "pages/10_📅_跟进日历.py",
+            "tone": "urgent",
+        })
+    if attention_customer_count > 0:
+        plan.append({
+            "id": "activate_customers",
+            "label": "激活沉默客户",
+            "detail": f"{attention_customer_count} 个客户缺少近期触达，适合问候、重启话题或安排跟进。",
+            "page": "pages/7_📇_客户管理.py",
+            "tone": "attention",
+            "state_updates": {"crm_attention_only": True},
+        })
+    if is_quick_setup_complete(prefs):
+        plan.append({
+            "id": "cold_email",
+            "label": "开发新客户",
+            "detail": "用已完善的业务资料生成新开发信，持续补充销售漏斗。",
+            "page": "pages/1_📧_开发信.py",
+            "tone": "steady",
+        })
+    return plan[:3]
 
 
 def build_home_next_actions(

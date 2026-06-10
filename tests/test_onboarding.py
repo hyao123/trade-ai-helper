@@ -162,6 +162,38 @@ def test_home_engagement_summary_surfaces_customer_activation_signal():
     assert summary["metrics"][0] == {"label": "待激活客户", "value": "2"}
 
 
+def test_home_daily_plan_prioritizes_revenue_recovery_work():
+    from utils.onboarding import build_home_daily_plan
+
+    plan = build_home_daily_plan(
+        prefs=_complete_prefs(),
+        customer_count=8,
+        due_followup_count=2,
+        attention_customer_count=3,
+    )
+
+    assert [item["id"] for item in plan] == ["due_followups", "activate_customers", "cold_email"]
+    assert plan[0]["tone"] == "urgent"
+    assert plan[0]["label"] == "处理今日跟进"
+    assert "2" in plan[0]["detail"]
+    assert plan[1]["state_updates"] == {"crm_attention_only": True}
+
+
+def test_home_daily_plan_guides_setup_before_growth_work():
+    from utils.onboarding import build_home_daily_plan
+
+    plan = build_home_daily_plan(
+        prefs={"company_name": "ABC"},
+        customer_count=0,
+        due_followup_count=0,
+        attention_customer_count=0,
+    )
+
+    assert [item["id"] for item in plan] == ["quick_setup", "add_customer"]
+    assert plan[0]["tone"] == "setup"
+    assert plan[1]["page"] == "pages/7_📇_客户管理.py"
+
+
 def test_home_next_actions_prioritize_customer_activation_when_no_due_followups():
     from utils.onboarding import build_home_next_actions
 
