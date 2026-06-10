@@ -134,10 +134,7 @@ with st.form("onboarding_quick_setup"):
             if prefs.get("ai_response_length", "中等") in ["简短", "中等", "详细"] else 1,
             horizontal=True,
         )
-        onboarding_done = st.checkbox(
-            "完成后不再提示我进行快速设置",
-            value=prefs.get("onboarding_completed", "false") == "true",
-        )
+        st.info("资料保存成功后会自动标记快速设置完成，首页将继续推荐开发信、客户建档和跟进节奏。")
 
     submitted = st.form_submit_button("保存并完成快速设置", type="primary", use_container_width=True)
 
@@ -172,7 +169,7 @@ if submitted:
             "default_tone": default_tone,
             "ai_style_tone": ai_style_tone,
             "ai_response_length": ai_response_length,
-            "onboarding_completed": "true" if onboarding_done else "false",
+            "onboarding_completed": "true",
         })
         st.success("✅ 快速设置已保存！后续开发信、询盘回复、报价和客户跟进会自动复用这些资料。")
         st.balloons()

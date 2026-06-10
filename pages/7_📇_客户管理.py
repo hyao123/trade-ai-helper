@@ -15,6 +15,7 @@ from utils.customers import (
     get_customers,
     remove_tag,
 )
+from utils.onboarding import filter_customers_needing_attention
 from utils.ui_helpers import check_auth, inject_css
 from utils.workflow import create_workflow_from_customer
 
@@ -88,7 +89,7 @@ if not customers:
     st.info("暂无客户记录，请在上方添加。")
 else:
     # 筛选
-    col_f1, col_f2 = st.columns(2)
+    col_f1, col_f2, col_f3 = st.columns([1, 1.35, 0.9])
     with col_f1:
         filter_stage = st.selectbox(
             "按阶段筛选",
@@ -97,6 +98,8 @@ else:
         )
     with col_f2:
         filter_search = st.text_input("搜索（公司名/联系人/产品）", key="crm_filter_search")
+    with col_f3:
+        attention_only = st.checkbox("只看需要激活", key="crm_attention_only")
 
     # 应用筛选
     filtered = customers
@@ -110,6 +113,8 @@ else:
             or q in c["contact"].lower()
             or q in c.get("product", "").lower()
         ]
+    if attention_only:
+        filtered = filter_customers_needing_attention(filtered)
 
     # Sort options + tag filter
     col_f3, col_f4 = st.columns(2)
@@ -125,6 +130,9 @@ else:
         filtered = sorted(filtered, key=lambda c: compute_customer_score(c), reverse=True)
     elif sort_by == "最近联系":
         filtered = sorted(filtered, key=lambda c: c.get("last_contact", ""), reverse=True)
+
+    if not filtered:
+        st.info("当前筛选条件下暂无客户。")
 
     # 渲染表格
     for i, cust in enumerate(filtered):

@@ -65,6 +65,17 @@ HOME_CSS = """
 .next-action-title { font-size: 0.82rem; color: #475569; font-weight: 850; margin-bottom: 0.55rem; }
 .next-action-band .stButton > button { min-height: 76px !important; border-radius: 12px !important; border: 1px solid #dbe3ef !important; background: #ffffff !important; color: #1e293b !important; white-space: pre-line !important; line-height: 1.35 !important; font-size: 0.82rem !important; font-weight: 700 !important; box-shadow: 0 1px 3px rgba(15,23,42,0.05) !important; }
 .next-action-band .stButton > button:hover { border-color: #6366f1 !important; box-shadow: 0 6px 18px rgba(99,102,241,0.12) !important; transform: translateY(-1px) !important; }
+.engagement-signal { margin: 0 0 1.35rem; padding: 1rem 1.1rem; border-radius: 16px; border: 1px solid #e2e8f0; background: #ffffff; box-shadow: 0 8px 24px rgba(15,23,42,0.05); display: grid; grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(86px, 0.45fr)); gap: 0.8rem; align-items: center; }
+.engagement-signal.urgent { border-left: 5px solid #f97316; background: linear-gradient(135deg, #fff7ed 0%, #ffffff 70%); }
+.engagement-signal.attention { border-left: 5px solid #0ea5e9; background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 70%); }
+.engagement-signal.setup { border-left: 5px solid #6366f1; background: linear-gradient(135deg, #eef2ff 0%, #ffffff 70%); }
+.engagement-signal.steady { border-left: 5px solid #22c55e; background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 70%); }
+.engagement-headline { font-weight: 900; color: #0f172a; font-size: 1rem; margin-bottom: 0.2rem; }
+.engagement-detail { color: #64748b; font-size: 0.82rem; line-height: 1.55; }
+.engagement-metric { border-left: 1px solid #e2e8f0; padding-left: 0.75rem; }
+.engagement-value { color: #1e293b; font-weight: 900; font-size: 1.15rem; line-height: 1; }
+.engagement-label { color: #64748b; font-size: 0.72rem; margin-top: 0.25rem; }
+@media (max-width: 900px) { .engagement-signal { grid-template-columns: 1fr 1fr; } .engagement-copy { grid-column: 1 / -1; } }
 </style>
 """
 
@@ -173,7 +184,7 @@ def _render_email_verification_banner(st) -> None:
 
 def _render_onboarding_banner(st) -> None:
     """Guide new users to complete quick setup when business context is missing."""
-    from utils.onboarding import profile_completion
+    from utils.onboarding import is_quick_setup_complete, profile_completion
     from utils.user_auth import get_current_user
     from utils.user_prefs import get_prefs
 
@@ -183,7 +194,7 @@ def _render_onboarding_banner(st) -> None:
 
     prefs = get_prefs()
     completion = profile_completion(prefs)
-    if prefs.get("onboarding_completed") == "true" and completion["complete"]:
+    if is_quick_setup_complete(prefs):
         return
 
     st.markdown(
@@ -205,7 +216,11 @@ def _render_onboarding_banner(st) -> None:
 def _render_next_actions(st) -> None:
     """Render prioritized actions for the current user's setup state."""
     from utils.customers import get_customers
-    from utils.onboarding import build_home_next_actions
+    from utils.onboarding import (
+        build_home_engagement_summary,
+        build_home_next_actions,
+        count_customers_needing_attention,
+    )
     from utils.user_auth import get_current_user
     from utils.user_prefs import get_prefs
 
@@ -214,31 +229,71 @@ def _render_next_actions(st) -> None:
         return
 
     try:
-        customer_count = len(get_customers())
+        customers = get_customers()
+        customer_count = len(customers)
     except Exception:
+        customers = []
         customer_count = 0
+    try:
+        from utils.workflow import get_due_workflows
 
+        due_followup_count = len(get_due_workflows())
+    except Exception:
+        due_followup_count = 0
+
+    prefs = get_prefs()
+    attention_customer_count = count_customers_needing_attention(customers)
     actions = build_home_next_actions(
         user=current_user,
-        prefs=get_prefs(),
+        prefs=prefs,
         customer_count=customer_count,
+        due_followup_count=due_followup_count,
+        attention_customer_count=attention_customer_count,
     )
-    if not actions:
-        return
+    if actions:
+        st.markdown('<div class="next-action-band"><div class="next-action-title">下一步建议</div>', unsafe_allow_html=True)
+        cols = st.columns(len(actions))
+        for col, action in zip(cols, actions):
+            with col:
+                button_type = "primary" if action.get("priority") == "primary" else "secondary"
+                if st.button(
+                    f"{action['label']}\n{action['detail']}",
+                    key=f"next_action_{action['id']}",
+                    type=button_type,
+                    use_container_width=True,
+                ):
+                    for key, value in action.get("state_updates", {}).items():
+                        st.session_state[key] = value
+                    st.switch_page(action["page"])
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown('<div class="next-action-band"><div class="next-action-title">下一步建议</div>', unsafe_allow_html=True)
-    cols = st.columns(len(actions))
-    for col, action in zip(cols, actions):
-        with col:
-            button_type = "primary" if action.get("priority") == "primary" else "secondary"
-            if st.button(
-                f"{action['label']}\n{action['detail']}",
-                key=f"next_action_{action['id']}",
-                type=button_type,
-                use_container_width=True,
-            ):
-                st.switch_page(action["page"])
-    st.markdown("</div>", unsafe_allow_html=True)
+    summary = build_home_engagement_summary(
+        prefs=prefs,
+        customer_count=customer_count,
+        due_followup_count=due_followup_count,
+        attention_customer_count=attention_customer_count,
+    )
+    metric_html = "".join(
+        f"""
+        <div class="engagement-metric">
+          <div class="engagement-value">{metric['value']}</div>
+          <div class="engagement-label">{metric['label']}</div>
+        </div>
+        """
+        for metric in summary["metrics"]
+    )
+    st.markdown(
+        f"""
+        <div class="engagement-signal {summary['tone']}">
+          <div class="engagement-copy">
+            <div class="engagement-headline">{summary['headline']}</div>
+            <div class="engagement-detail">{summary['detail']}</div>
+          </div>
+          {metric_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def _render_home(st) -> None:

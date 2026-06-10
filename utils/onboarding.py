@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TypedDict
+from datetime import date
+from typing import NotRequired, TypedDict
 
 REQUIRED_PROFILE_FIELDS = (
     "company_name",
@@ -36,6 +37,14 @@ class HomeNextAction(TypedDict):
     detail: str
     page: str
     priority: str
+    state_updates: NotRequired[dict[str, object]]
+
+
+class EngagementSummary(TypedDict):
+    headline: str
+    detail: str
+    tone: str
+    metrics: list[dict[str, str]]
 
 
 def _has_value(value: object) -> bool:
@@ -66,11 +75,108 @@ def profile_completion(prefs: dict) -> ProfileCompletion:
     }
 
 
+def is_quick_setup_complete(prefs: dict) -> bool:
+    """Return True when the seller profile is complete enough for daily workflows."""
+    return profile_completion(prefs)["complete"]
+
+
+def count_customers_needing_attention(
+    customers: list[dict],
+    *,
+    today: date | None = None,
+    stale_days: int = 30,
+) -> int:
+    """Count customers without a recent contact touchpoint."""
+    return len(filter_customers_needing_attention(customers, today=today, stale_days=stale_days))
+
+
+def customer_needs_attention(
+    customer: dict,
+    *,
+    today: date | None = None,
+    stale_days: int = 30,
+) -> bool:
+    """Return True when a customer has no recent contact record."""
+    today = today or date.today()
+    last_contact = str(customer.get("last_contact") or "").strip()
+    if not last_contact:
+        return True
+    try:
+        days_since_contact = (today - date.fromisoformat(last_contact)).days
+    except ValueError:
+        return True
+    return days_since_contact > stale_days
+
+
+def filter_customers_needing_attention(
+    customers: list[dict],
+    *,
+    today: date | None = None,
+    stale_days: int = 30,
+) -> list[dict]:
+    """Return customers without a recent contact touchpoint."""
+    today = today or date.today()
+    return [
+        customer
+        for customer in customers
+        if customer_needs_attention(customer, today=today, stale_days=stale_days)
+    ]
+
+
+def build_home_engagement_summary(
+    *,
+    prefs: dict,
+    customer_count: int = 0,
+    due_followup_count: int = 0,
+    attention_customer_count: int = 0,
+) -> EngagementSummary:
+    """Build a compact daily work signal for the home page."""
+    profile_ready = is_quick_setup_complete(prefs)
+    if due_followup_count > 0:
+        headline = f"今天有 {due_followup_count} 个客户待跟进"
+        detail = "优先处理已到期商机，保持客户节奏不断档。"
+        tone = "urgent"
+        first_metric = {"label": "今日跟进", "value": str(max(due_followup_count, 0))}
+    elif attention_customer_count > 0:
+        headline = f"有 {attention_customer_count} 个客户需要激活"
+        detail = "这些客户缺少近期联系记录，适合安排问候、跟进或重新分层。"
+        tone = "attention"
+        first_metric = {"label": "待激活客户", "value": str(max(attention_customer_count, 0))}
+    elif customer_count <= 0:
+        headline = "先建立第一个客户档案"
+        detail = "把潜在客户沉淀到 CRM，后续邮件、报价和跟进才能形成闭环。"
+        tone = "setup"
+        first_metric = {"label": "今日跟进", "value": str(max(due_followup_count, 0))}
+    elif not profile_ready:
+        headline = "完善公司资料，提升生成质量"
+        detail = "补齐主营产品和公司优势后，AI 输出会更贴近真实业务。"
+        tone = "setup"
+        first_metric = {"label": "今日跟进", "value": str(max(due_followup_count, 0))}
+    else:
+        headline = "工作台已就绪"
+        detail = "继续开发新客户，并保持现有客户的跟进节奏。"
+        tone = "steady"
+        first_metric = {"label": "今日跟进", "value": str(max(due_followup_count, 0))}
+
+    return {
+        "headline": headline,
+        "detail": detail,
+        "tone": tone,
+        "metrics": [
+            first_metric,
+            {"label": "客户资产", "value": str(max(customer_count, 0))},
+            {"label": "资料状态", "value": "完整" if profile_ready else "待完善"},
+        ],
+    }
+
+
 def build_home_next_actions(
     *,
     user: dict | None,
     prefs: dict,
     customer_count: int = 0,
+    due_followup_count: int = 0,
+    attention_customer_count: int = 0,
 ) -> list[HomeNextAction]:
     """Build prioritized home-page actions for a user's current setup state."""
     if not user or user.get("username") in (None, "admin"):
@@ -89,13 +195,32 @@ def build_home_next_actions(
             "priority": "primary",
         })
 
-    if not completion["complete"] or prefs.get("onboarding_completed") != "true":
+    if not is_quick_setup_complete(prefs):
         actions.append({
             "id": "quick_setup",
             "label": "完成快速设置",
             "detail": f"{completion['completed']}/{completion['total']}，{_missing_preview(completion['missing_labels'])}",
             "page": "pages/34_🚀_快速设置.py",
             "priority": "primary" if not actions else "secondary",
+        })
+
+    if completion["complete"] and due_followup_count > 0:
+        actions.append({
+            "id": "due_followups",
+            "label": "今日跟进",
+            "detail": f"{due_followup_count} 个客户到期，优先处理商机",
+            "page": "pages/10_📅_跟进日历.py",
+            "priority": "primary" if not actions else "secondary",
+        })
+
+    if completion["complete"] and due_followup_count <= 0 and attention_customer_count > 0:
+        actions.append({
+            "id": "activate_customers",
+            "label": "激活客户",
+            "detail": f"{attention_customer_count} 个客户缺少近期触达",
+            "page": "pages/7_📇_客户管理.py",
+            "priority": "primary" if not actions else "secondary",
+            "state_updates": {"crm_attention_only": True},
         })
 
     if completion["complete"]:
@@ -115,7 +240,7 @@ def build_home_next_actions(
             "page": "pages/7_📇_客户管理.py",
             "priority": "secondary",
         })
-    else:
+    elif due_followup_count <= 0 and attention_customer_count <= 0:
         actions.append({
             "id": "follow_up",
             "label": "跟进客户",
