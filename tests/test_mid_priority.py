@@ -100,6 +100,68 @@ class TestCustomerScoring(unittest.TestCase):
         self.assertGreaterEqual(score, 0)
         self.assertLessEqual(score, 100)
 
+    def test_recommend_customer_next_action_flags_stale_customer(self):
+        from datetime import date
+
+        from utils.customers import recommend_customer_next_action
+
+        action = recommend_customer_next_action(
+            {
+                "company": "Dormant Co",
+                "contact": "Dana",
+                "email": "dana@example.com",
+                "product": "Solar Light",
+                "stage": "已发信",
+                "last_contact": "2026-04-01",
+            },
+            today=date(2026, 6, 10),
+        )
+
+        self.assertEqual(action["id"], "reactivate")
+        self.assertEqual(action["tone"], "attention")
+        self.assertIn("70", action["detail"])
+
+    def test_recommend_customer_next_action_prioritizes_missing_contact(self):
+        from datetime import date
+
+        from utils.customers import recommend_customer_next_action
+
+        action = recommend_customer_next_action(
+            {
+                "company": "No Email Co",
+                "contact": "Nina",
+                "product": "LED",
+                "stage": "待开发",
+                "last_contact": "2026-06-09",
+            },
+            today=date(2026, 6, 10),
+        )
+
+        self.assertEqual(action["id"], "complete_contact")
+        self.assertEqual(action["label"], "补全联系方式")
+        self.assertEqual(action["tone"], "setup")
+
+    def test_recommend_customer_next_action_spots_active_opportunity(self):
+        from datetime import date
+
+        from utils.customers import recommend_customer_next_action
+
+        action = recommend_customer_next_action(
+            {
+                "company": "Active Buyer",
+                "contact": "Alex",
+                "email": "alex@example.com",
+                "product": "LED",
+                "stage": "已报价",
+                "last_contact": "2026-06-08",
+            },
+            today=date(2026, 6, 10),
+        )
+
+        self.assertEqual(action["id"], "advance_deal")
+        self.assertEqual(action["tone"], "urgent")
+        self.assertIn("报价", action["detail"])
+
     def test_add_and_remove_tag(self):
         with tempfile.TemporaryDirectory() as tmp:
             _st.session_state.clear()

@@ -14,6 +14,7 @@ from utils.customers import (
     delete_customer,
     get_customers,
     mark_customer_contacted,
+    recommend_customer_next_action,
     remove_tag,
 )
 from utils.onboarding import filter_customers_needing_attention
@@ -157,6 +158,24 @@ else:
             st.caption(f"添加日期: {cust['created_at']} | 最后联系: {cust['last_contact']}")
             if cust.get("notes"):
                 st.write(f"📝 {cust['notes']}")
+
+            next_action = recommend_customer_next_action(cust)
+            tone_color = {
+                "urgent": "#f97316",
+                "attention": "#0ea5e9",
+                "setup": "#6366f1",
+                "steady": "#22c55e",
+            }.get(next_action["tone"], "#64748b")
+            st.markdown(
+                (
+                    f'<div style="border-left:4px solid {tone_color};background:#f8fafc;'
+                    'padding:0.65rem 0.8rem;border-radius:8px;margin:0.65rem 0;'
+                    'font-size:0.86rem;color:#334155;">'
+                    f'<b>{next_action["label"]}</b> · {next_action["detail"]}'
+                    '</div>'
+                ),
+                unsafe_allow_html=True,
+            )
 
             # 标签管理
             st.markdown("**🏷️ 标签：**")

@@ -7,11 +7,21 @@ Supports per-user isolation when a user is logged in.
 
 from __future__ import annotations
 
+from datetime import date
+from typing import TypedDict
+
 import streamlit as st
 
 from utils import storage
 
 _FILENAME = "customers.json"
+
+
+class CustomerNextAction(TypedDict):
+    id: str
+    label: str
+    detail: str
+    tone: str
 
 
 def _get_current_username() -> str | None:
@@ -225,6 +235,59 @@ def compute_customer_score(customer: dict) -> int:
         complete_score += 5
 
     return min(stage_score + recency_score + complete_score, 100)
+
+
+def recommend_customer_next_action(
+    customer: dict,
+    *,
+    today: date | None = None,
+    stale_days: int = 30,
+) -> CustomerNextAction:
+    """Recommend the next practical action for a CRM customer."""
+    today = today or date.today()
+    if not str(customer.get("email") or "").strip():
+        return {
+            "id": "complete_contact",
+            "label": "补全联系方式",
+            "detail": "缺少邮箱，先补全联系方式再推进开发信、报价和跟进。",
+            "tone": "setup",
+        }
+
+    stage = str(customer.get("stage") or "")
+    if stage in {"已询盘", "已报价", "已发样", "谈判中"}:
+        return {
+            "id": "advance_deal",
+            "label": "推进成交",
+            "detail": f"客户处于{stage}阶段，优先发送跟进或确认下一步。",
+            "tone": "urgent",
+        }
+
+    last_contact = str(customer.get("last_contact") or "").strip()
+    if not last_contact:
+        return {
+            "id": "reactivate",
+            "label": "安排首次触达",
+            "detail": "暂无联系记录，建议今天安排一次问候或开发信。",
+            "tone": "attention",
+        }
+    try:
+        days_since_contact = (today - date.fromisoformat(last_contact)).days
+    except ValueError:
+        days_since_contact = stale_days + 1
+    if days_since_contact > stale_days:
+        return {
+            "id": "reactivate",
+            "label": "激活沉默客户",
+            "detail": f"已经 {days_since_contact} 天未联系，建议问候、更新报价或安排跟进。",
+            "tone": "attention",
+        }
+
+    return {
+        "id": "keep_warm",
+        "label": "保持节奏",
+        "detail": "客户近期有触达记录，可继续维护标签、补充画像或准备下一封邮件。",
+        "tone": "steady",
+    }
 
 
 def get_customer_tags(index: int) -> list[str]:
