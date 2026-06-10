@@ -13,6 +13,7 @@ from utils.customers import (
     compute_customer_score,
     delete_customer,
     get_customers,
+    mark_customer_contacted,
     remove_tag,
 )
 from utils.onboarding import filter_customers_needing_attention
@@ -186,6 +187,22 @@ else:
                     st.session_state["followup_product_val"] = cust.get("product", "")
                     st.switch_page("pages/5_📬_跟进邮件.py")
             with col_a3:
+                if st.button("📅 安排跟进", key=f"crm_schedule_{i}", use_container_width=True):
+                    if create_workflow_from_customer(cust):
+                        st.success("已加入跟进日历，后续会按节奏提醒。")
+                    else:
+                        st.info("该客户已有进行中的跟进记录。")
+                    st.rerun()
+
+            col_b1, col_b2 = st.columns(2)
+            with col_b1:
+                if st.button("✅ 标记已触达", key=f"crm_contacted_{i}", use_container_width=True):
+                    if mark_customer_contacted(cust["company"], cust["contact"]):
+                        st.success("已更新最后联系日期。")
+                    else:
+                        st.warning("未找到该客户，无法更新联系日期。")
+                    st.rerun()
+            with col_b2:
                 if st.button("🗑️ 删除", key=f"crm_del_{i}", use_container_width=True):
                     # 找到原始索引并删除
                     idx = customers.index(cust)

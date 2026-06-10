@@ -386,6 +386,47 @@ class TestCRMIntegration:
             result = update_customer_stage("Nobody Corp", "Ghost", "已询盘")
             assert result is False
 
+    def test_mark_customer_contacted_updates_last_contact_only(self):
+        from datetime import date
+
+        mock_st = self._setup_mock_st()
+        tmp_dir = Path(tempfile.mkdtemp())
+        with patch("utils.customers.st", mock_st), \
+             patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            from utils.customers import (
+                add_customer,
+                find_customer,
+                mark_customer_contacted,
+            )
+            mock_st.session_state.clear()
+            add_customer({
+                "company": "Dormant Co",
+                "contact": "Dana",
+                "email": "dana@example.com",
+                "country": "USA",
+                "product": "Solar Light",
+                "stage": "已发信",
+                "notes": "",
+                "created_at": "2024-01-01",
+                "last_contact": "2024-01-01",
+            })
+
+            result = mark_customer_contacted("Dormant Co", "Dana", today=date(2026, 6, 10))
+
+            assert result is True
+            cust = find_customer("Dormant Co", "Dana")
+            assert cust["stage"] == "已发信"
+            assert cust["last_contact"] == "2026-06-10"
+
+    def test_mark_customer_contacted_not_found(self):
+        mock_st = self._setup_mock_st()
+        tmp_dir = Path(tempfile.mkdtemp())
+        with patch("utils.customers.st", mock_st), \
+             patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            from utils.customers import mark_customer_contacted
+            mock_st.session_state.clear()
+            assert mark_customer_contacted("Nobody Corp", "Ghost") is False
+
     def test_create_workflow_from_customer(self):
         mock_st = self._setup_mock_st()
         tmp_dir = Path(tempfile.mkdtemp())

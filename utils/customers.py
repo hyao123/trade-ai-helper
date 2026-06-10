@@ -141,6 +141,23 @@ def update_customer_stage(company: str, contact: str, new_stage: str) -> bool:
     return False
 
 
+def mark_customer_contacted(company: str, contact: str, *, today=None) -> bool:
+    """Update only the customer's last-contact date. Return True if updated."""
+    from datetime import date
+
+    contact_date = today or date.today()
+    customers = _get_customers()
+    company_lower = company.lower()
+    contact_lower = contact.lower()
+    for cust in customers:
+        if (cust.get("company", "").lower() == company_lower
+                and cust.get("contact", "").lower() == contact_lower):
+            cust["last_contact"] = contact_date.isoformat()
+            _persist_customers()
+            return True
+    return False
+
+
 
 # ---------------------------------------------------------------------------
 # Customer scoring & tagging helpers
