@@ -162,6 +162,48 @@ class TestCustomerScoring(unittest.TestCase):
         self.assertEqual(action["tone"], "urgent")
         self.assertIn("报价", action["detail"])
 
+    def test_sort_customers_by_next_action_puts_actionable_work_first(self):
+        from datetime import date
+
+        from utils.customers import sort_customers_by_next_action
+
+        customers = [
+            {
+                "company": "Warm Co",
+                "contact": "Wendy",
+                "email": "wendy@example.com",
+                "stage": "已发信",
+                "last_contact": "2026-06-09",
+            },
+            {
+                "company": "Dormant Co",
+                "contact": "Dana",
+                "email": "dana@example.com",
+                "stage": "已发信",
+                "last_contact": "2026-04-01",
+            },
+            {
+                "company": "No Email Co",
+                "contact": "Nina",
+                "stage": "待开发",
+                "last_contact": "2026-06-09",
+            },
+            {
+                "company": "Active Buyer",
+                "contact": "Alex",
+                "email": "alex@example.com",
+                "stage": "已报价",
+                "last_contact": "2026-06-08",
+            },
+        ]
+
+        ordered = sort_customers_by_next_action(customers, today=date(2026, 6, 10))
+
+        self.assertEqual(
+            [customer["company"] for customer in ordered],
+            ["Active Buyer", "No Email Co", "Dormant Co", "Warm Co"],
+        )
+
     def test_add_and_remove_tag(self):
         with tempfile.TemporaryDirectory() as tmp:
             _st.session_state.clear()

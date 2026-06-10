@@ -16,6 +16,7 @@ from utils.customers import (
     mark_customer_contacted,
     recommend_customer_next_action,
     remove_tag,
+    sort_customers_by_next_action,
 )
 from utils.onboarding import filter_customers_needing_attention
 from utils.ui_helpers import check_auth, inject_css
@@ -121,14 +122,16 @@ else:
     # Sort options + tag filter
     col_f3, col_f4 = st.columns(2)
     with col_f3:
-        sort_by = st.selectbox("排序方式", ["最新添加", "评分最高", "最近联系"], key="crm_sort")
+        sort_by = st.selectbox("排序方式", ["行动优先", "最新添加", "评分最高", "最近联系"], key="crm_sort")
     with col_f4:
         all_tags = sorted({t for c in filtered for t in c.get("tags", [])})
         filter_tag = st.selectbox("按标签筛选", ["全部"] + all_tags, key="crm_filter_tag")
 
     if filter_tag != "全部":
         filtered = [c for c in filtered if filter_tag in c.get("tags", [])]
-    if sort_by == "评分最高":
+    if sort_by == "行动优先":
+        filtered = sort_customers_by_next_action(filtered)
+    elif sort_by == "评分最高":
         filtered = sorted(filtered, key=lambda c: compute_customer_score(c), reverse=True)
     elif sort_by == "最近联系":
         filtered = sorted(filtered, key=lambda c: c.get("last_contact", ""), reverse=True)

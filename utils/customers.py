@@ -290,6 +290,31 @@ def recommend_customer_next_action(
     }
 
 
+def sort_customers_by_next_action(
+    customers: list[dict],
+    *,
+    today: date | None = None,
+) -> list[dict]:
+    """Sort customers by the most commercially actionable next step."""
+    action_rank = {
+        "advance_deal": 0,
+        "complete_contact": 1,
+        "reactivate": 2,
+        "keep_warm": 3,
+    }
+    today = today or date.today()
+
+    def sort_key(customer: dict) -> tuple[int, int, str]:
+        action = recommend_customer_next_action(customer, today=today)
+        return (
+            action_rank.get(action["id"], 99),
+            -compute_customer_score(customer),
+            str(customer.get("company") or ""),
+        )
+
+    return sorted(customers, key=sort_key)
+
+
 def get_customer_tags(index: int) -> list[str]:
     """Return the tags list for a customer by index."""
     customers = _get_customers()
