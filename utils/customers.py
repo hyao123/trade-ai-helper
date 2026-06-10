@@ -315,6 +315,42 @@ def sort_customers_by_next_action(
     return sorted(customers, key=sort_key)
 
 
+def filter_customers_by_next_action(
+    customers: list[dict],
+    action_id: str,
+    *,
+    today: date | None = None,
+) -> list[dict]:
+    """Return customers whose recommended next action matches the requested action id."""
+    if not action_id or action_id == "all":
+        return customers
+    today = today or date.today()
+    return [
+        customer
+        for customer in customers
+        if recommend_customer_next_action(customer, today=today)["id"] == action_id
+    ]
+
+
+def summarize_customer_next_actions(
+    customers: list[dict],
+    *,
+    today: date | None = None,
+) -> dict[str, int]:
+    """Count customers by recommended next action."""
+    today = today or date.today()
+    summary = {
+        "advance_deal": 0,
+        "complete_contact": 0,
+        "reactivate": 0,
+        "keep_warm": 0,
+    }
+    for customer in customers:
+        action_id = recommend_customer_next_action(customer, today=today)["id"]
+        summary[action_id] = summary.get(action_id, 0) + 1
+    return summary
+
+
 def get_customer_tags(index: int) -> list[str]:
     """Return the tags list for a customer by index."""
     customers = _get_customers()

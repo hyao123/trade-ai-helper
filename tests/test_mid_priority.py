@@ -204,6 +204,68 @@ class TestCustomerScoring(unittest.TestCase):
             ["Active Buyer", "No Email Co", "Dormant Co", "Warm Co"],
         )
 
+    def test_filter_customers_by_next_action_returns_matching_work(self):
+        from datetime import date
+
+        from utils.customers import filter_customers_by_next_action
+
+        customers = [
+            {
+                "company": "Active Buyer",
+                "contact": "Alex",
+                "email": "alex@example.com",
+                "stage": "已报价",
+                "last_contact": "2026-06-08",
+            },
+            {
+                "company": "Dormant Co",
+                "contact": "Dana",
+                "email": "dana@example.com",
+                "stage": "已发信",
+                "last_contact": "2026-04-01",
+            },
+        ]
+
+        filtered = filter_customers_by_next_action(customers, "advance_deal", today=date(2026, 6, 10))
+
+        self.assertEqual([customer["company"] for customer in filtered], ["Active Buyer"])
+
+    def test_summarize_customer_next_actions_counts_each_bucket(self):
+        from datetime import date
+
+        from utils.customers import summarize_customer_next_actions
+
+        summary = summarize_customer_next_actions(
+            [
+                {
+                    "company": "Active Buyer",
+                    "contact": "Alex",
+                    "email": "alex@example.com",
+                    "stage": "已报价",
+                    "last_contact": "2026-06-08",
+                },
+                {
+                    "company": "No Email Co",
+                    "contact": "Nina",
+                    "stage": "待开发",
+                    "last_contact": "2026-06-09",
+                },
+                {
+                    "company": "Dormant Co",
+                    "contact": "Dana",
+                    "email": "dana@example.com",
+                    "stage": "已发信",
+                    "last_contact": "2026-04-01",
+                },
+            ],
+            today=date(2026, 6, 10),
+        )
+
+        self.assertEqual(summary["advance_deal"], 1)
+        self.assertEqual(summary["complete_contact"], 1)
+        self.assertEqual(summary["reactivate"], 1)
+        self.assertEqual(summary["keep_warm"], 0)
+
     def test_add_and_remove_tag(self):
         with tempfile.TemporaryDirectory() as tmp:
             _st.session_state.clear()

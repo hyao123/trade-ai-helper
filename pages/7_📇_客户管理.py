@@ -12,11 +12,13 @@ from utils.customers import (
     add_tag,
     compute_customer_score,
     delete_customer,
+    filter_customers_by_next_action,
     get_customers,
     mark_customer_contacted,
     recommend_customer_next_action,
     remove_tag,
     sort_customers_by_next_action,
+    summarize_customer_next_actions,
 )
 from utils.onboarding import filter_customers_needing_attention
 from utils.ui_helpers import check_auth, inject_css
@@ -119,16 +121,29 @@ else:
     if attention_only:
         filtered = filter_customers_needing_attention(filtered)
 
-    # Sort options + tag filter
-    col_f3, col_f4 = st.columns(2)
+    # Sort options + tag/action filters
+    action_summary = summarize_customer_next_actions(filtered)
+    action_options = {
+        "全部": "all",
+        f"推进成交 ({action_summary['advance_deal']})": "advance_deal",
+        f"补全联系方式 ({action_summary['complete_contact']})": "complete_contact",
+        f"激活沉默客户 ({action_summary['reactivate']})": "reactivate",
+        f"保持节奏 ({action_summary['keep_warm']})": "keep_warm",
+    }
+    col_f3, col_f4, col_f5 = st.columns(3)
     with col_f3:
         sort_by = st.selectbox("排序方式", ["行动优先", "最新添加", "评分最高", "最近联系"], key="crm_sort")
     with col_f4:
         all_tags = sorted({t for c in filtered for t in c.get("tags", [])})
         filter_tag = st.selectbox("按标签筛选", ["全部"] + all_tags, key="crm_filter_tag")
+    with col_f5:
+        filter_action_label = st.selectbox("按行动筛选", list(action_options), key="crm_filter_action")
 
     if filter_tag != "全部":
         filtered = [c for c in filtered if filter_tag in c.get("tags", [])]
+    filter_action = action_options[filter_action_label]
+    if filter_action != "all":
+        filtered = filter_customers_by_next_action(filtered, filter_action)
     if sort_by == "行动优先":
         filtered = sort_customers_by_next_action(filtered)
     elif sort_by == "评分最高":
