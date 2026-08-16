@@ -24,6 +24,7 @@ import hashlib
 import time
 from collections import defaultdict
 from typing import Generator
+from uuid import uuid4
 
 from openai import (
     APIStatusError,
@@ -44,6 +45,20 @@ from utils.secrets import get_secret
 from utils.storage import load_json, save_json
 
 logger = get_logger("ai_client")
+
+
+def _new_request_id() -> str:
+    """Return a short random id for correlating one AI call across logs."""
+    return uuid4().hex[:12]
+
+
+def _build_messages(prompt: str, system_prompt: str | None) -> list[dict]:
+    """Build the chat messages array (system first, then user)."""
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+    return messages
 
 # ---------------------------------------------------------------------------
 # 客户端单例
@@ -274,16 +289,24 @@ def call_llm(
     if err:
         return err
 
+    request_id = _new_request_id()
+
     # ── Multi-model gateway路由 ──
     if _should_use_gateway():
         try:
             from utils.ai_gateway import get_gateway
             gw = get_gateway()
             tier = _get_user_model_tier(user_id)
-            logger.info("API call via gateway: tier=%s, user=%s", tier, user_id)
+            logger.info("API call via gateway: tier=%s, user=%s, request_id=%s", tier, user_id, request_id)
             _rate_limit_consume(user_id)
-            result = gw.generate(prompt, system_prompt, tier=tier,
-                                 temperature=temperature, max_tokens=max_tokens)
+            result = gw.generate(
+                prompt,
+                system_prompt,
+                tier=tier,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                request_id=request_id,
+            )
             if result.startswith("⚠️"):
                 _rate_limit_rollback(user_id)
                 _rollback_tier_usage()
@@ -294,13 +317,10 @@ def call_llm(
             # Fall through to direct NVIDIA call below
 
     # ── Direct NVIDIA NIM call (original path) ──
-    logger.info("API call: model=%s, user=%s", _MODEL, user_id)
+    logger.info("API call: model=%s, user=%s, request_id=%s", _MODEL, user_id, request_id)
     _rate_limit_consume(user_id)
 
-    messages = []
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
-    messages.append({"role": "user", "content": prompt})
+    messages = _build_messages(prompt, system_prompt)
 
     kwargs: dict = {
         "model": _MODEL,
@@ -313,10 +333,10 @@ def call_llm(
 
     try:
         resp = _get_client().chat.completions.create(**kwargs)
-        logger.info("API call success: model=%s, user=%s", _MODEL, user_id)
+        logger.info("API call success: model=%s, user=%s, request_id=%s", _MODEL, user_id, request_id)
         return resp.choices[0].message.content or ""
     except Exception as e:
-        logger.error("API call failed: model=%s, user=%s", _MODEL, user_id)
+        logger.error("API call failed: model=%s, user=%s, request_id=%s", _MODEL, user_id, request_id)
         _rate_limit_rollback(user_id)
         _rollback_tier_usage()
         return _handle_api_error(e)
@@ -354,16 +374,24 @@ def stream_llm(
         yield err
         return
 
+    request_id = _new_request_id()
+
     # ── Multi-model gateway路由 ──
     if _should_use_gateway():
         try:
             from utils.ai_gateway import get_gateway
             gw = get_gateway()
             tier = _get_user_model_tier(user_id)
-            logger.info("Stream API call via gateway: tier=%s, user=%s", tier, user_id)
+            logger.info("Stream API call via gateway: tier=%s, user=%s, request_id=%s", tier, user_id, request_id)
             slot_consumed = False
-            for token in gw.stream(prompt, system_prompt, tier=tier,
-                                   temperature=temperature, max_tokens=max_tokens):
+            for token in gw.stream(
+                prompt,
+                system_prompt,
+                tier=tier,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                request_id=request_id,
+            ):
                 if not slot_consumed and not token.startswith("⚠️"):
                     _rate_limit_consume(user_id)
                     slot_consumed = True
@@ -376,11 +404,8 @@ def stream_llm(
             # Fall through to direct NVIDIA call below
 
     # ── Direct NVIDIA NIM call (original path) ──
-    logger.info("Stream API call: model=%s, user=%s", _MODEL, user_id)
-    messages = []
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
-    messages.append({"role": "user", "content": prompt})
+    logger.info("Stream API call: model=%s, user=%s, request_id=%s", _MODEL, user_id, request_id)
+    messages = _build_messages(prompt, system_prompt)
 
     kwargs: dict = {
         "model": _MODEL,
@@ -405,7 +430,7 @@ def stream_llm(
         if not slot_consumed:
             _rollback_tier_usage()
     except Exception as e:
-        logger.error("Stream API call failed: model=%s, user=%s", _MODEL, user_id)
+        logger.error("Stream API call failed: model=%s, user=%s, request_id=%s", _MODEL, user_id, request_id)
         if not slot_consumed:
             _rollback_tier_usage()
         yield _handle_api_error(e)

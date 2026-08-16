@@ -18,6 +18,14 @@ https://trade-ai-helper.streamlit.app
 pip install -r requirements.txt
 ```
 
+> 项目目标运行环境为 Python 3.11（见 `.python-version`），3.11–3.13 均可运行。
+
+开发 / 运行测试需额外安装：
+
+```bash
+pip install -r requirements-dev.txt
+```
+
 ### 2. 配置密钥
 
 本地开发可创建 `.env` 或使用 Streamlit Secrets：
@@ -44,9 +52,11 @@ http://localhost:8501
 
 ## ☁️ 部署：Streamlit Cloud
 
-本项目直接使用 **Streamlit Cloud** 作为主部署平台。
+本项目**仅**使用 **Streamlit Cloud** 作为部署平台。
 
-> Streamlit 使用 WebSocket 长连接，不建议部署在 Vercel / Netlify 等 Serverless 平台。仓库不再维护 Vercel 运行配置。
+> Streamlit 依赖 WebSocket 长连接，不适合部署在 Vercel / Netlify 等 Serverless 平台。
+> 仓库中不保留 `vercel.json`、`Procfile`、`runtime.txt` 等其它平台运行配置；如需其它托管环境，
+> 请参考 `docs/deployment.md` 自行使用 `streamlit run app.py --server.port=$PORT --server.address=0.0.0.0` 启动命令。
 
 ### Streamlit Cloud 配置
 
@@ -74,6 +84,9 @@ SQLITE_DB_PATH = "trade_ai_helper.sqlite3"
 # 可选：多模型 Provider
 OPENAI_API_KEY = "sk-xxx"
 DEEPSEEK_API_KEY = "sk-xxx"
+DASHSCOPE_API_KEY = "sk-xxx"   # 通义千问 (Qwen)
+ZHIPUAI_API_KEY = "xxx"        # 智谱 (GLM)
+MOONSHOT_API_KEY = "sk-xxx"    # 月之暗面 (Kimi)
 
 # 可选：Stripe 支付
 STRIPE_SECRET_KEY = "sk_live_xxx"

@@ -285,11 +285,15 @@ class AIGateway:
         temperature: float = 0.7,
         max_tokens: int | None = None,
         fallback: bool = True,
+        request_id: str | None = None,
     ) -> str:
         """
         Non-streaming generation with automatic fallback.
 
         Custom provider (from user prefs) takes highest priority when enabled.
+
+        Args:
+            request_id: Optional id for correlating this call across logs.
 
         Returns:
             Generated text string, or error message starting with "⚠️"
@@ -297,7 +301,7 @@ class AIGateway:
         # ── Priority 1: custom provider ──
         custom_client, custom_model_id = self._get_custom_client()
         if custom_client:
-            logger.info("Using custom provider model=%s", custom_model_id)
+            logger.info("Using custom provider model=%s request_id=%s", custom_model_id, request_id)
             messages = self._build_messages(prompt, system_prompt)
             kwargs: dict = {"model": custom_model_id, "messages": messages,
                             "temperature": temperature, "timeout": 60}
@@ -307,7 +311,10 @@ class AIGateway:
                 resp = custom_client.chat.completions.create(**kwargs)
                 return resp.choices[0].message.content or ""
             except Exception as e:
-                logger.error("Custom provider call failed (%s): %s", custom_model_id, _redact(e))
+                logger.error(
+                    "Custom provider call failed (%s) request_id=%s: %s",
+                    custom_model_id, request_id, _redact(e),
+                )
                 if not fallback:
                     return _CUSTOM_PROVIDER_GENERIC_ERROR
                 logger.info("Falling back to built-in providers after custom provider failure")
@@ -319,7 +326,10 @@ class AIGateway:
 
         if not client:
             if fallback:
-                return self._fallback_generate(prompt, system_prompt, temperature, max_tokens, exclude=provider_name)
+                return self._fallback_generate(
+                    prompt, system_prompt, temperature, max_tokens,
+                    exclude=provider_name, request_id=request_id,
+                )
             return "⚠️ AI 服务未配置，请检查 API Key 设置"
 
         messages = self._build_messages(prompt, system_prompt)
@@ -330,12 +340,18 @@ class AIGateway:
         try:
             resp = client.chat.completions.create(**kwargs)
             result = resp.choices[0].message.content or ""
-            self._track_usage(provider_name, model_id, resp)
+            self._track_usage(provider_name, model_id, resp, request_id)
             return result
         except Exception as e:
-            logger.error("AI generation failed (%s/%s): %s", provider_name, model_id, _redact(e))
+            logger.error(
+                "AI generation failed (%s/%s) request_id=%s: %s",
+                provider_name, model_id, request_id, _redact(e),
+            )
             if fallback:
-                return self._fallback_generate(prompt, system_prompt, temperature, max_tokens, exclude=provider_name)
+                return self._fallback_generate(
+                    prompt, system_prompt, temperature, max_tokens,
+                    exclude=provider_name, request_id=request_id,
+                )
             return "⚠️ AI 调用失败，请稍后重试"
 
     def stream(
@@ -347,17 +363,21 @@ class AIGateway:
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int | None = None,
+        request_id: str | None = None,
     ) -> Generator[str, None, None]:
         """
         Streaming generation. Yields text tokens.
 
         Custom provider (from user prefs) takes highest priority when enabled.
         Falls back to non-streaming on provider failure.
+
+        Args:
+            request_id: Optional id for correlating this call across logs.
         """
         # ── Priority 1: custom provider ──
         custom_client, custom_model_id = self._get_custom_client()
         if custom_client:
-            logger.info("Streaming via custom provider model=%s", custom_model_id)
+            logger.info("Streaming via custom provider model=%s request_id=%s", custom_model_id, request_id)
             messages = self._build_messages(prompt, system_prompt)
             kwargs: dict = {"model": custom_model_id, "messages": messages,
                             "temperature": temperature, "stream": True, "timeout": 90}
@@ -371,7 +391,10 @@ class AIGateway:
                         yield delta
                 return
             except Exception as e:
-                logger.error("Custom provider stream failed (%s): %s", custom_model_id, _redact(e))
+                logger.error(
+                    "Custom provider stream failed (%s) request_id=%s: %s",
+                    custom_model_id, request_id, _redact(e),
+                )
                 yield _CUSTOM_PROVIDER_GENERIC_ERROR
                 return
 
@@ -395,7 +418,10 @@ class AIGateway:
                 if delta:
                     yield delta
         except Exception as e:
-            logger.error("AI stream failed (%s/%s): %s", provider_name, model_id, _redact(e))
+            logger.error(
+                "AI stream failed (%s/%s) request_id=%s: %s",
+                provider_name, model_id, request_id, _redact(e),
+            )
             yield "⚠️ AI 调用失败，请稍后重试"
 
     # ── Internal helpers ──────────────────────────────
@@ -436,13 +462,14 @@ class AIGateway:
 
     def _fallback_generate(
         self, prompt: str, system_prompt: str | None,
-        temperature: float, max_tokens: int | None, exclude: str
+        temperature: float, max_tokens: int | None, exclude: str,
+        request_id: str | None = None,
     ) -> str:
         """Try other available providers as fallback."""
         for provider_name in self.get_available_providers():
             if provider_name == exclude:
                 continue
-            logger.info("Falling back to provider: %s", provider_name)
+            logger.info("Falling back to provider: %s request_id=%s", provider_name, request_id)
             config = PROVIDERS[provider_name]
             default_model = config["default_model"]
             model_id = config["models"][default_model]
@@ -455,14 +482,17 @@ class AIGateway:
                 if max_tokens:
                     kwargs["max_tokens"] = max_tokens
                 resp = client.chat.completions.create(**kwargs)
-                self._track_usage(provider_name, model_id, resp)
+                self._track_usage(provider_name, model_id, resp, request_id)
                 return resp.choices[0].message.content or ""
             except Exception as e:
-                logger.warning("Fallback %s also failed: %s", provider_name, _redact(e))
+                logger.warning(
+                    "Fallback %s also failed request_id=%s: %s",
+                    provider_name, request_id, _redact(e),
+                )
                 continue
         return "⚠️ 所有 AI 服务暂时不可用，请稍后重试"
 
-    def _track_usage(self, provider: str, model: str, response) -> None:
+    def _track_usage(self, provider: str, model: str, response, request_id: str | None = None) -> None:
         """Track token usage for cost analysis."""
         try:
             usage = response.usage
@@ -473,6 +503,7 @@ class AIGateway:
                     "input_tokens": usage.prompt_tokens,
                     "output_tokens": usage.completion_tokens,
                     "total_tokens": usage.total_tokens,
+                    "request_id": request_id or "",
                 })
         except Exception:
             pass

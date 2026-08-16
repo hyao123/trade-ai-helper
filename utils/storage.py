@@ -24,18 +24,29 @@ logger = get_logger("storage")
 
 @contextlib.contextmanager
 def _file_lock(filepath: Path):
-    """Serialize JSON file access with a best-effort cross-platform lock file."""
+    """Serialize JSON file access with a best-effort cross-platform lock file.
+
+    The lock is intentionally best-effort: if the underlying OS lock cannot be
+    acquired (e.g. ``msvcrt.locking`` raising ``OSError``/``PermissionError`` on
+    restricted filesystems or sandboxed environments), we fall back to an
+    unlocked context rather than failing the read/write entirely. This mirrors
+    the documented intent in ``storage.py``'s module docstring and keeps data
+    persistence working even when advisory locking is unavailable.
+    """
     lock_path = filepath.with_name(f"{filepath.name}.lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(lock_path, "a+") as lock_file:
-        if os.name == "nt":
-            import msvcrt
 
-            msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
-            try:
+    try:
+        lock_file = open(lock_path, "a+")
+    except OSError as exc:
+        logger.debug("Lock file unavailable (%s), using unlocked fallback: %s", lock_path, exc)
+        yield
+        return
+
+    with lock_file:
+        if os.name == "nt":
+            with _windows_lock(lock_file, lock_path):
                 yield
-            finally:
-                msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
         else:
             import fcntl
 
@@ -44,6 +55,56 @@ def _file_lock(filepath: Path):
                 yield
             finally:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
+@contextlib.contextmanager
+def _windows_lock(lock_file, lock_path: Path):
+    """Windows-specific advisory lock around ``lock_file``'s first byte.
+
+    Uses non-blocking ``LK_NBLCK`` with bounded retries so we never hang a
+    request on a lock held by a crashed/leaked process. On any ``OSError``
+    (including ``PermissionError`` in restricted/sandboxed filesystems) we
+    degrade to an unlocked context rather than abort persistence.
+    """
+    import msvcrt
+
+    # Ensure the file has at least one byte so the byte-range lock is valid.
+    try:
+        lock_file.seek(0, os.SEEK_END)
+        if lock_file.tell() == 0:
+            lock_file.write(" ")
+            lock_file.flush()
+    except OSError:
+        yield
+        return
+
+    lock_file.seek(0)
+
+    acquired = False
+    delay = 0.05
+    for _ in range(10):
+        try:
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+            acquired = True
+            break
+        except OSError:
+            time.sleep(delay)
+            delay = min(delay * 1.5, 0.5)
+
+    if not acquired:
+        logger.debug("Could not acquire OS lock for %s; using unlocked fallback", lock_path)
+        yield
+        return
+
+    try:
+        yield
+    finally:
+        try:
+            lock_file.seek(0)
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+        except OSError:
+            # Unlock may fail if the handle was closed or lock released externally.
+            pass
 
 
 def _quarantine_invalid_json(filepath: Path) -> None:

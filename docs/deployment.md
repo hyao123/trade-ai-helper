@@ -8,21 +8,18 @@ Recommended setup:
 
 ```text
 User browser
-  ├─ https://trade-ai-helper.streamlit.app   # Streamlit Cloud runtime
-  └─ Vercel custom/project URL               # optional redirect only
+  └─ https://trade-ai-helper.streamlit.app   # Streamlit Cloud runtime
 ```
 
-Vercel is **not** used to run Streamlit. It only redirects traffic to the Streamlit Cloud app. This repository's `vercel.json` is intentionally configured as a redirect layer because Streamlit requires WebSocket support and should not be deployed as a Vercel/Netlify serverless function.
+The repository is deployed **only** on Streamlit Cloud. Because Streamlit requires long-lived HTTP/WebSocket connections, it must not be deployed as a Vercel / Netlify serverless function. Serverless-style config files (`vercel.json`, `Procfile`, `runtime.txt`) have been removed from the repository.
 
 ## Supported runtime platforms
 
 | Platform | Status | Notes |
 |---|---|---|
 | Streamlit Cloud | Recommended | Set main file to `app.py`; configure secrets in Streamlit Cloud. |
-| Railway | Supported | Uses `Procfile`; supports `$PORT` and long-lived connections. |
-| Render | Supported | Uses `Procfile`; configure as a Web Service. |
-| Vercel | Redirect only | Do not run Streamlit here; use it only as a redirect/front-door if needed. |
-| Netlify | Not supported | Serverless runtime is not suitable for Streamlit WebSocket sessions. |
+| Self-hosted Streamlit | Supported | Run `streamlit run app.py --server.port=$PORT --server.address=0.0.0.0` on any long-lived server. |
+| Vercel / Netlify | Not supported | Serverless runtime is not suitable for Streamlit WebSocket sessions. |
 
 ## Streamlit Cloud settings
 
@@ -91,28 +88,15 @@ Logged-in user history is saved per account. AI generation history is stored in 
 
 For a public demo, start with SQLite. For production with multiple app instances or strict durability requirements, move to PostgreSQL.
 
-## Railway / Render
+## Self-hosting
 
-The app ships with this `Procfile`:
+For self-hosted long-lived servers (Docker, a VPS, Railway, Render, etc.), start Streamlit with a `$PORT`-style command:
 
-```procfile
-web: streamlit run app.py --server.port=$PORT --server.address=0.0.0.0
+```bash
+streamlit run app.py --server.port=$PORT --server.address=0.0.0.0
 ```
 
-That command is intended for hosts that inject a `$PORT` environment variable. Configure secrets as platform environment variables.
-
-## Vercel redirect behavior
-
-`vercel.json` permanently redirects all routes to Streamlit Cloud:
-
-```json
-{
-  "destination": "https://trade-ai-helper.streamlit.app",
-  "permanent": true
-}
-```
-
-A successful Vercel deployment only confirms that the redirect layer is live. It does **not** validate the Streamlit runtime.
+Configure platform environment variables for secrets. The repository intentionally does not ship a `Procfile` or `runtime.txt`; add platform-specific config in the target host if needed.
 
 ## Deployment verification checklist
 
