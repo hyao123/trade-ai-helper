@@ -285,30 +285,45 @@ with tab_custom_model:
     # ── Preset shortcuts ──────────────────────────────
     PRESETS: dict[str, dict] = {
         "（手动填写）": {"base_url": "", "model": ""},
-        "SiliconFlow": {
-            "base_url": "https://api.siliconflow.cn/v1",
-            "model": "Qwen/Qwen2.5-72B-Instruct",
-        },
-        "月之暗面 (Moonshot)": {
-            "base_url": "https://api.moonshot.cn/v1",
-            "model": "moonshot-v1-8k",
-        },
-        "零一万物 (Yi)": {
-            "base_url": "https://api.lingyiwanwu.com/v1",
-            "model": "yi-large",
-        },
-        "DeepSeek (官方)": {
+        "DeepSeek (官方推荐 · 超高性价比)": {
             "base_url": "https://api.deepseek.com/v1",
             "model": "deepseek-chat",
+            "guide": "前往 https://platform.deepseek.com 登录并创建 API Key，充值 2 元即可使用数月。",
         },
-        "Groq": {
+        "阿里通义千问 (DashScope)": {
+            "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "model": "qwen-plus",
+            "guide": "前往阿里云百炼平台开通并获取 API Key，新用户赠送数百万免费 Token。",
+        },
+        "智谱 AI (GLM-4)": {
+            "base_url": "https://open.bigmodel.cn/api/paas/v4",
+            "model": "glm-4-flash",
+            "guide": "前往智谱开放平台注册并创建 API Key，glm-4-flash 模型免费开放。",
+        },
+        "月之暗面 (Moonshot / Kimi)": {
+            "base_url": "https://api.moonshot.cn/v1",
+            "model": "moonshot-v1-8k",
+            "guide": "前往 https://platform.moonshot.cn 注册并创建 API Key。",
+        },
+        "SiliconFlow (硅基流动)": {
+            "base_url": "https://api.siliconflow.cn/v1",
+            "model": "Qwen/Qwen2.5-72B-Instruct",
+            "guide": "前往 https://siliconflow.cn 注册并生成 API Key。",
+        },
+        "OpenAI (官方)": {
+            "base_url": "https://api.openai.com/v1",
+            "model": "gpt-4o-mini",
+            "guide": "前往 https://platform.openai.com 获取 API Key。",
+        },
+        "Groq (海外极速推理)": {
             "base_url": "https://api.groq.com/openai/v1",
             "model": "llama-3.3-70b-versatile",
+            "guide": "前往 https://console.groq.com 获取免费 API Key。",
         },
-
-        "Ollama (本地)": {
+        "Ollama (本地私有化)": {
             "base_url": "http://localhost:11434/v1",
             "model": "qwen2.5:72b",
+            "guide": "本地运行 ollama run qwen2.5 即可无需联网使用。",
         },
     }
 
@@ -329,6 +344,13 @@ with tab_custom_model:
         disabled=not custom_enabled,
     )
     preset_cfg = PRESETS[selected_preset]
+    if preset_cfg.get("guide"):
+        st.markdown(
+            f'<div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; color: #166534; margin: 8px 0 14px;">'
+            f'💡 <strong>新手指南：</strong>{preset_cfg["guide"]}'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
     st.markdown("---")
     col_c1, col_c2 = st.columns(2)

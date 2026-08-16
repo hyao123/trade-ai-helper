@@ -73,16 +73,17 @@ HOME_CSS = """
 
 QUICK_ACCESS = [
     ("🚀", "快速设置", "2分钟初始化资料", "pages/34_🚀_快速设置.py"),
+    ("🏭", "智能寻源", "货源匹配+化工定制", "pages/38_🏭_智能寻源.py"),
     ("📧", "开发信", "AI 高转化冷邮件", "pages/1_📧_开发信.py"),
     ("📩", "询盘回复", "逐条回答+报价", "pages/2_📩_询盘回复.py"),
+    ("📥", "AI收件箱", "智能邮件分类回复", "pages/35_📥_AI收件箱.py"),
+    ("🚀", "自动推送", "批量营销+自动跟进", "pages/36_🚀_自动推送.py"),
     ("📄", "报价单", "多SKU专业PDF", "pages/3_📄_报价单.py"),
     ("📬", "跟进邮件", "5阶段智能跟进", "pages/5_📬_跟进邮件.py"),
     ("💰", "智能报价", "AI定价策略", "pages/17_💰_智能报价.py"),
     ("🗣️", "谈判话术", "6场景应对脚本", "pages/13_🗣️_谈判话术.py"),
     ("🔍", "意图识别", "分析回复意图", "pages/26_🔍_意图识别.py"),
     ("🏷️", "HS编码", "AI建议+关税", "pages/27_🏷️_HS编码.py"),
-    ("👤", "客户画像", "B2B企业分析", "pages/28_👤_客户画像.py"),
-    ("🌐", "邮件润色", "翻译+润色+对比", "pages/15_🌐_邮件润色.py"),
 ]
 
 
@@ -90,6 +91,9 @@ NAV_SECTIONS = {
     "📧 邮件": [
         ("📧", "开发信", "AI 高转化冷邮件 + Subject", "pages/1_📧_开发信.py"),
         ("📩", "询盘回复", "逐条回答 + 报价区间", "pages/2_📩_询盘回复.py"),
+        ("📥", "AI收件箱", "智能分类与邮件处理", "pages/35_📥_AI收件箱.py"),
+        ("📥", "入站邮件", "导入客户邮件与草稿", "pages/37_📥_入站邮件.py"),
+        ("🚀", "自动推送", "自动化营销与按行业开发", "pages/36_🚀_自动推送.py"),
         ("📬", "跟进邮件", "5阶段智能跟进", "pages/5_📬_跟进邮件.py"),
         ("📨", "批量开发信", "CSV批量个性化发送", "pages/12_📨_批量开发信.py"),
         ("🗣️", "谈判话术", "6场景谈判应对", "pages/13_🗣️_谈判话术.py"),
@@ -116,6 +120,7 @@ NAV_SECTIONS = {
         ("📈", "仪表盘", "核心指标可视化", "pages/33_📊_仪表盘.py"),
     ],
     "🔧 工具": [
+        ("🏭", "智能寻源", "产业带+化工定制+退税", "pages/38_🏭_智能寻源.py"),
         ("📄", "报价单PDF", "多SKU专业PDF", "pages/3_📄_报价单.py"),
         ("📜", "形式发票", "Proforma Invoice", "pages/25_📜_形式发票.py"),
         ("▪", "装箱发票", "Packing List+商业发票", "pages/19_▪_装箱发票.py"),
@@ -289,6 +294,35 @@ def _render_home(st) -> None:
           <div class="stat-pill"><div class="stat-pill-icon" style="background:#faf5ff;">📄</div><div><div class="stat-pill-val">4</div><div class="stat-pill-lbl">PDF 文档</div></div></div>
           <div class="stat-pill"><div class="stat-pill-icon" style="background:#fffbeb;">🤖</div><div><div class="stat-pill-val">16+</div><div class="stat-pill-lbl">AI 场景</div></div></div>
           <div class="stat-pill"><div class="stat-pill-icon" style="background:#f0f9ff;">📊</div><div><div class="stat-pill-val">CRM</div><div class="stat-pill-lbl">客户管理</div></div></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ── 零基础新手 3 步开单向导 ──
+    st.markdown(
+        """
+        <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border: 1.5px solid #cbd5e1; border-radius: 16px; padding: 1.2rem 1.4rem; margin-bottom: 1.5rem;">
+            <div style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-bottom: 0.4rem;">
+                🌟 零基础外贸人 · 3 步开单极速指引
+            </div>
+            <div style="font-size: 0.85rem; color: #475569; margin-bottom: 0.8rem;">
+                无需任何电脑复杂设置，跟着以下 3 步，3 分钟即可完成全套外贸展业闭环：
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px;">
+                    <div style="font-weight: 700; color: #4f46e5; font-size: 0.88rem; margin-bottom: 4px;">① 预填公司资料</div>
+                    <div style="font-size: 0.78rem; color: #64748b; line-height: 1.4;">设置一次公司名和主营产品，全站所有页面自动带入签名。</div>
+                </div>
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px;">
+                    <div style="font-weight: 700; color: #0284c7; font-size: 0.88rem; margin-bottom: 4px;">② 找货源 / 拓客 / 写信</div>
+                    <div style="font-size: 0.78rem; color: #64748b; line-height: 1.4;">智能匹配全国产业带与化工基地，AI 一键生成高转化开发信。</div>
+                </div>
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px;">
+                    <div style="font-weight: 700; color: #16a34a; font-size: 0.88rem; margin-bottom: 4px;">③ 测算退税 & 出报价单</div>
+                    <div style="font-size: 0.78rem; color: #64748b; line-height: 1.4;">输入采购价秒算 13% 退税与 FOB 保本价，一键导出专业 PDF。</div>
+                </div>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,

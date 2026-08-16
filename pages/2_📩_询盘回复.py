@@ -40,6 +40,44 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ── 快捷范例 ──────────────────────────────────────────
+demo_cols = st.columns(2)
+with demo_cols[0]:
+    if st.button("💡 填入范例 1: 德国买家 LED 询盘", use_container_width=True):
+        st.session_state["inquiry_text_val"] = (
+            "Dear Sales Team,\n\n"
+            "We are a lighting distributor in Munich, Germany. We are interested in your 150W Industrial LED High Bay Light.\n"
+            "Could you please answer the following questions:\n"
+            "1. What is the lumen efficiency (lm/W) and warranty period?\n"
+            "2. Do you have CE, RoHS and TUV certificates for European market?\n"
+            "3. What is your MOQ and unit price for 200 pcs and 500 pcs (FOB Hamburg)?\n"
+            "4. What is the lead time for 200 pcs?\n\n"
+            "Looking forward to hearing from you soon.\n\n"
+            "Best regards,\n"
+            "Markus Weber\n"
+            "Procurement Manager, Bavaria Light GmbH"
+        )
+        st.session_state["inquiry_customer_val"] = "Markus Weber"
+        st.rerun()
+with demo_cols[1]:
+    if st.button("🧪 填入范例 2: 化工原料大宗询价与索样", use_container_width=True):
+        st.session_state["inquiry_text_val"] = (
+            "Hi Supplier,\n\n"
+            "We have an urgent requirement for Cyclohexanone (CAS: 108-94-1).\n"
+            "Target quantity: 1x20GP (approx 16.8 MT in 200L drums).\n"
+            "Destination Port: Rotterdam, Netherlands (CIF).\n"
+            "Please provide:\n"
+            "1. Best CIF Rotterdam quotation.\n"
+            "2. Latest COA (need purity >= 99.8%, moisture < 0.05%).\n"
+            "3. MSDS in 16 sections conforming to EU REACH regulations.\n"
+            "4. Can you send 1L sample by DHL to our lab for testing?\n\n"
+            "Thanks & regards,\n"
+            "Dr. Hans Becker\n"
+            "Lead Chemist, EuroCoat Resins B.V."
+        )
+        st.session_state["inquiry_customer_val"] = "Dr. Hans Becker"
+        st.rerun()
+
 col1, col2 = st.columns([3, 2])
 with col1:
     inquiry = st.text_area(

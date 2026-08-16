@@ -9,6 +9,7 @@ Unit tests for mid-priority features:
 """
 from __future__ import annotations
 
+import datetime
 import sys
 import types
 import unittest
@@ -51,18 +52,20 @@ class TestCustomerScoring(unittest.TestCase):
 
     def test_score_increases_with_stage(self):
         from utils.customers import compute_customer_score
-        low = compute_customer_score({"stage": "新客户", "last_contact": "2026-05-14"})
-        mid = compute_customer_score({"stage": "已报价", "last_contact": "2026-05-14"})
-        high = compute_customer_score({"stage": "已下单", "last_contact": "2026-05-14"})
+        today_str = datetime.date.today().isoformat()
+        low = compute_customer_score({"stage": "新客户", "last_contact": today_str})
+        mid = compute_customer_score({"stage": "已报价", "last_contact": today_str})
+        high = compute_customer_score({"stage": "已下单", "last_contact": today_str})
         self.assertLess(low, mid)
         self.assertLess(mid, high)
 
     def test_score_range_0_to_100(self):
         from utils.customers import compute_customer_score
+        today_str = datetime.date.today().isoformat()
         for stage in ["新客户", "已询盘", "已下单", "长期合作"]:
             score = compute_customer_score({
                 "stage": stage,
-                "last_contact": "2026-05-14",
+                "last_contact": today_str,
                 "email": "test@test.com",
                 "contact": "Tom",
                 "product": "LED",
@@ -72,25 +75,29 @@ class TestCustomerScoring(unittest.TestCase):
 
     def test_recent_contact_gives_higher_score(self):
         from utils.customers import compute_customer_score
+        today = datetime.date.today()
+        recent_str = (today - datetime.timedelta(days=1)).isoformat()
+        old_str = (today - datetime.timedelta(days=120)).isoformat()
         recent = compute_customer_score({
             "stage": "已报价",
-            "last_contact": "2026-05-13",  # 1 day ago
+            "last_contact": recent_str,  # 1 day ago
         })
         old = compute_customer_score({
             "stage": "已报价",
-            "last_contact": "2025-01-01",  # > 90 days
+            "last_contact": old_str,  # > 90 days
         })
         self.assertGreater(recent, old)
 
     def test_complete_data_adds_score(self):
         from utils.customers import compute_customer_score
+        today_str = datetime.date.today().isoformat()
         incomplete = compute_customer_score({"stage": "新客户"})
         complete = compute_customer_score({
             "stage": "新客户",
             "email": "x@x.com",
             "contact": "Tom",
             "product": "LED",
-            "last_contact": "2026-05-14",
+            "last_contact": today_str,
         })
         self.assertGreater(complete, incomplete)
 

@@ -73,6 +73,27 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ── 快捷范例 ──────────────────────────────────────────
+demo_cols = st.columns(3)
+with demo_cols[0]:
+    if st.button("💡 范例1: LED商业照明", use_container_width=True):
+        st.session_state["email_product_val"] = "High Bay LED Industrial Light 150W"
+        st.session_state["email_customer_val"] = "David Miller, EuroLux Lighting GmbH"
+        st.session_state["email_features_val"] = "• 150lm/W 高光效，省电 65%\n• 5年原厂质保，CE/RoHS/TUV认证\n• 现货仓储，支持低起订量 (MOQ 50 PCS)\n• 免费提供 IES 配光文件及定制包装"
+        st.rerun()
+with demo_cols[1]:
+    if st.button("🧪 范例2: 精细化工/有机溶剂", use_container_width=True):
+        st.session_state["email_product_val"] = "Cyclohexanone (Purity >= 99.8%)"
+        st.session_state["email_customer_val"] = "Procurement Dept, Global Chemical Dist. LLC"
+        st.session_state["email_features_val"] = "• 主含量 >= 99.8%，水分 <= 0.05%\n• REACH 注册完成，符合 ISO9001/ISO14001 标准\n• 现货供应，支持 ISO Tank / 200L 镀锌钢桶\n• 提供出厂 COA 及 16项国际标准 SDS"
+        st.rerun()
+with demo_cols[2]:
+    if st.button("📱 范例3: 消费电子智能配件", use_container_width=True):
+        st.session_state["email_product_val"] = "Magnetic Wireless Power Bank 10000mAh"
+        st.session_state["email_customer_val"] = "Purchasing Team, SmartTech Retailers"
+        st.session_state["email_features_val"] = "• 15W 磁吸快充 + 20W PD双向输出\n• 航空级超薄铝合金机身，通过 UN38.3/FCC 认证\n• 支持定制 Logo、外包装及彩盒打样 (3天出样)\n• 欧洲/美洲海外仓支持快速交货"
+        st.rerun()
+
 col1, col2 = st.columns(2)
 with col1:
     product = st.text_input(

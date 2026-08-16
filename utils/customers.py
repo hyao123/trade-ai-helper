@@ -183,10 +183,24 @@ def compute_customer_score(customer: dict) -> int:
 
     # Recency score (25 pts max)
     recency_score = 0
-    last_contact = customer.get("last_contact", "")
+    last_contact = str(customer.get("last_contact") or "").strip()
     if last_contact:
+        parsed_date = None
+        # Support ISO "YYYY-MM-DD" or with timestamp "YYYY-MM-DD HH:MM:SS"
+        cleaned_date = last_contact.split("T")[0].split(" ")[0].replace("/", "-")
         try:
-            days = (datetime.date.today() - datetime.date.fromisoformat(last_contact)).days
+            parsed_date = datetime.date.fromisoformat(cleaned_date)
+        except (ValueError, TypeError):
+            # Fallback parse for formats like YYYY-M-D
+            parts = cleaned_date.split("-")
+            if len(parts) == 3:
+                try:
+                    parsed_date = datetime.date(int(parts[0]), int(parts[1]), int(parts[2]))
+                except (ValueError, TypeError):
+                    parsed_date = None
+
+        if parsed_date:
+            days = (datetime.date.today() - parsed_date).days
             if days <= 7:
                 recency_score = 25
             elif days <= 30:
@@ -195,8 +209,6 @@ def compute_customer_score(customer: dict) -> int:
                 recency_score = 10
             else:
                 recency_score = 3
-        except (ValueError, TypeError):
-            pass
 
     # Completeness score (15 pts max)
     complete_score = 0
