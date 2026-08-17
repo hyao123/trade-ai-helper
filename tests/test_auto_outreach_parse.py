@@ -5,7 +5,6 @@ headers ("Email", "Company") must not silently drop every row.
 """
 from __future__ import annotations
 
-import io
 import sys
 import types
 

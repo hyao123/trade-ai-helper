@@ -25,7 +25,13 @@ from utils.inbox_integration import (
     send_via_provider,
 )
 from utils.secrets import get_secret
-from utils.ui_helpers import check_auth, copy_button, get_user_id, html_escape, inject_css
+from utils.ui_helpers import (
+    check_auth,
+    copy_button,
+    get_user_id,
+    html_escape,
+    inject_css,
+)
 
 st.set_page_config(page_title="AI收件箱 | 外贸AI助手", page_icon="📥", layout="wide")
 inject_css()

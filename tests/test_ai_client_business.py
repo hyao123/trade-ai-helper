@@ -10,7 +10,6 @@ from __future__ import annotations
 import importlib
 from unittest.mock import patch
 
-
 # Functions that pages import from utils.ai_client (each must exist).
 PAGE_IMPORTED = [
     "generate_email",
@@ -51,13 +50,14 @@ def test_agent_tool_registry_references_exist():
                 bad.append(f"{tool_id}: {module}.{func} not found")
         except Exception as exc:  # pragma: no cover - defensive
             bad.append(f"{tool_id}: {module}.{func} import error: {exc}")
-    assert bad == [], f"AGENT_TOOLS references broken:\n" + "\n".join(bad)
+    assert bad == [], "AGENT_TOOLS references broken:\n" + "\n".join(bad)
 
 
 def test_smart_quote_wrapper_signature_matches_pages():
     """pages/17 calls generate_smart_quote with keyword args matching the prompt builder."""
-    from utils.ai_client import generate_smart_quote
     import inspect
+
+    from utils.ai_client import generate_smart_quote
 
     params = inspect.signature(generate_smart_quote).parameters
     for expected in ("product", "target_market", "order_quantity", "production_cost", "trade_term"):
@@ -85,9 +85,9 @@ def test_agent_tools_function_params_are_all_callable_kwargs():
         "analyze_customer_profile": analyze_customer_profile,
         "recognize_email_intent": recognize_email_intent,
     }
-    from utils.ai_agent import AGENT_TOOLS
-
     import inspect
+
+    from utils.ai_agent import AGENT_TOOLS
 
     for tool_id, cfg in AGENT_TOOLS.items():
         func = func_map.get(cfg["function"])

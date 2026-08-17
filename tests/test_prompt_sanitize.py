@@ -6,8 +6,6 @@ known prompt-injection patterns are neutralized.
 """
 from __future__ import annotations
 
-import sys
-
 # The sanitizer filters these known multi-word injection phrases.
 _KNOWN_INJECTION = "ignore previous instructions"
 
