@@ -35,14 +35,25 @@ from openai import (
 )
 
 from config.prompts import (
+    build_ab_variant_prompt,
+    build_bl_interpretation_prompt,
+    build_bulk_email_prompt,
+    build_competitor_analysis_prompt,
+    build_complaint_response_prompt,
+    build_contract_template_prompt,
     build_customer_profile_prompt,
+    build_email_polish_prompt,
     build_email_prompt,
     build_followup_prompt,
+    build_holiday_greeting_prompt,
     build_hs_code_prompt,
     build_inquiry_prompt,
     build_intent_recognition_prompt,
+    build_listing_prompt,
+    build_negotiation_prompt,
     build_product_intro_prompt,
     build_smart_quote_prompt,
+    build_social_post_prompt,
 )
 from utils.logger import get_logger
 from utils.secrets import get_secret
@@ -661,4 +672,163 @@ def analyze_customer_profile(
 ) -> str | Generator[str, None, None]:
     """生成 B2B 客户画像深度分析。"""
     prompt, system = build_customer_profile_prompt(company_name, website, industry, additional_info)
+    return _call_with_style(prompt, system, user_id=user_id, stream=stream)
+
+
+def generate_product_intro(
+    product: str,
+    features: str,
+    target: str,
+    languages: list[str],
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    """生成多语言产品介绍文案。"""
+    prompt, system = build_product_intro_prompt(product, features, target, languages)
+    return _call_with_style(prompt, system, user_id=user_id, stream=stream)
+
+
+def generate_listing(
+    product: str,
+    keywords: str,
+    features: str,
+    platform: str = "Amazon",
+    category: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    """生成电商产品上架 Listing 文案。"""
+    prompt, system = build_listing_prompt(product, keywords, features, platform, category)
+    return _call_with_style(prompt, system, user_id=user_id, stream=stream)
+
+
+def generate_social_post(
+    product: str,
+    features: str,
+    platform: str = "LinkedIn",
+    audience: str = "",
+    promo: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    """生成社交媒体营销文案。"""
+    prompt, system = build_social_post_prompt(product, features, platform, audience, promo)
+    return _call_with_style(prompt, system, user_id=user_id, stream=stream)
+
+
+def generate_holiday_greeting(
+    holiday: str,
+    customer_name: str,
+    company: str,
+    relationship_level: str,
+    product_mention: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    """生成节日问候邮件。"""
+    prompt, system = build_holiday_greeting_prompt(holiday, customer_name, company, relationship_level, product_mention)
+    return _call_with_style(prompt, system, user_id=user_id, stream=stream)
+
+
+def generate_email_polish(
+    email_content: str,
+    source_lang: str,
+    target_lang: str,
+    mode: str,
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    """翻译 + 润色外贸邮件。"""
+    prompt, system = build_email_polish_prompt(email_content, source_lang, target_lang, mode)
+    return _call_with_style(prompt, system, user_id=user_id, stream=stream)
+
+
+def generate_complaint_response(
+    complaint_type: str,
+    severity: str,
+    relationship: str,
+    proposed_solution: str,
+    customer_complaint: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    """生成专业客诉回复。"""
+    prompt, system = build_complaint_response_prompt(complaint_type, severity, relationship, proposed_solution, customer_complaint)
+    return _call_with_style(prompt, system, user_id=user_id, stream=stream)
+
+
+def generate_ab_variants(
+    product: str,
+    customer_type: str,
+    num_variants: int = 3,
+    focus: str = "subject_line",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    """生成 A/B 测试文案变体。"""
+    prompt, system = build_ab_variant_prompt(product, customer_type, num_variants, focus)
+    return _call_with_style(prompt, system, user_id=user_id, stream=stream)
+
+
+def generate_contract_template(
+    contract_type: str,
+    seller_info: str,
+    buyer_info: str,
+    product: str,
+    terms: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    """生成国际贸易合同模板。"""
+    prompt, system = build_contract_template_prompt(contract_type, seller_info, buyer_info, product, terms)
+    return _call_with_style(prompt, system, user_id=user_id, stream=stream)
+
+
+def interpret_bill_of_lading(
+    bl_content: str,
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    """解读提单（B/L）字段与风险。"""
+    prompt, system = build_bl_interpretation_prompt(bl_content)
+    return _call_with_style(prompt, system, user_id=user_id, stream=stream)
+
+
+def analyze_competitor(
+    your_product: str,
+    competitor_info: str,
+    your_advantages: str = "",
+    target_market: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    """生成竞品分析（Battle Card + 话术）。"""
+    prompt, system = build_competitor_analysis_prompt(your_product, competitor_info, your_advantages, target_market)
+    return _call_with_style(prompt, system, user_id=user_id, stream=stream)
+
+
+def generate_bulk_email(
+    company: str,
+    contact_name: str,
+    product: str,
+    industry: str = "",
+    country: str = "",
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    """生成批量开发信邮件。"""
+    prompt, system = build_bulk_email_prompt(company, contact_name, product, industry, country)
+    return _call_with_style(prompt, system, user_id=user_id, stream=stream)
+
+
+def generate_negotiation(
+    scenario: str,
+    product: str,
+    current_offer: str,
+    bottom_line: str,
+    stream: bool = False,
+    user_id: str = "default",
+) -> str | Generator[str, None, None]:
+    """生成谈判话术。"""
+    prompt, system = build_negotiation_prompt(scenario, product, current_offer, bottom_line)
     return _call_with_style(prompt, system, user_id=user_id, stream=stream)
