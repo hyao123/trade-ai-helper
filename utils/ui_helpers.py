@@ -530,11 +530,22 @@ def extract_subject(text: str) -> tuple[str, str]:
     return "", text
 
 
+def html_escape(value: object) -> str:
+    """Escape a value for safe interpolation into ``unsafe_allow_html`` markup.
+
+    Use this for ANY user/AI/email-controlled content placed inside an
+    f-string that is later rendered with ``unsafe_allow_html=True``. Prevents
+    stored/reflected XSS (e.g. ``<img onerror=...>`` inside an email From
+    header or AI-generated text).
+    """
+    return html.escape(str(value), quote=True)
+
+
 def show_subject(subject: str, key: str) -> None:
     """渲染主题行高亮卡片 + 复制按钮（XSS 安全）。"""
     if not subject:
         return
-    safe_subject = html.escape(subject)
+    safe_subject = html_escape(subject)
     st.markdown(
         f'<div class="subject-box">'
         f'<div class="subject-label">📌 邮件主题行（Subject Line）</div>'

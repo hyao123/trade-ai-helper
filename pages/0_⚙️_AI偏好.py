@@ -382,10 +382,11 @@ with tab_custom_model:
         )
         custom_api_key = st.text_input(
             "API Key (SK) *",
-            value=prefs.get("custom_provider_api_key", ""),
-            placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx",
+            value="",  # Do not echo the saved key back into the widget.
+            placeholder=("••••••••（已保存，留空保持不变）" if prefs.get("custom_provider_api_key")
+                         else "sk-xxxxxxxxxxxxxxxxxxxxxxxx"),
             type="password",
-            help="Bearer token / Secret Key，不会上传到任何第三方",
+            help="Bearer token / Secret Key，不会上传到任何第三方。留空则保留已保存的 Key。",
             disabled=not custom_enabled,
         )
 
@@ -395,8 +396,13 @@ with tab_custom_model:
     with col_save:
         if st.button("💾 保存自定义模型配置", type="primary",
                      use_container_width=True, key="save_custom_model"):
+            saved_key = prefs.get("custom_provider_api_key", "").strip()
+            new_key = custom_api_key.strip()
+            # A blank field keeps the previously saved key (the widget never
+            # echoes it back, so the user cannot accidentally wipe it).
+            effective_key = new_key or saved_key
             if custom_enabled and (not custom_base_url.strip() or
-                                   not custom_api_key.strip() or
+                                   not effective_key or
                                    not custom_model.strip()):
                 st.error("❌ 启用自定义模型时，Base URL、模型 ID 和 API Key 均为必填项。")
             else:
@@ -405,7 +411,7 @@ with tab_custom_model:
                     "custom_provider_name": custom_name.strip(),
                     "custom_provider_base_url": custom_base_url.strip().rstrip("/"),
                     "custom_provider_model": custom_model.strip(),
-                    "custom_provider_api_key": custom_api_key.strip(),
+                    "custom_provider_api_key": effective_key,
                 })
                 if custom_enabled:
                     st.success(f"✅ 已保存！后续所有 AI 调用将优先使用 **{custom_name or custom_model}**。")
@@ -415,14 +421,15 @@ with tab_custom_model:
     with col_test:
         if st.button("🔗 测试连接", use_container_width=True, key="test_custom_model",
                      disabled=not custom_enabled):
-            if not custom_base_url.strip() or not custom_api_key.strip() or not custom_model.strip():
+            test_key = custom_api_key.strip() or prefs.get("custom_provider_api_key", "").strip()
+            if not custom_base_url.strip() or not test_key or not custom_model.strip():
                 st.warning("请先填写 Base URL、模型 ID 和 API Key")
             else:
                 with st.spinner("连接测试中…"):
                     try:
                         from openai import OpenAI as _OAI
                         _test_client = _OAI(
-                            api_key=custom_api_key.strip(),
+                            api_key=test_key,
                             base_url=custom_base_url.strip().rstrip("/"),
                         )
                         _resp = _test_client.chat.completions.create(

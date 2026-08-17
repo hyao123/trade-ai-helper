@@ -25,7 +25,7 @@ from utils.inbox_integration import (
     send_via_provider,
 )
 from utils.secrets import get_secret
-from utils.ui_helpers import check_auth, copy_button, get_user_id, inject_css
+from utils.ui_helpers import check_auth, copy_button, get_user_id, html_escape, inject_css
 
 st.set_page_config(page_title="AI收件箱 | 外贸AI助手", page_icon="📥", layout="wide")
 inject_css()
@@ -82,15 +82,9 @@ st.markdown("""
 # ═════════════════════════════════════════════════════════
 # OAuth 回调处理（用户授权后被重定向回来）
 # ═════════════════════════════════════════════════════════
-try:
-    qp = st.query_params
-    auth_code = qp.get("code")
-    auth_state = qp.get("state", "")
-except Exception:
-    # Older streamlit fallback
-    qp = st.experimental_get_query_params()
-    auth_code = qp.get("code", [None])[0]
-    auth_state = qp.get("state", [""])[0]
+qp = st.query_params
+auth_code = qp.get("code")
+auth_state = qp.get("state", "")
 
 if auth_code:
     provider = auth_state if auth_state in PROVIDERS else "gmail"
@@ -296,7 +290,7 @@ with tab_inbox:
                 with col_meta:
                     st.markdown(
                         f"<div style='font-size:0.85rem;color:#64748b;'>"
-                        f"📧 <b>From:</b> {from_addr} &nbsp;|&nbsp; "
+                        f"📧 <b>From:</b> {html_escape(from_addr)} &nbsp;|&nbsp; "
                         f"📅 {date[:25] if date else '-'} &nbsp;|&nbsp; "
                         f"<span style='background:{badge_color};color:white;padding:2px 8px;"
                         f"border-radius:10px;font-size:0.75rem;'>"
@@ -313,7 +307,7 @@ with tab_inbox:
                         st.markdown(
                             f"<div style='background:#f8fafc;border-left:3px solid #cbd5e1;"
                             f"padding:0.6rem 0.9rem;border-radius:4px;margin:0.5rem 0;"
-                            f"font-size:0.88rem;color:#475569;'>{snippet[:400]}</div>",
+                            f"font-size:0.88rem;color:#475569;'>{html_escape(snippet[:400])}</div>",
                             unsafe_allow_html=True,
                         )
 

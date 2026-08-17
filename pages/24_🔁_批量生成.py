@@ -11,7 +11,7 @@ import streamlit as st
 from config.prompts import EMAIL_LANGUAGES
 from utils.ai_client import call_llm
 from utils.history import add_to_history
-from utils.ui_helpers import check_auth, copy_button, get_user_id, inject_css
+from utils.ui_helpers import check_auth, copy_button, get_user_id, html_escape, inject_css
 from utils.user_prefs import get_ai_style_suffix, get_pref
 
 st.set_page_config(page_title="批量生成 | 外贸AI助手", page_icon="🔁", layout="wide")
@@ -209,7 +209,7 @@ if st.session_state.batch_results:
             st.markdown(
                 f'<div style="background:#f8fafc;border-radius:8px;padding:1rem;'
                 f'border:1px solid #e2e8f0;white-space:pre-wrap;'
-                f'font-size:0.9rem;line-height:1.7;">{r["content"]}</div>',
+                f'font-size:0.9rem;line-height:1.7;">{html_escape(r["content"])}</div>',
                 unsafe_allow_html=True,
             )
             c1, c2 = st.columns(2)

@@ -37,6 +37,7 @@ from datetime import datetime
 from typing import Generator
 
 from utils.logger import get_logger
+from utils.sanitize import sanitize_input
 from utils.storage import load_user_json, save_user_json
 
 logger = get_logger("inbox_ai")
@@ -193,10 +194,12 @@ def classify_email(
     """
     from utils.ai_client import call_llm
 
+    # External email content is attacker-controlled; sanitize before prompting
+    # to bound prompt-injection surfaces.
     prompt = _CLASSIFICATION_PROMPT.format(
-        from_email=from_email,
-        subject=subject,
-        snippet=snippet[:500],
+        from_email=sanitize_input(from_email, max_length=300),
+        subject=sanitize_input(subject, max_length=300),
+        snippet=sanitize_input(snippet, max_length=500),
     )
 
     result_text = call_llm(
@@ -221,31 +224,12 @@ def classify_email(
 
 
 def _parse_classification(text: str) -> dict:
-    """Parse the AI classification JSON response."""
-    import json
+    """Parse the classification JSON from the LLM response with safe defaults."""
+    from utils.sanitize import parse_llm_json
 
-    # Try to extract JSON from the response
-    text = text.strip()
-
-    # Handle potential markdown code block wrapping
-    if text.startswith("```"):
-        lines = text.split("\n")
-        text = "\n".join(lines[1:-1]) if len(lines) > 2 else text
-
-    try:
-        data = json.loads(text)
-        # Validate required fields
-        if "intent" not in data:
-            data["intent"] = "info_only"
-        if data["intent"] not in INTENT_CATEGORIES:
-            data["intent"] = "info_only"
-        data.setdefault("confidence", 0.5)
-        data.setdefault("urgency", "medium")
-        data.setdefault("key_points", [])
-        data.setdefault("suggested_action", "")
-        return data
-    except (json.JSONDecodeError, TypeError):
-        logger.warning("Failed to parse classification JSON: %s", text[:100])
+    data = parse_llm_json(text)
+    if data is None:
+        logger.warning("Failed to parse classification JSON: %s", str(text)[:100])
         return {
             "intent": "info_only",
             "confidence": 0.3,
@@ -253,6 +237,15 @@ def _parse_classification(text: str) -> dict:
             "key_points": [],
             "suggested_action": "Review manually",
         }
+    if "intent" not in data:
+        data["intent"] = "info_only"
+    if data["intent"] not in INTENT_CATEGORIES:
+        data["intent"] = "info_only"
+    data.setdefault("confidence", 0.5)
+    data.setdefault("urgency", "medium")
+    data.setdefault("key_points", [])
+    data.setdefault("suggested_action", "")
+    return data
 
 
 def _calculate_priority(classification: dict, intent_info: dict) -> int:
@@ -405,10 +398,11 @@ def generate_reply_suggestion(
 
     intent_info = INTENT_CATEGORIES.get(intent, INTENT_CATEGORIES["info_only"])
 
+    # External email content is attacker-controlled; sanitize before prompting.
     prompt = _REPLY_PROMPT.format(
-        from_email=from_email,
-        subject=subject,
-        snippet=snippet[:800],
+        from_email=sanitize_input(from_email, max_length=300),
+        subject=sanitize_input(subject, max_length=300),
+        snippet=sanitize_input(snippet, max_length=800),
         intent=intent,
         intent_label=intent_info["label"],
         key_points=", ".join(key_points or ["General inquiry"]),

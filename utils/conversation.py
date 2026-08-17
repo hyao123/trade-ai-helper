@@ -103,22 +103,24 @@ class Conversation:
             return
 
         display_msgs = msgs[-max_display:]
+        from utils.ui_helpers import html_escape
         for msg in display_msgs:
             role = msg["role"]
             content = msg["content"]
             preview = content[:300] + ("…" if len(content) > 300 else "")
+            safe_preview = html_escape(preview)
             if role == "user":
                 st.markdown(
                     f'<div style="background:#eff6ff;border-left:3px solid #3b82f6;'
                     f'padding:0.6rem 0.9rem;border-radius:6px;margin:0.4rem 0;'
-                    f'font-size:0.88rem;"><b>👤 你</b><br>{preview}</div>',
+                    f'font-size:0.88rem;"><b>👤 你</b><br>{safe_preview}</div>',
                     unsafe_allow_html=True,
                 )
             else:
                 st.markdown(
                     f'<div style="background:#f0fdf4;border-left:3px solid #22c55e;'
                     f'padding:0.6rem 0.9rem;border-radius:6px;margin:0.4rem 0;'
-                    f'font-size:0.88rem;"><b>🤖 AI</b><br>{preview}</div>',
+                    f'font-size:0.88rem;"><b>🤖 AI</b><br>{safe_preview}</div>',
                     unsafe_allow_html=True,
                 )
 

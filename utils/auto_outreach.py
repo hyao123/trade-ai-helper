@@ -105,6 +105,20 @@ def parse_prospect_file(file_content: bytes, filename: str) -> tuple[list[dict],
     return valid_prospects, error
 
 
+def _normalize_header(name: str, index: int) -> str:
+    """Normalize a CSV/Excel header to the validator's expected key form.
+
+    - strips surrounding whitespace / BOM
+    - lowercases
+    - replaces internal spaces with underscores so "Contact Name" -> "contact_name",
+      matching the validated keys (email, company, contact_name, product, ...).
+    """
+    if not name:
+        return f"col_{index}"
+    normalized = name.strip().lower().replace(" ", "_")
+    return normalized or f"col_{index}"
+
+
 def _parse_csv(file_content: bytes) -> tuple[list[dict], str]:
     """解析CSV文件。"""
     # 尝试多种编码
@@ -118,8 +132,25 @@ def _parse_csv(file_content: bytes) -> tuple[list[dict], str]:
         return [], "无法识别文件编码"
 
     reader = csv.DictReader(io.StringIO(text))
-    rows = list(reader)
-    return rows, ""
+    raw_rows = list(reader)
+    if not raw_rows:
+        return [], ""
+
+    # Normalize headers (lowercase + spaces->underscores) so that CSV files with
+    # capitalized/multi-word headers ("Email", "Contact Name") validate correctly
+    # instead of silently dropping every row in the required-field check below.
+    fieldmap = {
+        h: _normalize_header(h, i)
+        for i, h in enumerate(reader.fieldnames or [])
+    }
+    prospects = []
+    for row in raw_rows:
+        record = {
+            fieldmap.get(h, h): (str(v).strip() if v is not None else "")
+            for h, v in row.items()
+        }
+        prospects.append(record)
+    return prospects, ""
 
 
 def _parse_excel(file_content: bytes) -> tuple[list[dict], str]:
@@ -135,7 +166,7 @@ def _parse_excel(file_content: bytes) -> tuple[list[dict], str]:
     if not rows:
         return [], "Excel 文件为空"
 
-    headers = [str(h).strip().lower() if h else f"col_{i}" for i, h in enumerate(rows[0])]
+    headers = [_normalize_header(h, i) for i, h in enumerate(rows[0])]
     prospects = []
     for row in rows[1:]:
         if not any(row):

@@ -1177,10 +1177,14 @@ def build_auto_outreach_prompt(
     company = sanitize_prompt_param(company, "company")
     contact_name = sanitize_prompt_param(contact_name, "contact_name")
     industry = sanitize_prompt_param(industry, "industry")
+    industry_focus = sanitize_prompt_param(industry_focus, "industry_focus")
+    industry_pain_points = sanitize_prompt_param(industry_pain_points, "industry_pain_points", max_length=1000)
     product_info = sanitize_prompt_param(product_info, "product_info")
     company_intro = sanitize_prompt_param(company_intro, "company_intro")
     country = sanitize_prompt_param(country, "country")
     product_interest = sanitize_prompt_param(product_interest, "product_interest")
+    # Catalog data is untrusted user content; sanitize and cap its length.
+    matched_products = sanitize_input(matched_products, max_length=1500)
 
     greeting_name = contact_name if contact_name else "Sir/Madam"
     company_info = f"\nYour Company Introduction: {company_intro}" if company_intro else ""
@@ -1451,6 +1455,11 @@ def build_drip_step_prompt(
     # Sanitize content fields
     product_info = sanitize_prompt_param(product_info, "product_info")
     company_intro = sanitize_prompt_param(company_intro, "company_intro")
+    industry = sanitize_prompt_param(industry, "industry")
+    industry_focus = sanitize_prompt_param(industry_focus, "industry_focus")
+    industry_pain_points = sanitize_prompt_param(industry_pain_points, "industry_pain_points", max_length=1000)
+    # Catalog data is untrusted user content; sanitize and cap its length.
+    matched_products = sanitize_input(matched_products, max_length=1500)
 
     greeting_name = contact_name if contact_name else "Sir/Madam"
     company_info = f"\nYour Company: {company_intro}" if company_intro else ""
