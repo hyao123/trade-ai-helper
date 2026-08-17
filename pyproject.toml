@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tradeai"
+version = "1.0.0"
+description = "AI-Trade Pro: All-in-one AI toolkit for foreign trade & international commerce"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "streamlit>=1.45.0",
+    "openai>=1.78.1",
+    "fpdf2>=2.8.3",
+    "python-dotenv>=1.2.1",
+    "stripe>=11.4.1",
+]
+
+[project.optional-dependencies]
+postgres = [
+    "psycopg2-binary>=2.9.9",
+]
+dev = [
+    "pytest>=8.3.0",
+    "ruff>=0.9.0",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "smoke: fast deployment/import health checks that validate the app can start safely.",
+    "integration: cross-module tests that exercise persisted storage or multi-module wiring.",
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]
