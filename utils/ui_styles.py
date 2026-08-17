@@ -420,3 +420,132 @@ _CSS = """
     }
 </style>
 """
+
+_AUTH_CSS = """
+<style>
+.auth-shell {
+    max-width: 1120px;
+    margin: 2.2rem auto 1.5rem;
+}
+.auth-hero-card {
+    min-height: 560px;
+    border-radius: 28px;
+    padding: 2.4rem;
+    color: white;
+    background:
+        radial-gradient(circle at 15% 20%, rgba(147,197,253,0.24), transparent 30%),
+        radial-gradient(circle at 85% 75%, rgba(167,139,250,0.28), transparent 34%),
+        linear-gradient(135deg, #0f172a 0%, #1e3a8a 48%, #4f46e5 100%);
+    box-shadow: 0 24px 70px rgba(15,23,42,0.22);
+    position: relative;
+    overflow: hidden;
+}
+.auth-hero-card::after {
+    content: '';
+    position: absolute;
+    inset: auto -40px -70px auto;
+    width: 220px;
+    height: 220px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 999px;
+}
+.auth-brand-row { display: flex; align-items: center; gap: 12px; margin-bottom: 2rem; }
+.auth-logo {
+    width: 46px; height: 46px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.22);
+    font-size: 1.35rem;
+}
+.auth-brand-title { font-size: 1.05rem; font-weight: 800; letter-spacing: -0.02em; }
+.auth-brand-sub { font-size: 0.76rem; color: rgba(226,232,240,0.82); margin-top: 2px; }
+.auth-eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px; border-radius: 999px;
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.18);
+    font-size: 0.78rem; font-weight: 700; color: #dbeafe;
+    margin-bottom: 1.1rem;
+}
+.auth-headline {
+    font-size: clamp(2rem, 4vw, 3.05rem);
+    font-weight: 900;
+    line-height: 1.08;
+    letter-spacing: -0.045em;
+    margin-bottom: 1rem;
+}
+.auth-headline span { color: #bfdbfe; }
+.auth-copy {
+    max-width: 470px;
+    color: rgba(226,232,240,0.86);
+    line-height: 1.75;
+    font-size: 0.98rem;
+}
+.auth-proof-grid {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px; margin: 1.8rem 0;
+}
+.auth-proof {
+    padding: 0.9rem 0.85rem;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.16);
+    backdrop-filter: blur(8px);
+}
+.auth-proof strong { display: block; font-size: 1.15rem; color: #ffffff; }
+.auth-proof span { display: block; margin-top: 3px; font-size: 0.72rem; color: rgba(226,232,240,0.76); }
+.auth-check-list { margin-top: 1.2rem; display: grid; gap: 0.7rem; }
+.auth-check-item {
+    display: flex; align-items: center; gap: 9px;
+    color: rgba(248,250,252,0.92); font-size: 0.88rem;
+}
+.auth-check-dot {
+    width: 22px; height: 22px; border-radius: 999px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(34,197,94,0.18); color: #bbf7d0;
+    border: 1px solid rgba(187,247,208,0.24);
+    font-size: 0.72rem; flex: 0 0 auto;
+}
+.auth-panel {
+    border-radius: 28px;
+    padding: 2rem;
+    background: rgba(255,255,255,0.96);
+    border: 1px solid rgba(226,232,240,0.9);
+    box-shadow: 0 24px 70px rgba(15,23,42,0.12);
+}
+.auth-panel-title { font-size: 1.35rem; font-weight: 850; color: #0f172a; letter-spacing: -0.025em; }
+.auth-panel-sub { color: #64748b; font-size: 0.88rem; line-height: 1.6; margin: 0.35rem 0 1.1rem; }
+.auth-note {
+    padding: 0.75rem 0.9rem;
+    border-radius: 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    margin: 0.75rem 0 1rem;
+}
+.auth-mini-row {
+    display: flex; justify-content: space-between; gap: 8px;
+    color: #64748b; font-size: 0.74rem; margin-top: 1rem;
+}
+.auth-required { color: #dc2626; font-weight: 700; }
+.auth-panel [data-baseweb="tab-list"] { gap: 8px; }
+.auth-panel [data-baseweb="tab"] {
+    border-radius: 12px !important;
+    background: #f8fafc !important;
+    padding: 0.7rem 1rem !important;
+}
+.auth-panel [aria-selected="true"] {
+    background: linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%) !important;
+    color: #1d4ed8 !important;
+    font-weight: 800 !important;
+}
+@media (max-width: 900px) {
+    .auth-shell { margin: 0.5rem auto; }
+    .auth-hero-card { min-height: auto; padding: 1.6rem; }
+    .auth-proof-grid { grid-template-columns: 1fr; }
+    .auth-panel { padding: 1.4rem; }
+}
+</style>
+"""
