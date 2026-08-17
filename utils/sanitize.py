@@ -89,3 +89,26 @@ def sanitize_prompt_param(text: str, param_name: str = "", max_length: int = 500
     Same as sanitize_input but with stricter max_length default.
     """
     return sanitize_input(text, max_length=max_length)
+
+
+def parse_llm_json(text: str) -> dict | None:
+    """Parse a JSON object from an LLM response, tolerating markdown fences.
+
+    Strips an optional triple-backtick code-block wrapper and returns the parsed
+    dict, or None when the text is not valid JSON. Used by both the AI agent
+    plan parser and the inbox classifier so the markdown-strip + ``json.loads``
+    pattern lives in one place.
+    """
+    import json
+
+    if not text:
+        return None
+    cleaned = str(text).strip()
+    if cleaned.startswith("```"):
+        lines = cleaned.split("\n")
+        cleaned = "\n".join(lines[1:-1]) if len(lines) > 2 else cleaned
+    try:
+        data = json.loads(cleaned)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return data if isinstance(data, dict) else None

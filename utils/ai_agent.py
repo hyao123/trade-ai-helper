@@ -481,50 +481,51 @@ class Agent:
     # ── Plan parsing ──────────────────────────────────
 
     def _parse_plan(self, goal: str, ai_response: str) -> AgentPlan:
-        """Parse AI-generated plan JSON into AgentPlan."""
-        import json
+        """Parse AI-generated plan JSON into AgentPlan.
 
+        Returns a plan with no tasks when the LLM returned a user-facing error
+        string (``call_llm`` uses a ``⚠️`` prefix for rate-limit/key/provider
+        failures) or unparseable JSON, so callers report a failure instead of
+        silently fabricating an unrelated tool invocation.
+        """
         plan = AgentPlan(goal=goal)
 
-        # Clean response (handle markdown wrapping)
-        text = ai_response.strip()
-        if text.startswith("```"):
-            lines = text.split("\n")
-            text = "\n".join(lines[1:-1]) if len(lines) > 2 else text
+        # A ⚠️-prefixed response is a user-facing error from call_llm (rate limit,
+        # missing key, provider failure) — never a valid plan. Do not turn it into
+        # a hard-coded tool call that executes the wrong action.
+        if ai_response.lstrip().startswith("⚠️"):
+            logger.warning("Agent plan rejected: LLM returned an error (goal='%s')", goal[:60])
+            return plan  # no tasks -> callers report a failed plan
 
-        try:
-            data = json.loads(text)
-            tasks_data = data.get("tasks", [])
+        # Clean response (handle markdown wrapping) and parse JSON in one step.
+        from utils.sanitize import parse_llm_json
+        data = parse_llm_json(ai_response)
 
-            for td in tasks_data:
-                tool_name = td.get("tool", "")
-                if tool_name not in AGENT_TOOLS:
-                    continue  # Skip unknown tools
+        if data is None:
+            logger.warning("Failed to parse agent plan (response: %s)", str(ai_response)[:200])
+            # Return an empty-task plan so the agent reports a failure instead of
+            # silently invoking a guessed tool with the raw goal as a parameter.
+            return plan
 
-                task = AgentTask(
-                    id=str(td.get("id", len(plan.tasks) + 1)),
-                    name=td.get("name", f"Step {len(plan.tasks) + 1}"),
-                    description=td.get("description", ""),
-                    tool=tool_name,
-                    params=td.get("params", {}),
-                    requires_confirmation=td.get(
-                        "requires_confirmation",
-                        AGENT_TOOLS[tool_name].get("requires_confirmation", False),
-                    ),
-                    depends_on=td.get("depends_on", []),
-                )
-                plan.tasks.append(task)
+        tasks_data = data.get("tasks", [])
+        for td in tasks_data:
+            tool_name = td.get("tool", "")
+            if tool_name not in AGENT_TOOLS:
+                continue  # Skip unknown tools
 
-        except (json.JSONDecodeError, TypeError) as e:
-            logger.warning("Failed to parse agent plan: %s (response: %s)", e, text[:200])
-            # Create a single-step fallback plan
-            plan.tasks.append(AgentTask(
-                id="1",
-                name="Direct execution",
-                description=goal,
-                tool="generate_cold_email",  # Default fallback
-                params={"product": goal},
-            ))
+            task = AgentTask(
+                id=str(td.get("id", len(plan.tasks) + 1)),
+                name=td.get("name", f"Step {len(plan.tasks) + 1}"),
+                description=td.get("description", ""),
+                tool=tool_name,
+                params=td.get("params", {}),
+                requires_confirmation=td.get(
+                    "requires_confirmation",
+                    AGENT_TOOLS[tool_name].get("requires_confirmation", False),
+                ),
+                depends_on=td.get("depends_on", []),
+            )
+            plan.tasks.append(task)
 
         return plan
 

@@ -383,11 +383,13 @@ class AIGateway:
                             "temperature": temperature, "stream": True, "timeout": 90}
             if max_tokens:
                 kwargs["max_tokens"] = max_tokens
+            emitted = False
             try:
                 stream_resp = custom_client.chat.completions.create(**kwargs)
                 for chunk in stream_resp:
                     delta = chunk.choices[0].delta.content
                     if delta:
+                        emitted = True
                         yield delta
                 return
             except Exception as e:
@@ -395,8 +397,12 @@ class AIGateway:
                     "Custom provider stream failed (%s) request_id=%s: %s",
                     custom_model_id, request_id, _redact(e),
                 )
-                yield _CUSTOM_PROVIDER_GENERIC_ERROR
-                return
+                if emitted:
+                    # Partial output already delivered; do not duplicate with a
+                    # fresh fallback response.
+                    yield _CUSTOM_PROVIDER_GENERIC_ERROR
+                    return
+                # Nothing streamed -> fall through to built-in providers below.
 
         # ── Priority 2 & 3: explicit override or tier strategy ──
         provider_name, model_id = self._resolve_model(tier, provider, model)

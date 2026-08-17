@@ -22,6 +22,13 @@ from utils.secrets import get_secret
 logger = get_logger("email_service")
 SMTP_TIMEOUT_SECONDS = 30
 
+# Re-entrancy guard. email_sendgrid.send_tracked_email falls back to
+# send_ai_generated_email on a generic error; without this flag, that nested
+# call would see SendGrid configured and call send_tracked_email again,
+# recursing until RecursionError (creating a bogus tracking record each level).
+# When set, send_ai_generated_email skips SendGrid and goes straight to SMTP.
+_SENDING_AI_EMAIL = False
+
 
 def is_email_configured() -> bool:
     """Return True only if all required SMTP environment variables are set (non-empty)."""
@@ -80,9 +87,12 @@ def send_email_with_attachments(
         return False, f"Invalid SMTP_PORT value: {smtp_port}"
 
     msg = MIMEMultipart()
+    from email.header import Header
     msg["From"] = from_email
     msg["To"] = to_email
-    msg["Subject"] = subject
+    # RFC-2047-encode the subject so CJK/emoji subjects are not mangled by
+    # strict SMTP servers. (Assign the Header object so as_string() encodes it.)
+    msg["Subject"] = Header(subject, "utf-8")
     msg.attach(MIMEText(body, "plain", "utf-8"))
 
     # Attach files (if any)
@@ -266,18 +276,25 @@ def send_ai_generated_email(
         logger.debug("Email tracking record creation failed (non-critical): %s", e)
 
     # ── Try SendGrid first (has built-in open/click tracking) ──
+    # Skip when already inside a SendGrid send attempt (see _SENDING_AI_EMAIL),
+    # so the SMTP fallback does not re-enter SendGrid and recurse.
+    global _SENDING_AI_EMAIL
     try:
         from utils.email_sendgrid import is_sendgrid_configured, send_tracked_email
-        if is_sendgrid_configured():
-            ok, msg, _tid = send_tracked_email(
-                to_email=to_email,
-                subject=subject,
-                body=body,
-                from_name=from_name,
-                tracking_id=tracking_id,
-                attachments=norm_attachments or None,
-            )
-            return ok, msg
+        if not _SENDING_AI_EMAIL and is_sendgrid_configured():
+            _SENDING_AI_EMAIL = True
+            try:
+                ok, msg, _tid = send_tracked_email(
+                    to_email=to_email,
+                    subject=subject,
+                    body=body,
+                    from_name=from_name,
+                    tracking_id=tracking_id,
+                    attachments=norm_attachments or None,
+                )
+                return ok, msg
+            finally:
+                _SENDING_AI_EMAIL = False
     except ImportError:
         pass
     except Exception as e:
