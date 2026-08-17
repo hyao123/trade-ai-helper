@@ -33,6 +33,13 @@ TIER_CONFIG: dict[str, dict] = {
         "daily_limit": 100,
         "features": ["basic", "logo_upload", "data_export"],
     },
+    # "team" is set by Stripe upgrades and mapped to premium model routing in
+    # ai_models.json; it needs an explicit quota here instead of silently
+    # falling back to free-tier limits (which previously granted only 20/day).
+    "team": {
+        "daily_limit": 300,
+        "features": ["basic", "logo_upload", "data_export", "priority_support"],
+    },
     "enterprise": {
         "daily_limit": None,  # unlimited
         "features": ["basic", "logo_upload", "data_export", "priority_support"],

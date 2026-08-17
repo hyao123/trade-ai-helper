@@ -111,6 +111,46 @@ def test_fallback_config_is_self_consistent():
     assert validate_config(_FALLBACK_CONFIG) == []
 
 
+def test_validate_config_detects_unknown_tier_model_key():
+    """tier_strategy[tier].model must be a key of that provider's models."""
+    path = _unique_workspace_file("ai_models_badtier.json")
+    path.write_text(json.dumps({
+        "providers": {
+            "nvidia": {
+                "base_url": "https://example.test/v1",
+                "key_env": "NVIDIA_API_KEY",
+                "models": {"llama-3.3-70b": "meta/llama-3.3-70b-instruct"},
+                "default_model": "llama-3.3-70b",
+            }
+        },
+        "tier_strategy": {
+            "fast": {"provider": "nvidia", "model": "no-such-model"},  # not in models
+            "balanced": {"provider": "nvidia", "model": "llama-3.3-70b"},
+            "premium": {"provider": "nvidia", "model": "llama-3.3-70b"},
+        },
+        "plan_defaults": {"free": "fast", "pro": "balanced", "team": "premium", "enterprise": "premium"},
+    }), encoding="utf-8")
+
+    try:
+        config = load_ai_model_config(path)
+        problems = validate_config(config)
+        assert any("tier_strategy['fast'].model" in p for p in problems), problems
+    finally:
+        path.unlink(missing_ok=True)
+
+
 def test_config_path_points_to_shipped_file():
     """Regression guard: the loader must default to the repo's own JSON."""
     assert _CONFIG_PATH.exists(), "config/ai_models.json is missing"
+
+
+def test_tier_config_and_plan_defaults_keys_align():
+    """Every plan in pricing.TIER_CONFIG must have a route in ai_models plan_defaults."""
+    from utils.pricing import TIER_CONFIG
+    config = load_ai_model_config()
+    plan_defaults = config.get("plan_defaults") or {}
+    missing = [p for p in TIER_CONFIG.keys() if p not in plan_defaults]
+    assert missing == [], (
+        f"TIER_CONFIG keys without an ai_models plan_default route: {missing}; "
+        "these users would fall back to free-tier limits while being routed to a higher model tier"
+    )

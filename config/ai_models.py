@@ -141,8 +141,17 @@ def validate_config(config: dict[str, Any]) -> list[str]:
     tier_strategy = config.get("tier_strategy") or {}
     for tier in ("fast", "balanced", "premium"):
         entry = tier_strategy.get(tier) or {}
-        if entry.get("provider") not in (providers or {}):
+        provider_name = entry.get("provider")
+        if provider_name not in (providers or {}):
             problems.append(f"tier_strategy[{tier!r}] references unknown provider")
+            continue
+        model_key = entry.get("model")
+        models = (providers.get(provider_name) or {}).get("models") or {}
+        if model_key not in models:
+            problems.append(
+                f"tier_strategy[{tier!r}].model {model_key!r} is not a key of "
+                f"provider {provider_name!r}'s models"
+            )
 
     plan_defaults = config.get("plan_defaults") or {}
     for plan in ("free", "pro", "team", "enterprise"):
