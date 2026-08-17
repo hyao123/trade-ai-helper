@@ -27,6 +27,7 @@ import abc
 import json
 import shutil
 import sqlite3
+import threading
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
@@ -143,6 +144,9 @@ class SQLiteBackend(DatabaseBackend):
       - users_db(username, data)
       - user_data(username, collection, data)
       - global_data(collection, data)
+
+    Reuses thread-local SQLite connections to eliminate per-query connection
+    and PRAGMA initialization overhead.
     """
 
     def __init__(self, db_path: str | Path):
@@ -150,14 +154,29 @@ class SQLiteBackend(DatabaseBackend):
         if not self._path.is_absolute():
             self._path = get_data_dir() / self._path
         self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._local = threading.local()
         self._ensure_tables()
 
-    def _get_conn(self):
-        conn = sqlite3.connect(self._path, timeout=30)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA foreign_keys=ON")
+    def _get_conn(self) -> sqlite3.Connection:
+        """Get or create a thread-local SQLite connection with WAL mode and foreign keys."""
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = sqlite3.connect(self._path, timeout=30, check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA foreign_keys=ON")
+            self._local.conn = conn
         return conn
+
+    def close(self) -> None:
+        """Close the active thread-local connection if open."""
+        conn = getattr(self._local, "conn", None)
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            self._local.conn = None
 
     def _ensure_tables(self) -> None:
         with self._get_conn() as conn:
@@ -269,6 +288,9 @@ class PostgreSQLBackend(DatabaseBackend):
       - users table for user accounts
       - user_data table for per-user collections (JSON)
       - global_data table for app-wide collections (JSON)
+
+    All methods use try/finally to guarantee connection cleanup even on
+    exceptions, preventing connection leaks in production.
     """
 
     def __init__(self, database_url: str):
@@ -282,8 +304,8 @@ class PostgreSQLBackend(DatabaseBackend):
 
     def _ensure_tables(self) -> None:
         """Create tables if they don't exist."""
+        conn = self._get_conn()
         try:
-            conn = self._get_conn()
             with conn.cursor() as cur:
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS users_db (
@@ -305,98 +327,113 @@ class PostgreSQLBackend(DatabaseBackend):
                     );
                 """)
             conn.commit()
-            conn.close()
             logger.info("PostgreSQL tables ensured")
         except Exception as e:
             logger.error("Failed to ensure PostgreSQL tables: %s", e)
             raise
+        finally:
+            conn.close()
 
     def get_all_users(self) -> dict:
         conn = self._get_conn()
-        with conn.cursor() as cur:
-            cur.execute("SELECT username, data FROM users_db")
-            rows = cur.fetchall()
-        conn.close()
-        return {row[0]: row[1] for row in rows}
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT username, data FROM users_db")
+                rows = cur.fetchall()
+            return {row[0]: row[1] for row in rows}
+        finally:
+            conn.close()
 
     def save_all_users(self, users: dict) -> None:
         conn = self._get_conn()
-        with conn.cursor() as cur:
-            usernames = list(users)
-            if usernames:
-                placeholders = ", ".join(["%s"] * len(usernames))
-                cur.execute(
-                    f"DELETE FROM user_data WHERE username NOT IN ({placeholders})",
-                    tuple(usernames),
-                )
-                cur.execute(
-                    f"DELETE FROM users_db WHERE username NOT IN ({placeholders})",
-                    tuple(usernames),
-                )
-            else:
-                cur.execute("DELETE FROM user_data")
-                cur.execute("DELETE FROM users_db")
+        try:
+            with conn.cursor() as cur:
+                usernames = list(users)
+                if usernames:
+                    placeholders = ", ".join(["%s"] * len(usernames))
+                    cur.execute(
+                        f"DELETE FROM user_data WHERE username NOT IN ({placeholders})",
+                        tuple(usernames),
+                    )
+                    cur.execute(
+                        f"DELETE FROM users_db WHERE username NOT IN ({placeholders})",
+                        tuple(usernames),
+                    )
+                else:
+                    cur.execute("DELETE FROM user_data")
+                    cur.execute("DELETE FROM users_db")
 
-            for username, data in users.items():
-                cur.execute("""
-                    INSERT INTO users_db (username, data, updated_at)
-                    VALUES (%s, %s, NOW())
-                    ON CONFLICT (username)
-                    DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
-                """, (username, json.dumps(data)))
-        conn.commit()
-        conn.close()
+                for username, data in users.items():
+                    cur.execute("""
+                        INSERT INTO users_db (username, data, updated_at)
+                        VALUES (%s, %s, NOW())
+                        ON CONFLICT (username)
+                        DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
+                    """, (username, json.dumps(data)))
+            conn.commit()
+        finally:
+            conn.close()
 
     def get_user(self, username: str) -> dict | None:
         conn = self._get_conn()
-        with conn.cursor() as cur:
-            cur.execute("SELECT data FROM users_db WHERE username = %s", (username,))
-            row = cur.fetchone()
-        conn.close()
-        return row[0] if row else None
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT data FROM users_db WHERE username = %s", (username,))
+                row = cur.fetchone()
+            return row[0] if row else None
+        finally:
+            conn.close()
 
     def load_user_data(self, username: str, collection: str, default: Any = None) -> Any:
         conn = self._get_conn()
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT data FROM user_data WHERE username = %s AND collection = %s",
-                (username, collection),
-            )
-            row = cur.fetchone()
-        conn.close()
-        return row[0] if row else (default if default is not None else [])
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT data FROM user_data WHERE username = %s AND collection = %s",
+                    (username, collection),
+                )
+                row = cur.fetchone()
+            return row[0] if row else (default if default is not None else [])
+        finally:
+            conn.close()
 
     def save_user_data(self, username: str, collection: str, data: Any) -> None:
         conn = self._get_conn()
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO user_data (username, collection, data, updated_at)
-                VALUES (%s, %s, %s, NOW())
-                ON CONFLICT (username, collection)
-                DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
-            """, (username, collection, json.dumps(data)))
-        conn.commit()
-        conn.close()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO user_data (username, collection, data, updated_at)
+                    VALUES (%s, %s, %s, NOW())
+                    ON CONFLICT (username, collection)
+                    DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
+                """, (username, collection, json.dumps(data)))
+            conn.commit()
+        finally:
+            conn.close()
 
     def load_global_data(self, collection: str, default: Any = None) -> Any:
         conn = self._get_conn()
-        with conn.cursor() as cur:
-            cur.execute("SELECT data FROM global_data WHERE collection = %s", (collection,))
-            row = cur.fetchone()
-        conn.close()
-        return row[0] if row else (default if default is not None else [])
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT data FROM global_data WHERE collection = %s", (collection,))
+                row = cur.fetchone()
+            return row[0] if row else (default if default is not None else [])
+        finally:
+            conn.close()
 
     def save_global_data(self, collection: str, data: Any) -> None:
         conn = self._get_conn()
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO global_data (collection, data, updated_at)
-                VALUES (%s, %s, NOW())
-                ON CONFLICT (collection)
-                DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
-            """, (collection, json.dumps(data)))
-        conn.commit()
-        conn.close()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO global_data (collection, data, updated_at)
+                    VALUES (%s, %s, NOW())
+                    ON CONFLICT (collection)
+                    DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
+                """, (collection, json.dumps(data)))
+            conn.commit()
+        finally:
+            conn.close()
 
 
 # ---------------------------------------------------------------------------
