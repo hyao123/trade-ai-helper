@@ -18,7 +18,6 @@ from utils.ai_gateway import get_gateway
 from utils.sourcing_ai import (
     CHEMICAL_MSDS_KEY_SECTIONS,
     DANGEROUS_GOODS_CLASSES,
-    INDUSTRIAL_CLUSTERS,
     build_customization_agreement_text,
     build_sourcing_rfq_prompt,
     calculate_export_profit,

@@ -432,6 +432,21 @@ def build_customization_agreement_text(
     is_chemical: bool = False,
 ) -> str:
     """生成标准化定制采购与质量把控协议框架。"""
+    # Clause text kept OUTSIDE the f-string: the strings contain \n escape
+    # sequences, which are not allowed inside f-string expressions before
+    # Python 3.12 (PEP 701). Inlining them caused a SyntaxError on Python 3.11.
+    chemical_clause = (
+        "### 第四条 危险品与化学品特殊条款\n"
+        "1. 乙方须保证提供符合 GHS 国际标准的 16 项中英文 SDS/MSDS，并与实际出货批次一致。\n"
+        "2. 涉及危险货物运输的，乙方须提供合规的 UN 认证危险货物包装及危包证。\n"
+        "3. 发生渗漏、包装破损引起港口滞留或罚款的，由乙方承担直接责任。"
+    )
+    packaging_clause = (
+        "### 第四条 包装与知识产权保护\n"
+        "1. 乙方须严格按照甲方提供的包装图稿及外箱唛头进行包装，确保海运/空运抗压防潮。\n"
+        "2. 乙方不得向任何第三方泄露甲方的定制设计、配方及图纸，不得将定制模具或产品转售第三方。"
+    )
+    clause_four = chemical_clause if is_chemical else packaging_clause
     agreement = f"""# 产品外贸定制采购与品质保证协议
 
 **甲方（采购方）**：{buyer_company or "________________________"}
@@ -453,7 +468,7 @@ def build_customization_agreement_text(
 2. 甲方有权在出厂前指定第三方检验机构（如 SGS、Intertek、BV）进行抽样检测，检测合格后方可放行发货。
 3. 若第三方检测结果显示主要指标不合格，乙方应免费重做或退还已收货款，并承担相应检测及延误损失。
 
-{"### 第四条 危险品与化学品特殊条款\n1. 乙方须保证提供符合 GHS 国际标准的 16 项中英文 SDS/MSDS，并与实际出货批次一致。\n2. 涉及危险货物运输的，乙方须提供合规的 UN 认证危险货物包装及危包证。\n3. 发生渗漏、包装破损引起港口滞留或罚款的，由乙方承担直接责任。" if is_chemical else "### 第四条 包装与知识产权保护\n1. 乙方须严格按照甲方提供的包装图稿及外箱唛头进行包装，确保海运/空运抗压防潮。\n2. 乙方不得向任何第三方泄露甲方的定制设计、配方及图纸，不得将定制模具或产品转售第三方。"}
+{clause_four}
 
 ### 第五条 违约责任与争议解决
 1. 因乙方交期延误影响船期造成的海运亏舱费、集装箱滞期费由乙方承担。

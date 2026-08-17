@@ -14,6 +14,7 @@ silently drift into an unusable state.
 from __future__ import annotations
 
 import copy
+import functools
 import json
 from pathlib import Path
 from typing import Any
@@ -97,26 +98,33 @@ def _normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     return config
 
 
-def load_ai_model_config(config_path: Path | None = None) -> dict[str, Any]:
-    """Load provider/model routing config from ``ai_models.json``.
-
-    Returns the JSON content with optional fields normalized. If the file is
-    missing or unreadable, returns a minimal built-in fallback so the app can
-    still boot (a warning is logged).
-    """
-    path = config_path or _CONFIG_PATH
+@functools.lru_cache(maxsize=32)
+def _load_and_normalize_ai_model_config(path_str: str) -> dict[str, Any]:
+    path = Path(path_str)
     try:
         with open(path, encoding="utf-8") as f:
             raw = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError, OSError) as exc:
         logger.warning("Unable to load AI model config %s: %s", path, exc)
-        return copy.deepcopy(_normalize_config(_FALLBACK_CONFIG))
+        return _normalize_config(_FALLBACK_CONFIG)
 
     if not isinstance(raw, dict):
         logger.warning("AI model config %s is not an object; using fallback", path)
-        return copy.deepcopy(_normalize_config(_FALLBACK_CONFIG))
+        return _normalize_config(_FALLBACK_CONFIG)
 
     return _normalize_config(raw)
+
+
+def load_ai_model_config(config_path: Path | None = None) -> dict[str, Any]:
+    """Load provider/model routing config from ``ai_models.json``.
+
+    Returns the JSON content with optional fields normalized. If the file is
+    missing or unreadable, returns a minimal built-in fallback so the app can
+    still boot (a warning is logged). Results are cached for performance.
+    """
+    path = config_path or _CONFIG_PATH
+    cached = _load_and_normalize_ai_model_config(str(path.resolve()))
+    return copy.deepcopy(cached)
 
 
 def validate_config(config: dict[str, Any]) -> list[str]:
