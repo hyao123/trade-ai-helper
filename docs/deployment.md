@@ -98,6 +98,30 @@ streamlit run app.py --server.port=$PORT --server.address=0.0.0.0
 
 Configure platform environment variables for secrets. The repository intentionally does not ship a `Procfile` or `runtime.txt`; add platform-specific config in the target host if needed.
 
+## Stripe webhook receiver
+
+Tier upgrades complete from the one-time Stripe Checkout return URL, so the main
+app never needs to receive webhooks. **Subscription lifecycle events** — cancelling
+a paid tier (downgrade to free) and failed payments — are handled by the
+`utils/stripe_webhook` handler, which is surfaced by a small **standalone WSGI
+receiver** in `webhook_receiver.py` (stdlib only, no extra dependencies).
+
+Point your Stripe webhook at `{APP_BASE_URL}/api/stripe/webhook` and configure the
+`STRIPE_WEBHOOK_SECRET` signing secret. Run it as a separate small process/function —
+**not** on the same worker as the Streamlit app:
+
+```bash
+# standalone
+PORT=8787 python webhook_receiver.py
+
+# or behind gunicorn / waitress
+gunicorn webhook_receiver:application --bind 0.0.0.0:8787
+waitress-serve --port=8787 webhook_receiver:application
+```
+
+`GET /healthz` returns `200 ok` for liveness probes. The receiver returns a non-2xx
+status on any failure so Stripe retries delivery.
+
 ## Deployment verification checklist
 
 After deploying to Streamlit Cloud, verify:

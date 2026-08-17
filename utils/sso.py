@@ -57,6 +57,18 @@ logger = get_logger("sso")
 _SSO_CONFIG_FILE = "sso_config.json"
 _SSO_SESSIONS_FILE = "sso_sessions.json"
 
+# SSO authentication is FAIL-CLOSED until a proper, signature-validating SAML/OIDC
+# implementation ships (e.g. python3-saml / signxml). The prior code path accepted
+# SAML/OIDC responses with zero cryptographic validation, allowing anyone who could
+# POST a crafted response — or point the server at a chosen issuer — to authenticate
+# as any email via provision_sso_user. Never enable this until full signature +
+# condition validation is in place.
+_SSO_AUTH_ENABLED = False
+_SSO_DISABLED_MESSAGE = (
+    "SSO 登录尚未启用：prevent signature validation (SAML) / ID-token validation (OIDC) "
+    "未实现，为避免认证绕过，该功能已强制关闭。请联系管理员。"
+)
+
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -207,18 +219,29 @@ def process_saml_response(
     """
     Process and validate a SAML Response from the IdP.
 
-    In production, this would fully validate XML signatures using a library
-    like python3-saml or signxml. This implementation extracts user attributes
-    for the basic flow.
+    **SECURITY — FAIL-CLOSED.** SAML responses are only accepted after full XML
+    signature + assertion-condition validation. That validation is not implemented,
+    so this function never authenticates a user and always returns ``False``. This
+    prevents a forged SAML Response (base64 blob) from being accepted and mapped to
+    any email via ``provision_sso_user``.
 
     Args:
         saml_response_b64: Base64-encoded SAML Response from POST
         team_id: Team context
 
     Returns:
-        (True, user_attributes_dict) on success
-        (False, error_message) on failure
+        ``(False, error_message)`` always (auth disabled).
     """
+    if not _SSO_AUTH_ENABLED:
+        logger.warning("SAML response rejected: SSO authentication is fail-closed")
+        return False, _SSO_DISABLED_MESSAGE
+
+    # ---------------------------------------------------------------------------
+    # NOT REACHABLE while `_SSO_AUTH_ENABLED` is False. Kept below only so the
+    # intended processing flow is documented; it MUST add signature + Conditions
+    # (NotBefore/NotOnOrAfter, Audience, Recipient, Issuer) and nonce validation
+    # before this function may ever return True.
+    # ---------------------------------------------------------------------------
     try:
         # Decode the SAML response
         response_xml = base64.b64decode(saml_response_b64).decode("utf-8")
@@ -316,7 +339,11 @@ def process_oidc_callback(
     """
     Process the OIDC authorization code callback.
 
-    Exchanges code for tokens, fetches user info.
+    **SECURITY — FAIL-CLOSED.** This flow never validates the ``state``/``nonce``
+    it generated, nor the returned ID token (signature/issuer/audience/nonce), so
+    it is disabled: it always returns ``False`` rather than trusting a bare
+    ``userinfo`` response that an attacker may have arranged. Re-enable only with
+    full ID-token validation + state/nonce verification.
 
     Args:
         code: Authorization code from callback
@@ -324,9 +351,16 @@ def process_oidc_callback(
         team_id: Team context
 
     Returns:
-        (True, user_info_dict) on success
-        (False, error_message) on failure
+        ``(False, error_message)`` always (auth disabled).
     """
+    if not _SSO_AUTH_ENABLED:
+        logger.warning("OIDC callback rejected: SSO authentication is fail-closed")
+        return False, _SSO_DISABLED_MESSAGE
+
+    # ---------------------------------------------------------------------------
+    # NOT REACHABLE while `_SSO_AUTH_ENABLED` is False. Must validate the ID token
+    # (signature, issuer, audience, nonce) and the `state` parameter before use.
+    # ---------------------------------------------------------------------------
     config = get_sso_config(team_id)
     issuer = config.get("issuer", "")
     client_id = config.get("client_id", "")
