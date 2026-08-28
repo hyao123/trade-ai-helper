@@ -142,6 +142,8 @@ NAV_SECTIONS = {
 
 def _render_email_verification_banner(st) -> None:
     """Show a clear home-page reminder when the current user's email is unverified."""
+    import html
+    
     from utils.repositories import load_user
     from utils.user_auth import get_current_user
 
@@ -161,12 +163,14 @@ def _render_email_verification_banner(st) -> None:
         return
 
     email = latest_user.get("email") or current_user.get("email") or "你的邮箱"
+    safe_username = html.escape(username)
+    safe_email = html.escape(email)
     st.markdown(
         f"""
         <div class="email-verify-banner">
           <div class="email-verify-title">📮 请先验证邮箱，解锁 AI 生成与套餐升级</div>
           <div class="email-verify-copy">
-            我们已为账号 <strong>{username}</strong> 绑定邮箱 <strong>{email}</strong>。
+            我们已为账号 <strong>{safe_username}</strong> 绑定邮箱 <strong>{safe_email}</strong>。
             为确保密码找回和账户通知可用，AI 生成、付费升级和高级功能需要先完成邮箱验证。
             请进入「账户管理」输入验证码，或重新发送验证邮件。
           </div>
