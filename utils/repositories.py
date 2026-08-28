@@ -44,10 +44,8 @@ def load_user(username: str) -> dict | None:
 
 
 def save_user(username: str, user_data: dict) -> None:
-    """Upsert one user profile while preserving the current backend contract."""
-    users = load_users()
-    users[username] = user_data
-    save_users(users)
+    """Upsert one user profile without rewriting other accounts."""
+    get_db().upsert_user(username, user_data)
 
 
 # ---------------------------------------------------------------------------

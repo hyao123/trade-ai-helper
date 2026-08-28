@@ -69,3 +69,16 @@ def test_email_verification_requests_round_trip_through_active_backend():
     assert requests == {"hashed-user": [1.0]}
     db.load_global_data.assert_called_once_with(EMAIL_VERIFICATION_REQUESTS_COLLECTION, default={})
     db.save_global_data.assert_called_once_with(EMAIL_VERIFICATION_REQUESTS_COLLECTION, requests)
+
+
+def test_save_user_calls_upsert_user_without_loading_all_users():
+    from utils.repositories import save_user
+
+    db = Mock()
+    user = {"username": "alice", "tier": "pro"}
+    with patch("utils.repositories.get_db", return_value=db):
+        save_user("alice", user)
+
+    db.upsert_user.assert_called_once_with("alice", user)
+    db.get_all_users.assert_not_called()
+    db.save_all_users.assert_not_called()
