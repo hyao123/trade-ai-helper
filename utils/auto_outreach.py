@@ -464,7 +464,6 @@ def run_campaign_step(
     sent_emails = {r["email"] for r in results if r.get("status") == "sent"}
 
     stats = campaign.get("stats", {})
-    unsaved_count = 0  # 追踪未持久化的结果数
 
     for i, prospect in enumerate(prospects):
         email = prospect.get("email", "")
@@ -495,7 +494,8 @@ def run_campaign_step(
             }
             results.append(result_entry)
             stats["failed"] = stats.get("failed", 0) + 1
-            unsaved_count += 1
+            _save_campaign_results(username, campaign_id, results)
+            update_campaign(username, campaign_id, {"stats": stats})
             yield {"index": i, "email": email, "status": "failed", "detail": email_data["error"]}
             # 失败不需要间隔
             continue
@@ -534,20 +534,14 @@ def run_campaign_step(
             yield {"index": i, "email": email, "status": "failed", "detail": msg}
 
         results.append(result_entry)
-        unsaved_count += 1
-
-        # 批量持久化（每N封写一次，减少IO）
-        if unsaved_count >= PERSIST_BATCH_SIZE:
-            _save_campaign_results(username, campaign_id, results)
-            update_campaign(username, campaign_id, {"stats": stats})
-            unsaved_count = 0
+        _save_campaign_results(username, campaign_id, results)
+        update_campaign(username, campaign_id, {"stats": stats})
 
         # 发送间隔（防SMTP限流）
         time.sleep(send_interval)
 
-    # 最终持久化剩余结果
-    _save_campaign_results(username, campaign_id, results)
-    update_campaign(username, campaign_id, {"status": "completed", "stats": stats})
+    # 最终状态更新
+    update_campaign(username, campaign_id, {"status": "completed"})
 
 
 # ---------------------------------------------------------------------------
