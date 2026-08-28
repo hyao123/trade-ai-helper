@@ -230,6 +230,31 @@ def _check_account_security_controls() -> ReadinessCheck:
     )
 
 
+def _check_auto_login(secret_getter: Callable[[str, str], str]) -> ReadinessCheck:
+    """Verify AUTO_LOGIN is not enabled in production."""
+    auto_login = secret_getter("AUTO_LOGIN", "")
+    # Check if AUTO_LOGIN is set to a truthy enabled value
+    if auto_login:
+        normalized = str(auto_login).strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return ReadinessCheck(
+                id="auto_login",
+                title="Auto-login bypass",
+                status="critical",
+                severity="critical",
+                detail="AUTO_LOGIN is enabled, bypassing authentication for all users.",
+                recommendation="Remove or set AUTO_LOGIN=0 in production. Use only for local development.",
+            )
+    return ReadinessCheck(
+        id="auto_login",
+        title="Auto-login bypass",
+        status="pass",
+        severity="info",
+        detail="AUTO_LOGIN is disabled or not set.",
+        recommendation="Keep AUTO_LOGIN unset in production deployments.",
+    )
+
+
 def run_readiness_checks(
     *,
     secret_getter: Callable[[str, str], str] = get_secret,
@@ -242,6 +267,7 @@ def run_readiness_checks(
         _check_payment(secret_getter),
         _check_email(secret_getter),
         _check_account_security_controls(),
+        _check_auto_login(secret_getter),
     ]
 
 
