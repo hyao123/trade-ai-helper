@@ -16,3 +16,6 @@ logs/
 .mypy_cache/
 .coverage
 htmlcov/
+
+.worktrees/
+.superpowers/
