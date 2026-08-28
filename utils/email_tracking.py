@@ -33,8 +33,8 @@ import uuid
 from datetime import datetime
 
 from utils.logger import get_logger
+from utils.repositories import load_email_tracking, save_email_tracking
 from utils.secrets import get_secret
-from utils.storage import load_json, save_json
 
 logger = get_logger("email_tracking")
 
@@ -90,12 +90,12 @@ def create_tracking_record(
     }
 
     # Save to global tracking store
-    records = load_json(_TRACKING_FILE, default=[])
+    records = load_email_tracking()
     records.append(record)
     # Cap at 10000 records to prevent unbounded growth
     if len(records) > 10000:
         records = records[-10000:]
-    save_json(_TRACKING_FILE, records)
+    save_email_tracking(records)
 
     logger.debug("Tracking record created: %s -> %s", tracking_id, to_email)
     return tracking_id
@@ -230,7 +230,7 @@ def record_open(tracking_id: str) -> bool:
     Returns:
         True if the record was found and updated
     """
-    records = load_json(_TRACKING_FILE, default=[])
+    records = load_email_tracking()
     for record in records:
         if record["tracking_id"] == tracking_id:
             record["open_count"] = record.get("open_count", 0) + 1
@@ -238,7 +238,7 @@ def record_open(tracking_id: str) -> bool:
                 record["opened_at"] = datetime.now().isoformat()
             if record["status"] in ("sent", "delivered"):
                 record["status"] = "opened"
-            save_json(_TRACKING_FILE, records)
+            save_email_tracking(records)
             logger.info("Open recorded: %s (count=%d)", tracking_id, record["open_count"])
 
             # Trigger notification on first open only
@@ -267,7 +267,7 @@ def record_click(tracking_id: str, url: str = "") -> bool:
     Returns:
         True if the record was found and updated
     """
-    records = load_json(_TRACKING_FILE, default=[])
+    records = load_email_tracking()
     for record in records:
         if record["tracking_id"] == tracking_id:
             record["click_count"] = record.get("click_count", 0) + 1
@@ -279,7 +279,7 @@ def record_click(tracking_id: str, url: str = "") -> bool:
                 record["clicked_links"] = clicked_links[-20:]  # Keep last 20
             if record["status"] in ("sent", "delivered", "opened"):
                 record["status"] = "clicked"
-            save_json(_TRACKING_FILE, records)
+            save_email_tracking(records)
             logger.info("Click recorded: %s -> %s", tracking_id, url[:50])
             return True
     return False
@@ -294,13 +294,13 @@ def record_reply(tracking_id: str) -> bool:
     Returns:
         True if the record was found and updated
     """
-    records = load_json(_TRACKING_FILE, default=[])
+    records = load_email_tracking()
     for record in records:
         if record["tracking_id"] == tracking_id:
             if not record.get("replied_at"):
                 record["replied_at"] = datetime.now().isoformat()
             record["status"] = "replied"
-            save_json(_TRACKING_FILE, records)
+            save_email_tracking(records)
             logger.info("Reply recorded: %s", tracking_id)
             return True
     return False
@@ -329,7 +329,7 @@ def update_tracking_status(tracking_id: str, status: str, reason: str = "") -> b
         "group_unsubscribe": "unsubscribed_at",
     }
 
-    records = load_json(_TRACKING_FILE, default=[])
+    records = load_email_tracking()
     for record in records:
         if record.get("tracking_id") == tracking_id:
             field = status_field_map.get(status)
@@ -346,7 +346,7 @@ def update_tracking_status(tracking_id: str, status: str, reason: str = "") -> b
             provider_events = record.get("provider_events", [])
             provider_events.append({"type": status, "reason": reason, "at": now})
             record["provider_events"] = provider_events[-50:]
-            save_json(_TRACKING_FILE, records)
+            save_email_tracking(records)
             logger.info("Tracking status updated: %s -> %s", tracking_id, status)
             return True
     logger.warning("Provider event for unknown tracking_id: %s", tracking_id)
@@ -364,7 +364,7 @@ def get_email_stats(tracking_id: str) -> dict | None:
     Returns:
         Record dict or None if not found
     """
-    records = load_json(_TRACKING_FILE, default=[])
+    records = load_email_tracking()
     for record in records:
         if record["tracking_id"] == tracking_id:
             return record
@@ -382,7 +382,7 @@ def get_user_email_stats(user_id: str, days: int = 30) -> dict:
     from datetime import timedelta
 
     cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-    records = load_json(_TRACKING_FILE, default=[])
+    records = load_email_tracking()
 
     user_records = [
         r for r in records
@@ -424,7 +424,7 @@ def get_campaign_stats(campaign: str, user_id: str = "") -> dict:
     Returns:
         Aggregated stats dict
     """
-    records = load_json(_TRACKING_FILE, default=[])
+    records = load_email_tracking()
     filtered = [r for r in records if r.get("campaign") == campaign]
     if user_id:
         filtered = [r for r in filtered if r.get("user_id") == user_id]
@@ -450,7 +450,7 @@ def get_recent_activity(user_id: str, limit: int = 20) -> list[dict]:
 
     Returns list of event dicts sorted by most recent.
     """
-    records = load_json(_TRACKING_FILE, default=[])
+    records = load_email_tracking()
     user_records = [r for r in records if r.get("user_id") == user_id]
 
     # Build activity feed

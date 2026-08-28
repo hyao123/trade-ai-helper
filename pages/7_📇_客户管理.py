@@ -143,7 +143,7 @@ else:
             c1, c2, c3 = st.columns(3)
             c1.write(f"📧 {cust['email'] or '—'}")
             c2.write(f"🌍 {cust['country']}")
-            c3.markdown(f"📦 {cust['product'] or '—'}  {score_badge}", unsafe_allow_html=True)
+            c3.markdown(f"📦 {html_escape(cust['product'] or '—')}  {score_badge}", unsafe_allow_html=True)
 
             st.caption(f"添加日期: {cust['created_at']} | 最后联系: {cust['last_contact']}")
             if cust.get("notes"):

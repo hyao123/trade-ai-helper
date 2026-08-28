@@ -10,6 +10,7 @@ from __future__ import annotations
 import streamlit as st
 
 from utils import storage
+from utils.repositories import load_customers, save_customers
 
 _FILENAME = "customers.json"
 
@@ -40,7 +41,7 @@ def _get_customers() -> list[dict]:
             or not st.session_state.get(flag_key)
             or st.session_state.get(scope_key) != scope
         ):
-            st.session_state[state_key] = storage.load_user_json(username, _FILENAME, default=[])
+            st.session_state[state_key] = load_customers(username)
             st.session_state[flag_key] = True
             st.session_state[scope_key] = scope
         return st.session_state[state_key]
@@ -50,7 +51,7 @@ def _get_customers() -> list[dict]:
             or not st.session_state.get("_customers_loaded_from_disk")
             or st.session_state.get("_customers_storage_scope") != scope
         ):
-            st.session_state["customers"] = storage.load_json(_FILENAME, default=[])
+            st.session_state["customers"] = load_customers(None)
             st.session_state["_customers_loaded_from_disk"] = True
             st.session_state["_customers_storage_scope"] = scope
         return st.session_state["customers"]
@@ -61,9 +62,9 @@ def _persist_customers() -> None:
     username = _get_current_username()
     if username:
         state_key = f"customers_{username}"
-        storage.save_user_json(username, _FILENAME, st.session_state.get(state_key, []))
+        save_customers(username, st.session_state.get(state_key, []))
     else:
-        storage.save_json(_FILENAME, st.session_state.get("customers", []))
+        save_customers(None, st.session_state.get("customers", []))
 
 
 def get_customers() -> list[dict]:

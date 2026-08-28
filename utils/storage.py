@@ -201,6 +201,55 @@ def save_json(filename: str, data) -> None:
     _save_json_file(get_data_dir() / filename, data)
 
 
+def mutate_json(filename: str, mutator, default=None):
+    """Atomically read, mutate, and write one JSON document.
+
+    The lock covers the complete read-modify-write transaction, preventing
+    concurrent callers from overwriting each other's updates. ``mutator``
+    receives the decoded value and must return the value to persist.
+    """
+    if default is None:
+        default = []
+    filepath = get_data_dir() / filename
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path: Path | None = None
+    with _file_lock(filepath):
+        try:
+            try:
+                with open(filepath, encoding="utf-8") as source:
+                    current = json.load(source)
+            except FileNotFoundError:
+                current = copy.deepcopy(default)
+            except json.JSONDecodeError:
+                logger.warning("Invalid JSON: %s, using default", filepath)
+                _quarantine_invalid_json(filepath)
+                current = copy.deepcopy(default)
+
+            updated = mutator(current)
+            with tempfile.NamedTemporaryFile(
+                "w",
+                encoding="utf-8",
+                dir=filepath.parent,
+                prefix=f".{filepath.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as tmp_file:
+                json.dump(updated, tmp_file, ensure_ascii=False, indent=2)
+                tmp_file.flush()
+                os.fsync(tmp_file.fileno())
+                tmp_path = Path(tmp_file.name)
+
+            if filepath.exists():
+                shutil.copy2(filepath, filepath.with_name(f"{filepath.name}.bak"))
+            os.replace(tmp_path, filepath)
+            tmp_path = None
+            return updated
+        finally:
+            if tmp_path and tmp_path.exists():
+                with contextlib.suppress(OSError):
+                    tmp_path.unlink()
+
+
 def get_user_data_dir(username: str) -> Path:
     """Return data/users/{username}/ directory. Creates it if needed."""
     if not username.isalnum():

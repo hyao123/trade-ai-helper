@@ -19,3 +19,4 @@ htmlcov/
 
 .worktrees/
 .superpowers/
+.pytest_tmp/

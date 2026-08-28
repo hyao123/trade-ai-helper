@@ -89,7 +89,7 @@ def application(environ: dict, start_response: Callable) -> list[bytes]:
 
     try:
         success, message = verify_and_process(payload, signature)
-    except Exception as exc:  # defensive: never crash the receiver silently
+    except Exception as exc:
         start_response(_STATUS_FAIL, [_CT_TEXT])
         return [f"Webhook processing failed: {exc}".encode("utf-8")]
 
@@ -97,10 +97,12 @@ def application(environ: dict, start_response: Callable) -> list[bytes]:
         start_response(_STATUS_OK, [_CT_JSON])
         return [("{\"ok\": true, \"message\": \"%s\"}" % _json_escape(message)).encode("utf-8")]
 
-    # Failure → tell Stripe to retry (4xx/5xx). An unparseable/unsigned payload
-    # that can never succeed still returns 400 so Stripe stops retrying a bad
-    # signature, while transient processing errors return 500 to trigger retry.
-    start_response(_STATUS_BAD_REQUEST, [_CT_JSON])
+    # Failure: signature/parse errors (permanent) return 400; handler errors return 500
+    # Check if message indicates signature or parse failure
+    if "signature" in message.lower() or "parse" in message.lower():
+        start_response(_STATUS_BAD_REQUEST, [_CT_JSON])
+    else:
+        start_response(_STATUS_FAIL, [_CT_JSON])
     return [("{\"ok\": false, \"message\": \"%s\"}" % _json_escape(message)).encode("utf-8")]
 
 

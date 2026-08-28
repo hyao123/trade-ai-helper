@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import abc
 import json
-import shutil
 import sqlite3
 import threading
 from pathlib import Path
@@ -50,7 +49,12 @@ class DatabaseBackend(abc.ABC):
 
     @abc.abstractmethod
     def save_all_users(self, users: dict) -> None:
-        """Persist the complete users database."""
+        """Upsert the provided users without deleting omitted users."""
+        ...
+
+    @abc.abstractmethod
+    def upsert_user(self, username: str, user_data: dict) -> None:
+        """Insert or update one user without rewriting other users."""
         ...
 
     @abc.abstractmethod
@@ -93,14 +97,19 @@ class JSONBackend(DatabaseBackend):
         return load_json("users_db.json", default={})
 
     def save_all_users(self, users: dict) -> None:
-        from utils.storage import get_data_dir, save_json
-        users_dir = get_data_dir() / "users"
-        if users_dir.exists():
-            valid_usernames = set(users)
-            for child in users_dir.iterdir():
-                if child.is_dir() and child.name not in valid_usernames:
-                    shutil.rmtree(child)
-        save_json("users_db.json", users)
+        for username, user_data in users.items():
+            self.upsert_user(username, user_data)
+
+    def upsert_user(self, username: str, user_data: dict) -> None:
+        from utils.storage import mutate_json
+
+        def update(users):
+            if not isinstance(users, dict):
+                users = {}
+            users[username] = user_data
+            return users
+
+        mutate_json("users_db.json", update, default={})
 
     def get_user(self, username: str) -> dict | None:
         users = self.get_all_users()
@@ -210,15 +219,6 @@ class SQLiteBackend(DatabaseBackend):
 
     def save_all_users(self, users: dict) -> None:
         with self._get_conn() as conn:
-            usernames = list(users)
-            if usernames:
-                placeholders = ",".join("?" for _ in usernames)
-                conn.execute(f"DELETE FROM user_data WHERE username NOT IN ({placeholders})", usernames)
-                conn.execute(f"DELETE FROM users_db WHERE username NOT IN ({placeholders})", usernames)
-            else:
-                conn.execute("DELETE FROM user_data")
-                conn.execute("DELETE FROM users_db")
-
             for username, data in users.items():
                 conn.execute(
                     """
@@ -229,6 +229,18 @@ class SQLiteBackend(DatabaseBackend):
                     """,
                     (username, _json_dumps(data)),
                 )
+
+    def upsert_user(self, username: str, user_data: dict) -> None:
+        with self._get_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO users_db (username, data, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(username)
+                DO UPDATE SET data = excluded.data, updated_at = CURRENT_TIMESTAMP
+                """,
+                (username, _json_dumps(user_data)),
+            )
 
     def get_user(self, username: str) -> dict | None:
         with self._get_conn() as conn:
@@ -348,21 +360,6 @@ class PostgreSQLBackend(DatabaseBackend):
         conn = self._get_conn()
         try:
             with conn.cursor() as cur:
-                usernames = list(users)
-                if usernames:
-                    placeholders = ", ".join(["%s"] * len(usernames))
-                    cur.execute(
-                        f"DELETE FROM user_data WHERE username NOT IN ({placeholders})",
-                        tuple(usernames),
-                    )
-                    cur.execute(
-                        f"DELETE FROM users_db WHERE username NOT IN ({placeholders})",
-                        tuple(usernames),
-                    )
-                else:
-                    cur.execute("DELETE FROM user_data")
-                    cur.execute("DELETE FROM users_db")
-
                 for username, data in users.items():
                     cur.execute("""
                         INSERT INTO users_db (username, data, updated_at)
@@ -370,6 +367,20 @@ class PostgreSQLBackend(DatabaseBackend):
                         ON CONFLICT (username)
                         DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
                     """, (username, json.dumps(data)))
+            conn.commit()
+        finally:
+            conn.close()
+
+    def upsert_user(self, username: str, user_data: dict) -> None:
+        conn = self._get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO users_db (username, data, updated_at)
+                    VALUES (%s, %s, NOW())
+                    ON CONFLICT (username)
+                    DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
+                """, (username, json.dumps(user_data)))
             conn.commit()
         finally:
             conn.close()

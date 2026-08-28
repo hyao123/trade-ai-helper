@@ -23,6 +23,15 @@ HISTORY_COLLECTION = "history.json"
 PREFS_COLLECTION = "prefs.json"
 EMAIL_EVENTS_COLLECTION = "email_events.json"
 INBOUND_EMAILS_COLLECTION = "inbound_emails.json"
+CUSTOMERS_COLLECTION = "customers.json"
+CAMPAIGNS_COLLECTION = "outreach_campaigns.json"
+TRACKING_COLLECTION = "email_tracking.json"
+_CAMPAIGN_RESULTS_PREFIX = "campaign_results_"
+
+
+def campaign_results_collection(campaign_id: str) -> str:
+    """Return the per-user collection name for one campaign's results."""
+    return f"{_CAMPAIGN_RESULTS_PREFIX}{campaign_id}.json"
 
 
 # ---------------------------------------------------------------------------
@@ -44,10 +53,8 @@ def load_user(username: str) -> dict | None:
 
 
 def save_user(username: str, user_data: dict) -> None:
-    """Upsert one user profile while preserving the current backend contract."""
-    users = load_users()
-    users[username] = user_data
-    save_users(users)
+    """Upsert one user profile without rewriting other accounts."""
+    get_db().upsert_user(username, user_data)
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +177,63 @@ def load_shared_prefs() -> dict:
 def save_shared_prefs(prefs: dict) -> None:
     """Persist shared/admin preferences."""
     get_db().save_global_data(PREFS_COLLECTION, prefs)
+
+
+# ---------------------------------------------------------------------------
+# CRM, outreach campaigns, and email tracking
+# ---------------------------------------------------------------------------
+def load_customers(username: str | None) -> list[dict]:
+    """Load customers from the active per-user or shared backend scope."""
+    if username:
+        data: Any = get_db().load_user_data(username, CUSTOMERS_COLLECTION, default=[])
+    else:
+        data = get_db().load_global_data(CUSTOMERS_COLLECTION, default=[])
+    return data if isinstance(data, list) else []
+
+
+def save_customers(username: str | None, customers: list[dict]) -> None:
+    """Persist customers to the active per-user or shared backend scope."""
+    if username:
+        get_db().save_user_data(username, CUSTOMERS_COLLECTION, customers)
+    else:
+        get_db().save_global_data(CUSTOMERS_COLLECTION, customers)
+
+
+def load_campaigns(username: str) -> list[dict]:
+    """Load outreach campaigns for one user."""
+    data: Any = get_db().load_user_data(username, CAMPAIGNS_COLLECTION, default=[])
+    return data if isinstance(data, list) else []
+
+
+def save_campaigns(username: str, campaigns: list[dict]) -> None:
+    """Persist outreach campaigns for one user."""
+    get_db().save_user_data(username, CAMPAIGNS_COLLECTION, campaigns)
+
+
+def load_campaign_results(username: str, campaign_id: str) -> list[dict]:
+    """Load results for one user's campaign."""
+    data: Any = get_db().load_user_data(
+        username, campaign_results_collection(campaign_id), default=[]
+    )
+    return data if isinstance(data, list) else []
+
+
+def save_campaign_results(username: str, campaign_id: str, results: list[dict]) -> None:
+    """Persist results for one user's campaign."""
+    get_db().save_user_data(
+        username, campaign_results_collection(campaign_id), results
+    )
+
+
+def load_email_tracking() -> list[dict]:
+    """Load the shared email tracking collection."""
+    data: Any = get_db().load_global_data(TRACKING_COLLECTION, default=[])
+    return data if isinstance(data, list) else []
+
+
+def save_email_tracking(records: list[dict]) -> None:
+    """Persist the shared email tracking collection."""
+    get_db().save_global_data(TRACKING_COLLECTION, records)
 
 
 # ---------------------------------------------------------------------------
