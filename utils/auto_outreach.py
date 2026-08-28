@@ -30,7 +30,13 @@ from utils.auto_outreach_config import (
     SEND_INTERVAL_SECONDS,
 )
 from utils.logger import get_logger
-from utils.storage import load_user_json, save_user_json
+from utils.repositories import (
+    campaign_results_collection,
+    load_campaign_results,
+    load_campaigns,
+    save_campaign_results,
+    save_campaigns,
+)
 
 logger = get_logger("auto_outreach")
 
@@ -269,9 +275,9 @@ def create_campaign(
     }
 
     # 持久化
-    campaigns = load_user_json(username, _CAMPAIGNS_FILE, default=[])
+    campaigns = load_campaigns(username)
     campaigns.append(campaign)
-    save_user_json(username, _CAMPAIGNS_FILE, campaigns)
+    save_campaigns(username, campaigns)
 
     logger.info("Campaign created: %s (%s) by %s", campaign_name, campaign_id, username)
     return campaign
@@ -279,7 +285,7 @@ def create_campaign(
 
 def get_campaigns(username: str) -> list[dict]:
     """获取用户的所有推送任务。"""
-    return load_user_json(username, _CAMPAIGNS_FILE, default=[])
+    return load_campaigns(username)
 
 
 def get_campaign(username: str, campaign_id: str) -> dict | None:
@@ -293,23 +299,23 @@ def get_campaign(username: str, campaign_id: str) -> dict | None:
 
 def update_campaign(username: str, campaign_id: str, updates: dict) -> bool:
     """更新推送任务。"""
-    campaigns = load_user_json(username, _CAMPAIGNS_FILE, default=[])
+    campaigns = load_campaigns(username)
     for c in campaigns:
         if c["id"] == campaign_id:
             c.update(updates)
             c["updated_at"] = datetime.now().isoformat()
-            save_user_json(username, _CAMPAIGNS_FILE, campaigns)
+            save_campaigns(username, campaigns)
             return True
     return False
 
 
 def delete_campaign(username: str, campaign_id: str) -> bool:
     """删除推送任务。"""
-    campaigns = load_user_json(username, _CAMPAIGNS_FILE, default=[])
+    campaigns = load_campaigns(username)
     original_len = len(campaigns)
     campaigns = [c for c in campaigns if c["id"] != campaign_id]
     if len(campaigns) < original_len:
-        save_user_json(username, _CAMPAIGNS_FILE, campaigns)
+        save_campaigns(username, campaigns)
         return True
     return False
 
@@ -782,8 +788,7 @@ def _get_results_filename(campaign_id: str) -> str:
 
 def _load_campaign_results(username: str, campaign_id: str) -> list[dict]:
     """从独立文件加载campaign发送结果。"""
-    filename = _get_results_filename(campaign_id)
-    results = load_user_json(username, filename, default=[])
+    results = load_campaign_results(username, campaign_id)
     # 兼容：如果独立文件为空，尝试从主campaign文件迁移
     if not results:
         campaign = get_campaign(username, campaign_id)
@@ -798,8 +803,7 @@ def _load_campaign_results(username: str, campaign_id: str) -> list[dict]:
 
 def _save_campaign_results(username: str, campaign_id: str, results: list[dict]) -> None:
     """将campaign发送结果保存到独立文件。"""
-    filename = _get_results_filename(campaign_id)
-    save_user_json(username, filename, results)
+    save_campaign_results(username, campaign_id, results)
 
 
 def get_campaign_results(username: str, campaign_id: str) -> list[dict]:
