@@ -35,7 +35,7 @@ st.markdown("""
 current_user = get_current_user()
 if current_user and current_user.get("email") and is_email_configured():
     user_email = current_user["email"]
-    due_count = len(get_due_workflows())
+    due_count = len(_safe_read(get_due_workflows, []))
     if due_count > 0:
         st.info(
             f"📨 你有 **{due_count}** 个跟进任务到期，可以发送邮件提醒到 `{user_email}`",
@@ -51,7 +51,7 @@ elif current_user and not current_user.get("email"):
     st.caption("💡 在账户管理页设置邮箱后，可开启自动跟进提醒功能")
 
 # ── 统计数据 ──────────────────────────────────────────
-stats = get_workflow_stats()
+stats = _safe_read(get_workflow_stats, {"active": 0, "replied": 0, "due": 0, "total": 0})
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("📬 跟踪中", stats["active"])
 c2.metric("✅ 已回复", stats["replied"])
@@ -88,16 +88,24 @@ if due_items:
                     st.switch_page("pages/5_📬_跟进邮件.py")
             with col_b:
                 if st.button(f"✅ 标记「{rule['label']}」已完成", key=f"done_{item['id']}", use_container_width=True):
-                    mark_followup_done(item["id"], rule["label"])
-                    st.success(f"已标记完成：{rule['label']}")
-                    st.rerun()
+                    try:
+                        mark_followup_done(item["id"], rule["label"])
+                    except Exception as exc:  # noqa: BLE001
+                        st.error(f"⚠️ 标记失败：{exc}")
+                    else:
+                        st.success(f"已标记完成：{rule['label']}")
+                        st.rerun()
             with col_c:
                 if st.button("🎉 客户已回复", key=f"replied_{item['id']}", use_container_width=True):
-                    update_workflow_status(item["id"], "已回复")
-                    if update_customer_stage(item["company"], item["customer"], "已询盘"):
-                        st.info("📇 已同步更新客户阶段")
-                    st.success("已标记为：已回复")
-                    st.rerun()
+                    try:
+                        update_workflow_status(item["id"], "已回复")
+                        if update_customer_stage(item["company"], item["customer"], "已询盘"):
+                            st.info("📇 已同步更新客户阶段")
+                    except Exception as exc:  # noqa: BLE001
+                        st.error(f"⚠️ 更新失败：{exc}")
+                    else:
+                        st.success("已标记为：已回复")
+                        st.rerun()
     st.markdown("---")
 
 # ── 新增工作流 ────────────────────────────────────────
@@ -126,7 +134,7 @@ if st.button("📬 记录已发邮件", type="primary", use_container_width=True
 st.markdown("</div>", unsafe_allow_html=True)
 
 # ── 所有工作流列表 ────────────────────────────────────
-all_wfs = get_all_workflows()
+all_wfs = _safe_read(get_all_workflows, [])
 if all_wfs:
     st.markdown("---")
     st.markdown(f"### 📋 所有跟进记录（{len(all_wfs)} 条）")
@@ -170,15 +178,23 @@ if all_wfs:
             with col_x:
                 if wf["status"] == "进行中":
                     if st.button("🎉 标记已回复", key=f"replied2_{wf['id']}", use_container_width=True):
-                        update_workflow_status(wf["id"], "已回复")
-                        if update_customer_stage(wf["company"], wf["customer"], "已询盘"):
-                            st.info("📇 已同步更新客户阶段")
-                        st.rerun()
+                        try:
+                            update_workflow_status(wf["id"], "已回复")
+                            if update_customer_stage(wf["company"], wf["customer"], "已询盘"):
+                                st.info("📇 已同步更新客户阶段")
+                        except Exception as exc:  # noqa: BLE001
+                            st.error(f"⚠️ 更新失败：{exc}")
+                        else:
+                            st.rerun()
             with col_y:
                 if wf["status"] != "已关闭":
                     if st.button("⚫ 关闭跟进", key=f"close_{wf['id']}", use_container_width=True):
-                        update_workflow_status(wf["id"], "已关闭")
-                        st.rerun()
+                        try:
+                            update_workflow_status(wf["id"], "已关闭")
+                        except Exception as exc:  # noqa: BLE001
+                            st.error(f"⚠️ 关闭失败：{exc}")
+                        else:
+                            st.rerun()
 
 st.markdown("---")
 st.markdown('<div class="footer">💼 外贸AI助手 · 跟进日历</div>', unsafe_allow_html=True)

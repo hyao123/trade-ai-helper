@@ -24,6 +24,13 @@ from utils.inbox_integration import (
     get_connection_status,
     send_via_provider,
 )
+from utils.mailslurp_integration import (
+    ensure_inbox,
+    fetch_received_emails,
+    get_inbox_state,
+    is_mailslurp_configured,
+    process_received_inbox,
+)
 from utils.secrets import get_secret
 from utils.ui_helpers import (
     check_auth,
@@ -142,13 +149,24 @@ with st.container():
         )
 
         if not available:
-            st.warning(
-                "⚠️ **管理员尚未配置 OAuth 凭证**\n\n"
-                "请在 `.env` 中配置以下任一组：\n\n"
-                "**Gmail：** `GMAIL_CLIENT_ID` + `GMAIL_CLIENT_SECRET`\n\n"
-                "**Outlook：** `OUTLOOK_CLIENT_ID` + `OUTLOOK_CLIENT_SECRET`\n\n"
-                f"OAuth 重定向 URI 应配置为: `{_get_redirect_uri()}`"
-            )
+            st.warning("⚠️ **管理员尚未配置邮箱 OAuth 凭证，暂无法连接邮箱。**")
+            with st.expander("🔧 如何配置（管理员 / 部署者点击展开）", expanded=True):
+                redirect_uri = _get_redirect_uri()
+                st.markdown(
+                    "在项目的 `.env` 文件里填入任一组 OAuth 凭证并**重启应用**即可启用。\n\n"
+                    "**选项 A — Gmail：**\n"
+                    "1. 到 [Google Cloud Console](https://console.cloud.google.com/apis/credentials) 创建 OAuth 2.0 客户端（Web 应用）\n"
+                    "2. 把下方「重定向 URI」添加到该客户端的**已授权重定向 URI** 列表\n"
+                    "3. 在 `.env` 中填 `GMAIL_CLIENT_ID` 和 `GMAIL_CLIENT_SECRET`\n\n"
+                    "**选项 B — Outlook / Microsoft 365：**\n"
+                    "1. 到 [Azure 门户](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) 注册应用\n"
+                    "2. 把下方「重定向 URI」添加到该应用的**重定向 URI**（Web 平台）\n"
+                    "3. 在 `.env` 中填 `OUTLOOK_CLIENT_ID` 和 `OUTLOOK_CLIENT_SECRET`\n\n"
+                    "> 💡 本机开发也可用：应用以 `localhost:8501` 运行时，重定向 URI 同样适用（Google/Azure 均支持本地回环）。",
+                    unsafe_allow_html=True,
+                )
+                st.code(f"重定向 URI（配置 OAuth 应用时需填写）：\n{redirect_uri}", language="text")
+                st.caption("配置完成后刷新本页面，「连接按钮」即会出现。")
         else:
             col_g, col_o = st.columns(2)
             with col_g:

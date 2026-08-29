@@ -12,6 +12,7 @@ from utils.ui_helpers import (
     show_regenerate_buttons,
     show_result,
 )
+from utils.user_prefs import get_pref
 
 st.set_page_config(page_title="谈判话术 | 外贸AI助手", page_icon="🗣️", layout="wide")
 inject_css()
@@ -35,11 +36,12 @@ with st.sidebar:
         "谈判场景 *",
         ["客户砍价", "要求延长账期", "要求降低MOQ", "催货", "要求免费样品", "竞争对手比价"],
         key="nego_scenario",
+        help="选择最贴近客户当前诉求的场景：砍价/压价、延长账期、降低起订量、催货、要免费样品或拿竞品来比价。",
     )
     product = st.text_input(
         "产品 *",
         placeholder="例如: LED Panel Light 600x600mm",
-        value=st.session_state.get("nego_product_val", ""),
+        value=st.session_state.get("nego_product_val", get_pref("default_product")),
         key="nego_product",
     )
     current_offer = st.text_input(

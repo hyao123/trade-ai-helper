@@ -18,12 +18,22 @@ from utils.customers import (
 from utils.ui_helpers import check_auth, inject_css
 from utils.workflow import create_workflow_from_customer
 
+
+def _is_valid_email(value: str) -> bool:
+    """Basic email format check (e.g. user@example.com)."""
+    import re
+    return re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", value) is not None
+
 st.set_page_config(page_title="客户管理 | 外贸AI助手", page_icon="📇", layout="wide")
 inject_css()
 check_auth()
 
 # ── 初始化客户数据 ────────────────────────────────────
-customers = get_customers()
+try:
+    customers = get_customers()
+except Exception:  # noqa: BLE001 - corrupted/unreadable storage must not crash the page
+    customers = []
+    st.warning("⚠️ 客户数据加载失败，已显示空列表。请稍后重试。")
 
 # ── 页头 ──────────────────────────────────────────────
 st.markdown("""
@@ -59,6 +69,8 @@ new_notes = st.text_input("备注", placeholder="通过 LinkedIn 找到的客户
 if st.button("💾 添加客户", type="primary", use_container_width=True):
     if not new_company.strip():
         st.warning("⚠️ 请填写公司名称")
+    elif new_email.strip() and not _is_valid_email(new_email.strip()):
+        st.warning("⚠️ 邮箱格式不正确，请检查后重试")
     else:
         customer_data = {
             "company": new_company.strip(),
@@ -71,12 +83,16 @@ if st.button("💾 添加客户", type="primary", use_container_width=True):
             "created_at": datetime.now().strftime("%Y-%m-%d"),
             "last_contact": datetime.now().strftime("%Y-%m-%d"),
         }
-        add_customer(customer_data)
-        st.success(f"✅ 已添加客户：{new_company}")
-        if new_stage in ["已发信", "已询盘", "已报价", "已发样", "谈判中"]:
-            if create_workflow_from_customer(customer_data):
-                st.info("📅 已自动创建跟进提醒")
-        st.rerun()
+        try:
+            add_customer(customer_data)
+            if new_stage in ["已发信", "已询盘", "已报价", "已发样", "谈判中"]:
+                if create_workflow_from_customer(customer_data):
+                    st.info("📅 已自动创建跟进提醒")
+        except Exception as exc:  # noqa: BLE001 - a persistence failure must not crash the page
+            st.error(f"⚠️ 添加客户失败，请稍后重试。（{exc}）")
+        else:
+            st.success(f"✅ 已添加客户：{new_company}")
+            st.rerun()
 
 st.markdown("</div>", unsafe_allow_html=True)
 
@@ -158,12 +174,20 @@ else:
                 with tag_cols[ti]:
                     if has_tag:
                         if st.button(f"✅ {tag}", key=f"tag_rm_{real_idx}_{tag}", use_container_width=True):
-                            remove_tag(real_idx, tag)
-                            st.rerun()
+                            try:
+                                remove_tag(real_idx, tag)
+                            except Exception as exc:  # noqa: BLE001
+                                st.error(f"移除标签失败：{exc}")
+                            else:
+                                st.rerun()
                     else:
                         if st.button(f"＋ {tag}", key=f"tag_add_{real_idx}_{tag}", use_container_width=True):
-                            add_tag(real_idx, tag)
-                            st.rerun()
+                            try:
+                                add_tag(real_idx, tag)
+                            except Exception as exc:  # noqa: BLE001
+                                st.error(f"添加标签失败：{exc}")
+                            else:
+                                st.rerun()
 
             # 操作按钮
             col_a1, col_a2, col_a3 = st.columns(3)
@@ -180,9 +204,13 @@ else:
             with col_a3:
                 if st.button("🗑️ 删除", key=f"crm_del_{i}", use_container_width=True):
                     # 找到原始索引并删除
-                    idx = customers.index(cust)
-                    delete_customer(idx)
-                    st.rerun()
+                    try:
+                        idx = customers.index(cust)
+                        delete_customer(idx)
+                    except Exception as exc:  # noqa: BLE001
+                        st.error(f"删除客户失败：{exc}")
+                    else:
+                        st.rerun()
 
 st.markdown("---")
 st.markdown('<div class="footer">💼 外贸AI助手 · 客户管理</div>', unsafe_allow_html=True)

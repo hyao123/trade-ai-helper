@@ -128,7 +128,7 @@ with tab_identity:
         "主营产品",
         value=prefs.get("main_products", ""),
         placeholder="例如：LED路灯、工矿灯、泛光灯、太阳能路灯等户外照明产品，功率范围30W-500W",
-        height=60,
+        height=80,
         help="描述你的主营产品线，逗号分隔或自由描述，推送时与产品目录互补",
     )
 
@@ -285,6 +285,11 @@ with tab_custom_model:
     # ── Preset shortcuts ──────────────────────────────
     PRESETS: dict[str, dict] = {
         "（手动填写）": {"base_url": "", "model": ""},
+        "xiazhuyun（本地 · 已配置）": {
+            "base_url": "https://api.xiazhuayun.com/v1",
+            "model": "deepseek-v4-flash",
+            "guide": "本地 AI API（已在项目 .env / ai_models.json 配置为默认模型）。启用后将在本页面优先使用该服务，Base URL 与模型已自动填入。",
+        },
         "DeepSeek (官方推荐 · 超高性价比)": {
             "base_url": "https://api.deepseek.com/v1",
             "model": "deepseek-chat",

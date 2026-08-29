@@ -94,9 +94,14 @@ with tab_clusters:
     with col_q2:
         chem_filter = st.checkbox("仅显示化工与新材料产业带", value=False)
 
-    clusters = match_industrial_clusters(search_kw, is_chemical_only=chem_filter)
+    if not search_kw.strip():
+        st.info("请输入产品 / 产业带 / 化工品类关键词进行检索。")
+        clusters: list = []
+        st.markdown("**共检索到 0 个匹配产业带（等待输入关键词）**")
+    else:
+        clusters = match_industrial_clusters(search_kw.strip(), is_chemical_only=chem_filter)
 
-    st.markdown(f"**共检索到 {len(clusters)} 个匹配产业带：**")
+        st.markdown(f"**共检索到 {len(clusters)} 个匹配产业带：**")
     for item in clusters:
         is_chem = item.get("is_chemical", False)
         badge_style = "background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;" if is_chem else "background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;"
@@ -190,12 +195,22 @@ with tab_calculator:
                 <tr><td style="color: #64748b;">无税计税基数 (单件)：</td><td style="text-align: right; font-weight: 600;">¥{calc_res['tax_free_base']:.2f}</td></tr>
                 <tr><td style="color: #16a34a;">单件出口退税金额：</td><td style="text-align: right; font-weight: 600; color: #16a34a;">+¥{calc_res['tax_rebate_amount']:.2f}</td></tr>
                 <tr><td style="color: #0284c7;">扣减退税后实际净采购成本：</td><td style="text-align: right; font-weight: 600; color: #0284c7;">¥{calc_res['net_purchase_cost']:.2f}</td></tr>
-                <tr><td style="color: #64748b;">单件国内综合成本 (含运/包/杂)：</td><td style="text-align: right; font-weight: 600;">¥{calc_res['unit_domestic_cost']:.2f}</td></tr>
                 <tr style="border-top: 1px solid #cbd5e1;"><td style="color: #0f172a; font-weight: 700;">建议 FOB 报价 (USD)：</td><td style="text-align: right; font-weight: 700; color: #0f172a;">${calc_res['fob_price_usd']:.2f}</td></tr>
                 <tr><td style="color: #0f172a; font-weight: 700;">建议 CIF 报价 (USD)：</td><td style="text-align: right; font-weight: 700; color: #0f172a;">${calc_res['cif_price_usd']:.2f}</td></tr>
             </table>
         </div>
         """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("**🔗 下一步成单业务流转：**")
+        flow_c1, flow_c2 = st.columns(2)
+        with flow_c1:
+            if st.button("📧 带入此价格 ➔ 去写开发信", use_container_width=True, type="primary"):
+                st.session_state["email_product_val"] = f"Export Order (FOB ${calc_res['fob_price_usd']:.2f})"
+                st.switch_page("pages/1_📧_开发信.py")
+        with flow_c2:
+            if st.button("📄 带入此价格 ➔ 出报价单 PDF", use_container_width=True):
+                st.switch_page("pages/3_📄_报价单.py")
 
 
 # ══════════════════════════════════════════════════════
@@ -349,4 +364,7 @@ with tab_ai_advisor:
                 system_prompt="你是一位拥有 15 年外贸供应链、精细化工与跨国大宗集采经验的首席采购官 (CPO)。",
                 tier="balanced",
             )
-            st.markdown(diag_result)
+            if isinstance(diag_result, str) and diag_result.strip().startswith("⚠️"):
+                st.error(diag_result.strip())
+            elif diag_result:
+                st.markdown(diag_result)

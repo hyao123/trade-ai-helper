@@ -118,15 +118,18 @@ if uploaded_file is not None:
                     status_text.markdown(f"⏳ 正在生成第 {i+1}/{len(rows)} 封... ({contact_name} @ {company})")
 
                     # 非流式调用（批量模式）
-                    result_text = generate_bulk_email(
-                        company=company,
-                        contact_name=contact_name,
-                        product=product,
-                        industry=industry,
-                        country=country,
-                        stream=False,
-                        user_id=user_id,
-                    )
+                    try:
+                        result_text = generate_bulk_email(
+                            company=company,
+                            contact_name=contact_name,
+                            product=product,
+                            industry=industry,
+                            country=country,
+                            stream=False,
+                            user_id=user_id,
+                        )
+                    except Exception as exc:  # noqa: BLE001 - one row must not abort the whole batch
+                        result_text = f"⚠️ 生成异常: {exc}"
 
                     if result_text and not result_text.startswith("⚠️"):
                         # 提取 Subject

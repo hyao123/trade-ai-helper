@@ -12,6 +12,7 @@ from utils.ui_helpers import (
     show_regenerate_buttons,
     show_result,
 )
+from utils.user_prefs import get_pref
 
 st.set_page_config(page_title="社媒文案 | 外贸AI助手", page_icon="💬", layout="wide")
 inject_css()
@@ -37,7 +38,7 @@ with col1:
     product = st.text_input(
         "产品名称 *",
         placeholder="例如: Portable Solar LED Camping Light",
-        value=st.session_state.get("social_product_val", ""),
+        value=st.session_state.get("social_product_val", get_pref("default_product")),
     )
     features = st.text_area(
         "产品卖点 / 核心优势 *",

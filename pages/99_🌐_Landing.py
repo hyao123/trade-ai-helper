@@ -5,10 +5,18 @@ pages/99_🌐_Landing.py
 """
 from __future__ import annotations
 
+import datetime
+import re
+
 import streamlit as st
 
 from utils.analytics import track_event
 from utils.storage import load_json, save_json
+
+
+def _is_valid_email(value: str) -> bool:
+    """Basic email format check (e.g. user@example.com)."""
+    return re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", value) is not None
 
 st.set_page_config(page_title="外贸AI助手 | TradeAI Pro", page_icon="💼", layout="wide")
 
@@ -229,25 +237,27 @@ with st.form("waitlist_form", clear_on_submit=True):
         submitted = st.form_submit_button("🚀 加入等候名单", use_container_width=True, type="primary")
 
     if submitted:
-        if not waitlist_email or "@" not in waitlist_email:
+        if not waitlist_email or not _is_valid_email(waitlist_email.strip()):
             st.warning("⚠️ 请输入有效的邮箱地址")
         else:
-            # 保存到等候名单
-            waitlist = load_json("waitlist.json", default=[])
-            # 去重
-            existing_emails = {entry["email"].lower() for entry in waitlist}
-            if waitlist_email.lower() in existing_emails:
-                st.info("📬 你已经在等候名单中了，我们会尽快联系你！")
-            else:
-                waitlist.append({
-                    "email": waitlist_email.strip(),
-                    "source": "landing_page",
-                    "timestamp": __import__("datetime").datetime.now().isoformat(),
-                })
-                save_json("waitlist.json", waitlist)
-                track_event("waitlist_signup", {"email": waitlist_email})
-                st.success(f"🎉 成功加入等候名单！我们会在新功能上线时通知 {waitlist_email}")
-                st.balloons()
+            email_clean = waitlist_email.strip().lower()
+            try:
+                waitlist = load_json("waitlist.json", default=[])
+                existing_emails = {entry["email"].lower() for entry in waitlist}
+                if email_clean in existing_emails:
+                    st.info("📬 你已经在等候名单中了，我们会尽快联系你！")
+                else:
+                    waitlist.append({
+                        "email": waitlist_email.strip(),
+                        "source": "landing_page",
+                        "timestamp": datetime.datetime.now().isoformat(),
+                    })
+                    save_json("waitlist.json", waitlist)
+                    track_event("waitlist_signup", {"email": waitlist_email})
+                    st.success(f"🎉 成功加入等候名单！我们会在新功能上线时通知 {waitlist_email}")
+                    st.balloons()
+            except Exception as exc:  # noqa: BLE001 - a write failure must not crash the public landing page
+                st.warning("⚠️ 暂时无法保存，请稍后再试。")
 
 # ── FAQ ──────────────────────────────────────────────
 st.markdown("---")

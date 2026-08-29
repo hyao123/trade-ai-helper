@@ -14,7 +14,7 @@ from utils.payment import (
     is_payment_configured,
 )
 from utils.pricing import TIER_CONFIG, get_daily_usage
-from utils.ui_helpers import check_auth, inject_css
+from utils.ui_helpers import check_auth, html_escape, inject_css
 from utils.user_auth import get_current_user
 
 st.set_page_config(page_title="套餐升级 | 外贸AI助手", page_icon="💳", layout="wide")
@@ -51,7 +51,7 @@ usage_str = f"{today_usage}/{daily_limit}" if daily_limit else f"{today_usage}/�
 st.markdown(
     f'<div class="main-form" style="display:flex;align-items:center;gap:1rem;">'
     f'  <span style="font-size:1.5rem;">👤</span>'
-    f'  <span style="font-size:1.1rem;font-weight:600;">{username}</span>'
+    f'  <span style="font-size:1.1rem;font-weight:600;">{html_escape(username)}</span>'
     f'  {tier_badge}'
     f'  <span style="margin-left:auto;color:#6b7280;">今日已用 {usage_str} 次</span>'
     f'</div>',
@@ -184,7 +184,7 @@ for i, plan in enumerate(PLANS):
                     if success:
                         st.success("✅ 支付会话已创建！")
                         st.markdown(
-                            f'<a href="{result}" target="_blank">'
+                            f'<a href="{html_escape(result)}" target="_blank">'
                             f'<button style="width:100%;background:#3b82f6;color:white;border:none;'
                             f'border-radius:8px;padding:0.6rem;font-weight:700;cursor:pointer;font-size:1rem;">'
                             f'💳 前往 Stripe 支付</button></a>',

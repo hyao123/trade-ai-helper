@@ -7,6 +7,7 @@ from __future__ import annotations
 import streamlit as st
 
 from utils.ui_helpers import check_auth, get_user_id, inject_css, show_result
+from utils.user_prefs import get_pref
 
 st.set_page_config(page_title="智能报价 | 外贸AI助手", page_icon="💰", layout="wide")
 inject_css()
@@ -61,19 +62,21 @@ st.markdown('<div class="form-title">📝 填写产品与市场信息</div>', un
 
 cost_str = f"${total_cost:.2f}/pc" if total_cost > 0 else ""
 
-col1, col2 = st.columns(2)
-with col1:
-    product = st.text_input("产品名称 *", placeholder="e.g. Stainless Steel Water Bottle 500ml")
-    target_market = st.text_input("目标市场 *", placeholder="e.g. North America, Europe, Southeast Asia")
-    order_quantity = st.number_input("预估订单数量", min_value=1, value=1000, step=100)
-with col2:
-    trade_term = st.selectbox("贸易术语", ["FOB", "CIF", "EXW", "DDP", "CFR", "FCA"])
-    production_cost = st.text_input("生产/采购成本（可选）", value=cost_str, placeholder="e.g. $3.50/pc including packaging")
-    competitor_info = st.text_input("竞争对手参考（可选）", placeholder="e.g. Competitor A sells at $6.99 on Amazon")
+with st.form("quote_form"):
+    col1, col2 = st.columns(2)
+    with col1:
+        product = st.text_input("产品名称 *", placeholder="e.g. Stainless Steel Water Bottle 500ml",
+                                value=get_pref("default_product"))
+        target_market = st.text_input("目标市场 *", placeholder="e.g. North America, Europe, Southeast Asia")
+        order_quantity = st.number_input("预估订单数量", min_value=1, value=1000, step=100)
+    with col2:
+        trade_term = st.selectbox("贸易术语", ["FOB", "CIF", "EXW", "DDP", "CFR", "FCA"])
+        production_cost = st.text_input("生产/采购成本（可选）", value=cost_str, placeholder="e.g. $3.50/pc including packaging")
+        competitor_info = st.text_input("竞争对手参考（可选）", placeholder="e.g. Competitor A sells at $6.99 on Amazon")
 
-st.markdown('<div class="tip-card">💡 提供越详细的信息（成本、竞品价格），AI 的报价建议越精准。</div>', unsafe_allow_html=True)
+    st.markdown('<div class="tip-card">💡 提供越详细的信息（成本、竞品价格），AI 的报价建议越精准。</div>', unsafe_allow_html=True)
 
-generate_clicked = st.button("🚀 生成智能报价建议", type="primary", use_container_width=True)
+    generate_clicked = st.form_submit_button("🚀 生成智能报价建议", type="primary", use_container_width=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
 # ── 生成逻辑 ──────────────────────────────────────────

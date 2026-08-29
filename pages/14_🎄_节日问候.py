@@ -12,6 +12,7 @@ from utils.ui_helpers import (
     show_regenerate_buttons,
     show_result,
 )
+from utils.user_prefs import get_pref
 
 st.set_page_config(page_title="节日问候 | 外贸AI助手", page_icon="🎄", layout="wide")
 inject_css()
@@ -57,7 +58,7 @@ with st.sidebar:
     product_mention = st.text_input(
         "顺带提及产品（可选）",
         placeholder="例如: our new LED series launching in Q1",
-        value=st.session_state.get("holiday_product_val", ""),
+        value=st.session_state.get("holiday_product_val", get_pref("default_product")),
         key="holiday_product",
     )
     stream_mode = st.toggle("⚡ 流式输出", value=True, key="holiday_stream")

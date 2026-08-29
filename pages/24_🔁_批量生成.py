@@ -131,6 +131,7 @@ if generate_clicked:
         progress = st.progress(0.0, text="正在生成第 1 封...")
         uid = get_user_id()
         style_suffix = get_ai_style_suffix()
+        errors: list[str] = []
 
         for i in range(num_variants):
             strat = strats[i % len(strats)]
@@ -159,7 +160,21 @@ Plain text only, no markdown symbols.{style_suffix}"""
             system = f"你是一位外贸开发信专家，精通{lang_name}写作，擅长使用不同心理策略撰写高转化冷邮件。"
 
             with st.spinner(f"⚡ 正在生成第 {i + 1}/{num_variants} 封（策略: {strat.split('：')[0]}）..."):
-                result = call_llm(prompt, system, user_id=uid)
+                try:
+                    result = call_llm(prompt, system, user_id=uid)
+                except Exception as exc:  # noqa: BLE001 - guard against any unexpected AI-layer exception
+                    result = f"⚠️ 第 {i + 1} 封生成异常: {exc}"
+
+            # The AI layer returns error text prefixed with ⚠️ (auth / rate-limit /
+            # network failure) or an empty string. Treat those as per-variant
+            # failures rather than valid output, so the batch summary is honest.
+            is_error = isinstance(result, str) and (
+                not result.strip() or result.strip().startswith("⚠️")
+            )
+            if is_error:
+                errors.append(f"版本 {label}（{strat.split('：')[0]}）: {result.strip() or '返回空结果'}")
+                progress.progress((i + 1) / num_variants, text=f"第 {i + 1} 封失败，跳过...")
+                continue
 
             st.session_state.batch_results.append({
                 "id": str(uuid.uuid4())[:6],
@@ -170,14 +185,25 @@ Plain text only, no markdown symbols.{style_suffix}"""
             progress.progress((i + 1) / num_variants, text=f"已完成 {i + 1}/{num_variants} 封")
 
         progress.empty()
-        st.balloons()
 
-        # Save to history
-        combined = "\n\n" + "=" * 60 + "\n\n".join(
-            f"=== 版本 {r['label']} ({r['strategy'].split('：')[0]}) ===\n{r['content']}"
-            for r in st.session_state.batch_results
-        )
-        add_to_history("批量生成", f"{product} × {num_variants}封", combined)
+        ok_count = len(st.session_state.batch_results)
+        if ok_count:
+            st.balloons()
+
+        if errors:
+            st.warning(
+                f"⚠️ 有 {len(errors)} 封生成失败："
+                + "；".join(errors[:5])
+                + ("…" if len(errors) > 5 else "")
+            )
+
+        if ok_count:
+            # Save only the successfully generated variants to history.
+            combined = "\n\n" + "=" * 60 + "\n\n".join(
+                f"=== 版本 {r['label']} ({r['strategy'].split('：')[0]}) ===\n{r['content']}"
+                for r in st.session_state.batch_results
+            )
+            add_to_history("批量生成", f"{product} × {ok_count}封", combined)
 
 # ── 展示结果 ──────────────────────────────────────────
 if st.session_state.batch_results:

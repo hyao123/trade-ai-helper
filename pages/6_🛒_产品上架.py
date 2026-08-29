@@ -12,6 +12,7 @@ from utils.ui_helpers import (
     show_regenerate_buttons,
     show_result,
 )
+from utils.user_prefs import get_pref
 
 st.set_page_config(page_title="产品上架 | 外贸AI助手", page_icon="🛒", layout="wide")
 inject_css()
@@ -37,7 +38,7 @@ with col1:
     product = st.text_input(
         "产品名称 *",
         placeholder="例如: Rechargeable LED Desk Lamp",
-        value=st.session_state.get("listing_product_val", ""),
+        value=st.session_state.get("listing_product_val", get_pref("default_product")),
     )
     keywords = st.text_area(
         "核心关键词 *（每行一个或逗号分隔）",

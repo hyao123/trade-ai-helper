@@ -21,7 +21,16 @@ if not current_user:
     st.warning("请先登录")
     st.stop()
 
-prefs = get_prefs()
+unable_load_prefs = False
+try:
+    prefs = get_prefs()
+except Exception:  # noqa: BLE001 - corrupted/unreadable prefs should not crash this setup page
+    from utils.user_prefs import _DEFAULTS
+    prefs = dict(_DEFAULTS)
+    unable_load_prefs = True
+
+if unable_load_prefs:
+    st.warning("⚠️ 读取既有偏好失败，已按空资料开始，保存时请重试。")
 
 st.markdown(
     """
@@ -155,29 +164,34 @@ if submitted:
     else:
         email_update_message = ""
         normalized_email = email_addr.strip()
-        if normalized_email and normalized_email.lower() != current_user.get("email", "").strip().lower():
-            email_updated, email_update_message = update_account_email(current_user["username"], normalized_email)
-            if not email_updated:
-                st.error(f"邮箱更新失败：{email_update_message}")
-                st.stop()
+        try:
+            if normalized_email and normalized_email.lower() != current_user.get("email", "").strip().lower():
+                email_updated, email_update_message = update_account_email(current_user["username"], normalized_email)
+                if not email_updated:
+                    st.error(f"邮箱更新失败：{email_update_message}")
+                    st.stop()
 
-        update_prefs({
-            "company_name": company_name.strip(),
-            "contact_name": contact_name.strip(),
-            "signature_name": contact_name.strip(),
-            "email": email_addr.strip(),
-            "phone": phone.strip(),
-            "default_product": default_product.strip(),
-            "main_products": main_products.strip(),
-            "target_markets": target_markets.strip(),
-            "company_description": company_description.strip(),
-            "default_trade_term": default_trade_term,
-            "default_language": default_language,
-            "default_tone": default_tone,
-            "ai_style_tone": ai_style_tone,
-            "ai_response_length": ai_response_length,
-            "onboarding_completed": "true",
-        })
+            update_prefs({
+                "company_name": company_name.strip(),
+                "contact_name": contact_name.strip(),
+                "signature_name": contact_name.strip(),
+                "email": email_addr.strip(),
+                "phone": phone.strip(),
+                "default_product": default_product.strip(),
+                "main_products": main_products.strip(),
+                "target_markets": target_markets.strip(),
+                "company_description": company_description.strip(),
+                "default_trade_term": default_trade_term,
+                "default_language": default_language,
+                "default_tone": default_tone,
+                "ai_style_tone": ai_style_tone,
+                "ai_response_length": ai_response_length,
+                "onboarding_completed": "true",
+            })
+        except Exception as exc:  # noqa: BLE001 - a disk/permission failure should not crash the page
+            st.error(f"⚠️ 保存失败，请稍后重试。（{exc}）")
+            st.stop()
+
         st.success("✅ 快速设置已保存！后续开发信、询盘回复、报价和客户跟进会自动复用这些资料。")
         if email_update_message:
             st.info("邮箱已同步到账户，请到「账户管理」完成新邮箱验证。")

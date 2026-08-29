@@ -46,16 +46,27 @@ if not export_access:
 # ── 数据统计摘要 ──────────────────────────────────────
 st.markdown("### 📊 数据统计")
 
-customers = get_customers()
-history = _get_history()
-templates = _get_store()
-workflows = get_all_workflows()
+# Guard each storage read so a single corrupted/unreadable store doesn't
+# crash the whole page; degrade to empty and warn instead.
+def _safe_read(getter, fallback):
+    try:
+        return getter()
+    except Exception:  # noqa: BLE001
+        return fallback
+
+customers = _safe_read(get_customers, [])
+history = _safe_read(_get_history, [])
+templates = _safe_read(_get_store, {})
+workflows = _safe_read(get_all_workflows, [])
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("👥 客户记录", f"{len(customers)} 条")
-c2.metric("📋 历史记录", f"{get_history_count()} 条")
+c2.metric("📋 历史记录", f"{_safe_read(get_history_count, 0)} 条")
 c3.metric("📌 模板数量", f"{sum(len(v) for v in templates.values())} 个")
 c4.metric("📅 跟进任务", f"{len(workflows)} 条")
+
+if not (customers or history or templates or workflows):
+    st.warning("⚠️ 数据加载失败或暂无数据，部分统计可能不完整。")
 
 st.markdown("---")
 
@@ -204,12 +215,22 @@ with imp_tab2:
                     use_container_width=True,
                 )
                 if st.button("📤 导入客户数据", type="primary", use_container_width=True):
-                    # Merge with existing customers (append, no overwrite)
+                    # Merge with existing customers (append, no overwrite),
+                    # skipping rows that lack the required company field.
+                    valid_rows = [r for r in rows if (r.get("company") or "").strip()]
+                    skipped = len(rows) - len(valid_rows)
                     existing = get_customers()
-                    existing.extend(rows)
-                    import_customers(existing)
-                    st.success(f"✅ 成功导入 {len(rows)} 条客户记录！")
-                    st.rerun()
+                    existing.extend(valid_rows)
+                    try:
+                        import_customers(existing)
+                    except Exception as exc:  # noqa: BLE001
+                        st.error(f"❌ 导入失败：{exc}")
+                    else:
+                        msg = f"✅ 成功导入 {len(valid_rows)} 条客户记录"
+                        if skipped:
+                            msg += f"，已跳过 {skipped} 行缺失公司名称的记录"
+                        st.success(msg)
+                        st.rerun()
         except Exception as e:
             st.error(f"❌ CSV 解析失败：{e}")
 

@@ -82,6 +82,7 @@ if _regen_mode:
 # ── 生成逻辑 ──────────────────────────────────────────
 if generate_clicked:
     st.session_state["complaint_content_val"] = customer_complaint
+    st.session_state["complaint_last_type"] = complaint_type
     st.session_state.results.pop("complaint", None)
 
     fname = f"投诉回复_{complaint_type}.txt"
@@ -121,11 +122,12 @@ if generate_clicked:
     show_regenerate_buttons("complaint", show_style_button=False)
 
 elif st.session_state.results.get("complaint"):
+    last_type = st.session_state.get("complaint_last_type", "")
     show_result(
         st.session_state.results["complaint"],
         "complaint",
         label="📝 投诉回复邮件（上次结果）",
-        file_name="投诉回复.txt",
+        file_name=f"投诉回复_{last_type}.txt" if last_type else "投诉回复.txt",
         height=320,
         balloons=False,
         show_subject_line=True,

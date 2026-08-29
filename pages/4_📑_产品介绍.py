@@ -12,6 +12,7 @@ from utils.ui_helpers import (
     show_regenerate_buttons,
     show_result,
 )
+from utils.user_prefs import get_pref
 
 st.set_page_config(page_title="产品介绍 | 外贸AI助手", page_icon="📑", layout="wide")
 inject_css()
@@ -35,7 +36,7 @@ st.markdown('<div class="tip-card">💡 产品特点越具体（如认证、数�
 col1, col2 = st.columns(2)
 with col1:
     product  = st.text_input("产品名称 *", placeholder="例如: Solar LED Street Light",
-                              value=st.session_state.get("intro_product_val", ""))
+                              value=st.session_state.get("intro_product_val", get_pref("default_product")))
     features = st.text_area(
         "产品特点 *",
         height=160,

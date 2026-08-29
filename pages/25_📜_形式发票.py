@@ -4,6 +4,7 @@ pages/25_📜_形式发票.py
 """
 from __future__ import annotations
 
+import datetime
 import uuid
 
 import streamlit as st
@@ -127,7 +128,7 @@ st.markdown('<hr style="margin:1.2rem 0;border-top:1px dashed #e5e7eb;">', unsaf
 st.markdown("#### 📦 贸易条款")
 tc1, tc2, tc3 = st.columns(3)
 with tc1:
-    pi_no = st.text_input("发票编号", value="PI-2026-001", key="pi_no")
+    pi_no = st.text_input("发票编号", value=f"PI-{datetime.datetime.now().year}-001", key="pi_no")
     payment_terms = st.selectbox("付款方式", ["T/T 30%", "T/T 50%", "L/C at sight",
                                               "D/P", "T/T in advance", "Western Union"])
 with tc2:
@@ -145,6 +146,10 @@ if generate_clicked:
     valid_items = [it for it in items_data if it.get("product", "").strip()]
     if not valid_items:
         st.warning("⚠️ 请填写至少一个产品名称")
+    elif not seller_co.strip():
+        st.warning("⚠️ 请填写卖方（发货人）公司名称")
+    elif not buyer_co.strip():
+        st.warning("⚠️ 请填写买方（收货人）公司名称")
     else:
         if seller_co:
             save_seller_identity(seller_co, get_pref("contact_name"), get_pref("email"), seller_phone)
@@ -159,14 +164,19 @@ if generate_clicked:
             "validity": validity, "delivery_time": delivery_time,
         }
 
-        with st.spinner("📄 正在生成形式发票 PDF..."):
-            pdf_bytes = generate_proforma_invoice_pdf(
-                items=valid_items, seller=seller,
-                buyer=buyer, trade_terms=trade_terms_data,
-            )
-        st.session_state.results["pi_pdf"] = pdf_bytes
-        st.session_state.results["pi_just_gen"] = True
-        st.balloons()
+        try:
+            with st.spinner("📄 正在生成形式发票 PDF..."):
+                pdf_bytes = generate_proforma_invoice_pdf(
+                    items=valid_items, seller=seller,
+                    buyer=buyer, trade_terms=trade_terms_data,
+                )
+        except Exception as exc:  # noqa: BLE001 - avoid crashing the page on PDF/report non rendering failures
+            st.error(f"⚠️ 形式发票生成失败，请检查输入后重试。（{exc}）")
+            st.session_state.results.pop("pi_pdf", None)
+        else:
+            st.session_state.results["pi_pdf"] = pdf_bytes
+            st.session_state.results["pi_just_gen"] = True
+            st.balloons()
 
 if st.session_state.results.get("pi_pdf"):
     if st.session_state.results.pop("pi_just_gen", False):

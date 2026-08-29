@@ -88,54 +88,53 @@ QUICK_ACCESS = [
 
 
 NAV_SECTIONS = {
-    "📧 邮件": [
+    "🔍 1. 获客拓客与寻源": [
+        ("🏭", "智能寻源", "产业带匹配+化工CAS+退税", "pages/38_🏭_智能寻源.py"),
         ("📧", "开发信", "AI 高转化冷邮件 + Subject", "pages/1_📧_开发信.py"),
-        ("📩", "询盘回复", "逐条回答 + 报价区间", "pages/2_📩_询盘回复.py"),
-        ("📥", "AI收件箱", "智能分类与邮件处理", "pages/35_📥_AI收件箱.py"),
-        ("📥", "入站邮件", "导入客户邮件与草稿", "pages/37_📥_入站邮件.py"),
-        ("🚀", "自动推送", "自动化营销与按行业开发", "pages/36_🚀_自动推送.py"),
-        ("📬", "跟进邮件", "5阶段智能跟进", "pages/5_📬_跟进邮件.py"),
         ("📨", "批量开发信", "CSV批量个性化发送", "pages/12_📨_批量开发信.py"),
-        ("🗣️", "谈判话术", "6场景谈判应对", "pages/13_🗣️_谈判话术.py"),
-        ("🎄", "节日问候", "文化适配祝福邮件", "pages/14_🎄_节日问候.py"),
-        ("🌐", "邮件润色", "翻译+润色+对比", "pages/15_🌐_邮件润色.py"),
-        ("😟", "投诉处理", "专业客诉回复", "pages/16_😟_投诉处理.py"),
-        ("🔍", "意图识别", "分析邮件真实意图", "pages/26_🔍_意图识别.py"),
-        ("🔁", "批量生成", "多策略批量对比", "pages/24_🔁_批量生成.py"),
-    ],
-    "📝 文案": [
-        ("📑", "产品介绍", "5语言产品文案", "pages/4_📑_产品介绍.py"),
+        ("🚀", "自动推送", "自动化营销与行业拓客", "pages/36_🚀_自动推送.py"),
         ("🛒", "产品上架", "Amazon/Shopify Listing", "pages/6_🛒_产品上架.py"),
-        ("💬", "社媒文案", "LinkedIn/IG/FB", "pages/8_💬_社媒文案.py"),
-        ("💰", "智能报价", "AI定价策略分析", "pages/17_💰_智能报价.py"),
-        ("🧪", "AB测试", "邮件变体对比", "pages/21_▪_AB测试.py"),
-        ("🏆", "竞品分析", "Battle Card + 话术", "pages/32_🏆_竞品分析.py"),
-        ("📝", "合同模板", "6类国际贸易合同", "pages/29_📝_合同模板.py"),
+        ("💬", "社媒文案", "LinkedIn/IG/FB 营销", "pages/8_💬_社媒文案.py"),
+        ("🔁", "批量生成", "多策略变体批量对比", "pages/24_🔁_批量生成.py"),
     ],
-    "👥 CRM": [
-        ("📇", "客户管理", "CRM+评分+标签", "pages/7_📇_客户管理.py"),
-        ("📅", "跟进日历", "自动提醒+邮件推送", "pages/10_📅_跟进日历.py"),
-        ("📊", "客户分析", "转化漏斗+地区分布", "pages/20_🔍_客户分析.py"),
-        ("👤", "客户画像", "B2B企业深度分析", "pages/28_👤_客户画像.py"),
-        ("📈", "仪表盘", "核心指标可视化", "pages/33_📊_仪表盘.py"),
+    "💰 2. 商机转化与谈判": [
+        ("📩", "询盘回复", "逐条回答 + 报价区间", "pages/2_📩_询盘回复.py"),
+        ("💰", "智能报价", "AI 定价策略与溢价分析", "pages/17_💰_智能报价.py"),
+        ("🗣️", "谈判话术", "6 大实战谈判应对脚本", "pages/13_🗣️_谈判话术.py"),
+        ("🔍", "意图识别", "分析买家邮件真实意图", "pages/26_🔍_意图识别.py"),
+        ("🌐", "邮件润色", "专业翻译+本土化润色", "pages/15_🌐_邮件润色.py"),
+        ("🏆", "竞品分析", "Battle Card 对抗话术", "pages/32_🏆_竞品分析.py"),
+        ("🧪", "AB测试", "邮件转化变体对比", "pages/21_▪_AB测试.py"),
     ],
-    "🔧 工具": [
-        ("🏭", "智能寻源", "产业带+化工定制+退税", "pages/38_🏭_智能寻源.py"),
-        ("📄", "报价单PDF", "多SKU专业PDF", "pages/3_📄_报价单.py"),
-        ("📜", "形式发票", "Proforma Invoice", "pages/25_📜_形式发票.py"),
-        ("▪", "装箱发票", "Packing List+商业发票", "pages/19_▪_装箱发票.py"),
-        ("📦", "装箱计算", "20/40GP装载优化", "pages/18_📦_装箱计算.py"),
-        ("🏷️", "HS编码", "AI建议+关税", "pages/27_🏷️_HS编码.py"),
-        ("🚢", "提单解读", "B/L字段+风险提示", "pages/30_🚢_提单解读.py"),
-        ("💱", "汇率计算", "实时多币种换算", "pages/31_💱_汇率计算.py"),
+    "📦 3. 履约出货与单证": [
+        ("📄", "报价单PDF", "多SKU专业外贸PDF", "pages/3_📄_报价单.py"),
+        ("📜", "形式发票", "Proforma Invoice (PI)", "pages/25_📜_形式发票.py"),
+        ("▪", "装箱发票", "Packing List + 商业发票", "pages/19_▪_装箱发票.py"),
+        ("📦", "装箱计算", "20/40GP 集装箱装载优化", "pages/18_📦_装箱计算.py"),
+        ("🏷️", "HS编码", "AI 建议 + 关税税率", "pages/27_🏷️_HS编码.py"),
+        ("🚢", "提单解读", "B/L 提单字段+风险提示", "pages/30_🚢_提单解读.py"),
+        ("📝", "合同模板", "6 类国际贸易合同框架", "pages/29_📝_合同模板.py"),
+        ("💱", "汇率计算", "实时多币种精准折算", "pages/31_💱_汇率计算.py"),
     ],
-    "⚙️ 设置": [
-        ("🚀", "快速设置", "2分钟初始化公司资料", "pages/34_🚀_快速设置.py"),
-        ("⚙️", "AI偏好", "预填+风格+自定义模型", "pages/0_⚙️_AI偏好.py"),
-        ("📋", "历史记录", "生成结果归档", "pages/9_📋_历史记录.py"),
-        ("📈", "数据导出", "JSON/CSV备份", "pages/22_📈_数据导出.py"),
-        ("💳", "套餐升级", "Free/Pro/Enterprise", "pages/23_💳_套餐升级.py"),
-        ("👤", "账户管理", "资料+密码+套餐", "pages/11_👤_账户管理.py"),
+    "🔄 4. 客户沉淀与复购": [
+        ("📇", "客户管理", "CRM + 评分 + 标签体系", "pages/7_📇_客户管理.py"),
+        ("📅", "跟进日历", "自动提醒 + 邮件推送", "pages/10_📅_跟进日历.py"),
+        ("📥", "AI收件箱", "Gmail/Outlook 智能分类直回", "pages/35_📥_AI收件箱.py"),
+        ("📥", "入站邮件", "导入客户邮件生成草稿", "pages/37_📥_入站邮件.py"),
+        ("📬", "跟进邮件", "5 阶段智能催单跟进", "pages/5_📬_跟进邮件.py"),
+        ("😟", "投诉处理", "客诉危机化解与方案", "pages/16_😟_投诉处理.py"),
+        ("🎄", "节日问候", "全球文化适配祝福", "pages/14_🎄_节日问候.py"),
+        ("📊", "客户分析", "转化漏斗 + 地区分布", "pages/20_🔍_客户分析.py"),
+        ("👤", "客户画像", "B2B 买家企业深度分析", "pages/28_👤_客户画像.py"),
+        ("📈", "仪表盘", "核心业务指标可视化", "pages/33_📊_仪表盘.py"),
+    ],
+    "⚙️ 系统与设置": [
+        ("🚀", "快速设置", "2 分钟初始化公司资料", "pages/34_🚀_快速设置.py"),
+        ("⚙️", "AI偏好", "预填 + 风格 + 自定义模型", "pages/0_⚙️_AI偏好.py"),
+        ("📋", "历史记录", "生成结果归档与复用", "pages/9_📋_历史记录.py"),
+        ("📈", "数据导出", "JSON / CSV 安全备份", "pages/22_📈_数据导出.py"),
+        ("💳", "套餐升级", "Free / Pro / Enterprise", "pages/23_💳_套餐升级.py"),
+        ("👤", "账户管理", "资料 + 密码 + 套餐", "pages/11_👤_账户管理.py"),
     ],
 }
 
@@ -343,7 +342,53 @@ def _render_home(st) -> None:
                     st.switch_page(page)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="section-label">全功能导航</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">⚡ 30秒高频极速工具箱 (即时测算与速写)</div>', unsafe_allow_html=True)
+    with st.container():
+        col_box1, col_box2 = st.columns(2)
+        with col_box1:
+            st.markdown(
+                """
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px;">
+                    <div style="font-weight: 700; color: #0f172a; margin-bottom: 8px; font-size: 0.92rem;">
+                        💱 快速汇率折算 (实时参考)
+                    </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            q_col1, q_col2, q_col3 = st.columns(3)
+            with q_col1:
+                usd_input = st.number_input("金额 (USD $)", min_value=0.0, value=1000.0, step=100.0, key="home_usd_in")
+            with q_col2:
+                fx_input = st.number_input("汇率 (USD/CNY)", min_value=1.0, value=7.20, step=0.01, key="home_fx_in")
+            with q_col3:
+                cny_res = usd_input * fx_input
+                st.metric("折合人民币", f"¥{cny_res:,.2f}")
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with col_box2:
+            st.markdown(
+                """
+                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px;">
+                    <div style="font-weight: 700; color: #0f172a; margin-bottom: 8px; font-size: 0.92rem;">
+                        💰 出口退税与 FOB 保本速算
+                    </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            r_col1, r_col2, r_col3 = st.columns(3)
+            with r_col1:
+                p_cny = st.number_input("采购价 (CNY含税)", min_value=0.0, value=100.0, step=10.0, key="home_p_cny")
+            with r_col2:
+                r_pct = st.number_input("退税率 (%)", min_value=0.0, max_value=30.0, value=13.0, step=1.0, key="home_r_pct")
+            with r_col3:
+                tax_free = p_cny / (1.0 + 0.13)
+                rebate_amt = tax_free * (r_pct / 100.0)
+                net_cost = p_cny - rebate_amt
+                breakeven_usd = net_cost / fx_input
+                st.metric("FOB 保本价", f"${breakeven_usd:.2f}", delta=f"退税 +¥{rebate_amt:.2f}")
+            st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="section-label">全功能成单效益导航 (4 大业务阶段)</div>', unsafe_allow_html=True)
     st.markdown('<div class="nav-section">', unsafe_allow_html=True)
     tabs = st.tabs(list(NAV_SECTIONS.keys()))
     for tab, items in zip(tabs, NAV_SECTIONS.values()):

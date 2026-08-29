@@ -22,7 +22,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ── 筛选 + 统计 ──────────────────────────────────────
-total = get_history_count()
+try:
+    total = get_history_count()
+except Exception:  # noqa: BLE001 - storage read failure must not crash the page
+    total = 0
 st.markdown(f"共 **{total}** 条记录（本次会话）")
 
 col_f1, col_f2, col_f3 = st.columns([2, 2, 1])
@@ -35,14 +38,24 @@ with col_f2:
     search_q = st.text_input("搜索关键词", placeholder="搜索标题或内容...")
 with col_f3:
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🗑️ 清空历史", use_container_width=True):
-        clear_history()
-        st.success("已清空所有历史记录")
-        st.rerun()
+    with st.popover("🗑️ 清空历史", use_container_width=True):
+        st.warning("将永久删除本次会话的所有历史记录，此操作**无法撤销**。")
+        confirm = st.checkbox("我确认删除全部历史", key="clear_hist_confirm")
+        if st.button("确认清空", type="primary", use_container_width=True, disabled=not confirm):
+            try:
+                clear_history()
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"⚠️ 清空失败：{exc}")
+            else:
+                st.success("已清空所有历史记录")
+                st.rerun()
 
 # ── 获取并渲染历史 ────────────────────────────────────
 feature_filter = None if filter_feature == "全部" else filter_feature
-records = get_history(feature=feature_filter, limit=50)
+try:
+    records = get_history(feature=feature_filter, limit=50)
+except Exception:  # noqa: BLE001 - storage read failure must not crash the page
+    records = []
 
 # 搜索过滤
 if search_q.strip():
@@ -120,7 +133,11 @@ else:
     from utils.workflow import import_workflows
 
     # 收集所有可导出数据
-    export_data = build_backup_bundle()
+    try:
+        export_data = build_backup_bundle()
+    except Exception:  # noqa: BLE001 - an export-read failure should not crash the page
+        export_data = {}
+        st.warning("⚠️ 部分数据读取失败，导出可能不完整。请稍后重试。")
 
     col_exp, col_imp = st.columns(2)
     with col_exp:
