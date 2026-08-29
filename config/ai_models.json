@@ -60,12 +60,21 @@
       },
       "default_model": "moonshot-v1-8k",
       "cost_per_1k_tokens": 0.003
+    },
+    "xiazhuayun": {
+      "base_url": "https://api.xiazhuayun.com/v1",
+      "key_env": "XIAZHUAYUN_API_KEY",
+      "models": {
+        "deepseek-v4-flash": "deepseek-v4-flash"
+      },
+      "default_model": "deepseek-v4-flash",
+      "cost_per_1k_tokens": 0.0
     }
   },
   "tier_strategy": {
-    "fast": {"provider": "deepseek", "model": "deepseek-chat"},
-    "balanced": {"provider": "nvidia", "model": "llama-3.3-70b"},
-    "premium": {"provider": "openai", "model": "gpt-4o"}
+    "fast": {"provider": "xiazhuayun", "model": "deepseek-v4-flash"},
+    "balanced": {"provider": "xiazhuayun", "model": "deepseek-v4-flash"},
+    "premium": {"provider": "xiazhuayun", "model": "deepseek-v4-flash"}
   },
   "plan_defaults": {
     "free": "fast",
