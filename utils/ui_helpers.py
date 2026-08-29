@@ -183,7 +183,16 @@ def check_auth() -> None:
     - Not authenticated: show login/register UI and st.stop()
     - APP_PASSWORD as admin fallback: if login password matches APP_PASSWORD,
       authenticate as admin with enterprise tier.
+    - AUTO_LOGIN=true signs straight into the built-in admin account, skipping
+      the login/register UI (intended for local/self-hosted use).
     """
+    # AUTO_LOGIN: bypass the auth screen and sign in as the built-in admin.
+    if get_secret("AUTO_LOGIN", "").strip().lower() in ("1", "true", "yes", "on"):
+        if not st.session_state.get("authenticated"):
+            st.session_state["authenticated"] = True
+            st.session_state["current_user"] = {"username": "admin", "tier": "enterprise"}
+        return
+
     app_password = get_secret("APP_PASSWORD")
     if not app_password:
         st.session_state["authenticated"] = True
@@ -477,11 +486,25 @@ def show_result(
     history_feature: str = "",
     history_title: str = "",
 ) -> None:
-    """统一渲染生成结果区域。"""
+    """统一渲染生成结果区域。
+
+    When the AI layer returns an error message (text beginning with ``⚠️``,
+    produced by ai_client/ai_gateway on auth/rate-limit/network failures), it is
+    surfaced as an error banner instead of being rendered as a "success" result
+    with balloons and download/copy controls. This avoids misleading users into
+    treating a failure as a successful generation.
+    """
     if not result:
         return
     if "results" not in st.session_state:
         st.session_state.results = {}
+
+    def _is_error(text: str) -> bool:
+        return isinstance(text, str) and text.strip().startswith("⚠️")
+
+    def _show_error_banner(text: str) -> None:
+        # Do not persist failure text into results/history or style it as output.
+        st.error(text.strip())
 
     if isinstance(result, types.GeneratorType):
         status_placeholder = st.empty()
@@ -491,8 +514,11 @@ def show_result(
         )
         full_text = _stream_into_container(result)
         status_placeholder.empty()
+        if _is_error(full_text):
+            _show_error_banner(full_text)
+            return
         st.session_state.results[result_key] = full_text
-        if history_feature and full_text and not full_text.startswith("⚠️"):
+        if history_feature and full_text and not _is_error(full_text):
             from utils.history import add_to_history
             add_to_history(history_feature, history_title or result_key, full_text)
         if balloons:
@@ -500,7 +526,11 @@ def show_result(
         _render_result_area(full_text, result_key, label, file_name, height, show_subject_line)
         return
 
-    if history_feature and result and not result.startswith("⚠️"):
+    if _is_error(result):
+        _show_error_banner(result)
+        return
+
+    if history_feature and result and not _is_error(result):
         from utils.history import add_to_history
         add_to_history(history_feature, history_title or result_key, result)
     _render_result_area(result, result_key, label, file_name, height, show_subject_line)
