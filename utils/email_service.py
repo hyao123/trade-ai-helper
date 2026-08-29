@@ -29,6 +29,12 @@ SMTP_TIMEOUT_SECONDS = 30
 # When set, send_ai_generated_email skips SendGrid and goes straight to SMTP.
 _SENDING_AI_EMAIL = False
 
+# Re-entrancy guard for the Resend provider, mirroring the SendGrid guard above.
+# email_resend.send_resend_email does not itself call back into
+# send_ai_generated_email, but keeping this guard future-proofs the fallback
+# chain and prevents any provider->send_ai_generated_email->Resend->... loop.
+_SENDING_RESEND_EMAIL = False
+
 
 def is_email_configured() -> bool:
     """Return True only if all required SMTP environment variables are set (non-empty)."""
@@ -227,8 +233,9 @@ def send_ai_generated_email(
     """
     Send an AI-generated email directly to a customer.
 
-    Automatically creates an email tracking record and uses SendGrid
-    (with open/click tracking) when configured, falling back to SMTP.
+    Automatically creates an email tracking record and sends through the best
+    configured provider in this order: Resend (when configured) -> SendGrid
+    (with open/click tracking) -> SMTP fallback.
 
     Args:
         to_email: recipient email address
@@ -275,7 +282,32 @@ def send_ai_generated_email(
     except Exception as e:
         logger.debug("Email tracking record creation failed (non-critical): %s", e)
 
-    # ── Try SendGrid first (has built-in open/click tracking) ──
+    # ── Try Resend first (modern provider, generous free tier, tracking header) ──
+    # When Resend is configured it is the preferred sender. Guarded so a
+    # fallback from Resend does not re-enter Resend and recurse.
+    global _SENDING_RESEND_EMAIL
+    try:
+        from utils.email_resend import is_resend_configured, send_resend_email
+        if not _SENDING_RESEND_EMAIL and is_resend_configured():
+            _SENDING_RESEND_EMAIL = True
+            try:
+                ok, msg, _tid = send_resend_email(
+                    to_email=to_email,
+                    subject=subject,
+                    body=body,
+                    from_name=from_name,
+                    tracking_id=tracking_id,
+                    attachments=norm_attachments or None,
+                )
+                return ok, msg
+            finally:
+                _SENDING_RESEND_EMAIL = False
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.warning("Resend send failed, falling back: %s", e)
+
+    # ── Try SendGrid next (has built-in open/click tracking) ──
     # Skip when already inside a SendGrid send attempt (see _SENDING_AI_EMAIL),
     # so the SMTP fallback does not re-enter SendGrid and recurse.
     global _SENDING_AI_EMAIL
