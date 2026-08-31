@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from utils.analytics import track_event
 from utils.logger import get_logger
+from utils.notifications import notify
 from utils.pricing import upgrade_user_tier
 from utils.repositories import (
     load_consumed_sessions,
@@ -162,6 +163,11 @@ def _handle_checkout_completed(session: dict) -> tuple[bool, str]:
         user_id=username,
         metadata={"target_tier": target_tier, "session_id": session_id},
     )
+    try:
+        plan_display = {"pro": "Pro", "team": "Team", "enterprise": "Enterprise"}.get(target_tier, target_tier)
+        notify(username, "payment_success", plan=plan_display)
+    except Exception as exc:  # noqa: BLE001 - notification failure must not break webhook ack
+        logger.error("Checkout notification error for %s: %s", username, exc)
     return True, f"Upgraded {username} to {target_tier}"
 
 
@@ -212,7 +218,7 @@ def _handle_subscription_deleted(subscription: dict) -> tuple[bool, str]:
 
 
 def _handle_payment_failed(invoice: dict) -> tuple[bool, str]:
-    """Handle failed payment - log and optionally notify user."""
+    """Handle failed payment - notify the user and record the event."""
     customer_id = invoice.get("customer")
     username = _find_username_by_customer_id(customer_id)
 
@@ -220,7 +226,14 @@ def _handle_payment_failed(invoice: dict) -> tuple[bool, str]:
         track_event("payment_failed", {"username": username})
         logger.warning("Payment failed for user %s", username)
         audit_event("stripe_payment_failed", "recorded", user_id=username, severity="warning")
-        # TODO: Send notification email to user
+        try:
+            notify(
+                username,
+                "payment_failed",
+                data={"invoice_id": invoice.get("id", ""), "customer_id": customer_id},
+            )
+        except Exception as exc:  # noqa: BLE001 - notification failure must not break webhook ack
+            logger.error("Payment-failed notification error for %s: %s", username, exc)
 
     return True, "Payment failure recorded"
 

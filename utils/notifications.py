@@ -76,6 +76,13 @@ NOTIFICATION_TYPES: dict[str, dict] = {
         "default_channels": ["in_app", "email_digest"],
         "priority": "medium",
     },
+    "payment_failed": {
+        "icon": "💳",
+        "title_template": "支付失败: 请检查您的付款方式",
+        "title_en": "Payment failed: please check your payment method",
+        "default_channels": ["in_app", "email_digest"],
+        "priority": "high",
+    },
     "team_invite": {
         "icon": "👥",
         "title_template": "{inviter} 邀请你加入团队 {team}",
