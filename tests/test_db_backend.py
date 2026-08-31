@@ -4,11 +4,11 @@ from __future__ import annotations
 from unittest.mock import patch
 
 
-def test_json_save_all_users_does_not_delete_users_missing_from_snapshot(tmp_path):
+def test_json_save_all_users_does_not_delete_users_missing_from_snapshot(ws_tmp):
     from utils.db import JSONBackend
 
     db = JSONBackend()
-    with patch("utils.storage.get_data_dir", return_value=tmp_path):
+    with patch("utils.storage.get_data_dir", return_value=ws_tmp):
         db.save_all_users({
             "alice": {"username": "alice", "tier": "free"},
             "bob": {"username": "bob", "tier": "pro"},
@@ -19,29 +19,29 @@ def test_json_save_all_users_does_not_delete_users_missing_from_snapshot(tmp_pat
         users = db.get_all_users()
         assert users["alice"]["tier"] == "team"
         assert users["bob"]["tier"] == "pro"
-        assert (tmp_path / "users" / "bob").exists()
+        assert (ws_tmp / "users" / "bob").exists()
         assert db.load_user_data("bob", "history.json", default=[]) == [{"id": "keep-bob"}]
 
 
-def test_json_save_all_users_empty_snapshot_is_noop(tmp_path):
+def test_json_save_all_users_empty_snapshot_is_noop(ws_tmp):
     from utils.db import JSONBackend
 
     db = JSONBackend()
-    with patch("utils.storage.get_data_dir", return_value=tmp_path):
+    with patch("utils.storage.get_data_dir", return_value=ws_tmp):
         db.save_all_users({"alice": {"username": "alice"}})
         db.save_user_data("alice", "history.json", [{"id": "keep"}])
         db.save_all_users({})
 
         assert db.get_all_users() == {"alice": {"username": "alice"}}
-        assert (tmp_path / "users" / "alice").exists()
+        assert (ws_tmp / "users" / "alice").exists()
         assert db.load_user_data("alice", "history.json", default=[]) == [{"id": "keep"}]
 
 
-def test_json_upsert_user_does_not_rewrite_other_users(tmp_path):
+def test_json_upsert_user_does_not_rewrite_other_users(ws_tmp):
     from utils.db import JSONBackend
 
     db = JSONBackend()
-    with patch("utils.storage.get_data_dir", return_value=tmp_path):
+    with patch("utils.storage.get_data_dir", return_value=ws_tmp):
         db.upsert_user("alice", {"username": "alice", "tier": "free"})
         db.upsert_user("bob", {"username": "bob", "tier": "pro"})
         db.upsert_user("alice", {"username": "alice", "tier": "enterprise"})
@@ -50,10 +50,10 @@ def test_json_upsert_user_does_not_rewrite_other_users(tmp_path):
         assert users["bob"]["tier"] == "pro"
 
 
-def test_sqlite_save_all_users_does_not_delete_users_missing_from_snapshot(tmp_path):
+def test_sqlite_save_all_users_does_not_delete_users_missing_from_snapshot(ws_tmp):
     from utils.db import SQLiteBackend
 
-    db = SQLiteBackend(tmp_path / "app.sqlite3")
+    db = SQLiteBackend(ws_tmp / "app.sqlite3")
     db.save_all_users({
         "alice": {"username": "alice", "tier": "free"},
         "bob": {"username": "bob", "tier": "pro"},
@@ -65,10 +65,10 @@ def test_sqlite_save_all_users_does_not_delete_users_missing_from_snapshot(tmp_p
     assert db.load_user_data("bob", "history.json", default=[]) == [{"id": "keep-bob"}]
 
 
-def test_sqlite_save_all_users_empty_snapshot_is_noop(tmp_path):
+def test_sqlite_save_all_users_empty_snapshot_is_noop(ws_tmp):
     from utils.db import SQLiteBackend
 
-    db = SQLiteBackend(tmp_path / "app.sqlite3")
+    db = SQLiteBackend(ws_tmp / "app.sqlite3")
     db.save_all_users({"alice": {"username": "alice"}})
     db.save_user_data("alice", "history.json", [{"id": "keep"}])
     db.save_all_users({})
@@ -77,10 +77,10 @@ def test_sqlite_save_all_users_empty_snapshot_is_noop(tmp_path):
     assert db.load_user_data("alice", "history.json", default=[]) == [{"id": "keep"}]
 
 
-def test_sqlite_upsert_user_updates_one_row(tmp_path):
+def test_sqlite_upsert_user_updates_one_row(ws_tmp):
     from utils.db import SQLiteBackend
 
-    db = SQLiteBackend(tmp_path / "app.sqlite3")
+    db = SQLiteBackend(ws_tmp / "app.sqlite3")
     db.upsert_user("alice", {"username": "alice", "tier": "free"})
     db.upsert_user("bob", {"username": "bob", "tier": "pro"})
     db.upsert_user("alice", {"username": "alice", "tier": "enterprise"})

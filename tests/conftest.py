@@ -109,6 +109,24 @@ def redirect_system_temp(monkeypatch):
     yield workspace_temp
 
 
+@pytest.fixture
+def ws_tmp():
+    """Function-scoped writable temp dir inside the workspace.
+
+    Replacement for pytest's ``tmp_path`` fixture, which relies on the OS
+    temp area that the DSH Windows sandbox cannot enumerate (WinError 5).
+    The returned ``Path`` lives under gitignored ``.pytest_tmp/`` so tests
+    that need a real writable directory run identically on any machine.
+    """
+    import shutil
+    import uuid
+
+    root = Path(".pytest_tmp") / "ws_tmp" / uuid.uuid4().hex[:12]
+    root.mkdir(parents=True, exist_ok=True)
+    yield root
+    shutil.rmtree(root, ignore_errors=True)
+
+
 def pytest_configure(config):
     """Register custom markers."""
     config.addinivalue_line(
