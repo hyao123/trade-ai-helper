@@ -181,16 +181,42 @@ def send_tracked_email(
 def get_email_stats(tracking_id: str) -> dict:
     """
     Get delivery/open/click stats for a tracked email.
-    
-    Note: In production, this would query SendGrid's Event Webhook data
-    stored in our database. For now, returns stats from local tracking.
+
+    Reads the normalized event store written by the SendGrid/Mailgun webhook
+    pipeline (``utils.email_events``). Falls back to unknown stats when the
+    store is unavailable so callers never crash on a broken backend.
     """
-    # TODO: Implement with SendGrid Event Webhook + database
+    try:
+        from utils.email_events import get_events_for_tracking_id
+        events = get_events_for_tracking_id(tracking_id)
+    except Exception as exc:
+        logger.warning("get_email_stats event store unavailable: %s", exc)
+        return {
+            "tracking_id": tracking_id,
+            "delivered": None,
+            "opened": None,
+            "clicked": None,
+        }
+
+    status = "unknown"
+    delivered = opened = clicked = None
+    for event in events:
+        event_type = str(event.get("event_type", ""))
+        timestamp = str(event.get("timestamp") or "")
+        if event_type in {"delivered", "processed"} and delivered is None:
+            status, delivered = "delivered", timestamp
+        elif event_type in {"open", "opened"} and opened is None:
+            status, opened = "opened", timestamp
+        elif event_type in {"click", "clicked"}:
+            status, clicked = "clicked", timestamp
+
     return {
         "tracking_id": tracking_id,
-        "delivered": None,
-        "opened": None,
-        "clicked": None,
+        "delivered": delivered,
+        "opened": opened,
+        "clicked": clicked,
+        "status": status,
+        "event_count": len(events),
     }
 
 

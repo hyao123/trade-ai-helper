@@ -141,6 +141,38 @@ def test_provider_event_updates_existing_tracking_status():
             assert stats["provider_events"][-1]["type"] == "bounce"
 
 
+def test_sendgrid_get_email_stats_reads_normalized_event_store():
+    """sendgrid.get_email_stats must aggregate the normalized event store."""
+    from utils.email_sendgrid import get_email_stats as sendgrid_stats
+
+    delivered = {"event_type": "delivered", "timestamp": "2026-01-01T01:00:00+00:00"}
+    opened = {"event_type": "open", "timestamp": "2026-01-01T02:00:00+00:00"}
+    clicked = {"event_type": "click", "timestamp": "2026-01-01T03:00:00+00:00"}
+
+    with patch("utils.email_events.get_events_for_tracking_id", return_value=[delivered, opened, clicked]):
+        stats = sendgrid_stats("track_abc")
+
+    assert stats["tracking_id"] == "track_abc"
+    assert stats["delivered"] == "2026-01-01T01:00:00+00:00"
+    assert stats["opened"] == "2026-01-01T02:00:00+00:00"
+    assert stats["clicked"] == "2026-01-01T03:00:00+00:00"
+    assert stats["status"] == "clicked"
+    assert stats["event_count"] == 3
+
+
+def test_sendgrid_get_email_stats_falls_back_gracefully():
+    """A broken event store must not raise; return unknown stats instead."""
+    from utils.email_sendgrid import get_email_stats as sendgrid_stats
+
+    with patch("utils.email_events.get_events_for_tracking_id", side_effect=RuntimeError("store down")):
+        stats = sendgrid_stats("track_bad")
+
+    assert stats["tracking_id"] == "track_bad"
+    assert stats["delivered"] is None
+    assert stats["opened"] is None
+    assert stats["clicked"] is None
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
