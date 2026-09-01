@@ -41,7 +41,21 @@ def isolate_app_storage(request, monkeypatch):
     import utils.db
     utils.db._db_instance = None
     utils.db._db_signature = None
-    
+
+    # Guard the DB singleton against the real backend. delenv is not enough:
+    # utils.secrets.load_dotenv() runs as a module-level side effect, so the
+    # first import of utils.secrets during a test re-injects .env values like
+    # SQLITE_DB_PATH. Patch utils.db's get_secret reference for DB keys so
+    # get_db() always falls back to the isolated JSON backend under ws dirs.
+    _orig_db_get_secret = utils.db.get_secret
+
+    def _isolated_secret(key, default=""):
+        if key in ("DATABASE_URL", "SQLITE_DB_PATH"):
+            return ""
+        return _orig_db_get_secret(key, default)
+
+    monkeypatch.setattr(utils.db, "get_secret", _isolated_secret)
+
     yield test_data_dir
     
     # Reset DB singleton after test
