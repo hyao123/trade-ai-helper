@@ -363,12 +363,12 @@ def send_digest(username: str, force: bool = False) -> tuple[bool, str]:
 
     body = "\n".join(body_lines)
 
-    # Send email
-    from utils.email_service import is_email_configured, send_email
-    if not is_email_configured():
+    # Send email (through the full provider chain: Resend -> SendGrid -> SMTP)
+    from utils.email_service import has_email_provider_configured, send_ai_generated_email
+    if not has_email_provider_configured():
         return False, "Email not configured"
 
-    ok, msg = send_email(email, subject, body)
+    ok, msg = send_ai_generated_email(email, subject, body)
     if ok:
         # Clear the queue
         save_user_json(username, "digest_queue.json", [])

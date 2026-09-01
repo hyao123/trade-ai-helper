@@ -243,20 +243,20 @@ class TestEmailServiceExtensions(unittest.TestCase):
         importlib.reload(_email_svc_mod)
 
     def test_send_followup_reminder_not_configured(self):
-        with patch.object(_email_svc_mod, "is_email_configured", return_value=False):
+        with patch.object(_email_svc_mod, "has_email_provider_configured", return_value=False):
             success, msg = _email_svc_mod.send_followup_reminder(
                 "test@test.com", "John", "ABC Co", "LED Light", 7, "Share case study"
             )
             self.assertFalse(success)
-            self.assertIn("not configured", msg.lower())
+            self.assertIn("未配置", msg)
 
     def test_send_ai_generated_email_not_configured(self):
-        with patch.object(_email_svc_mod, "is_email_configured", return_value=False):
+        with patch.object(_email_svc_mod, "has_email_provider_configured", return_value=False):
             success, msg = _email_svc_mod.send_ai_generated_email("to@test.com", "Subject", "Body")
             self.assertFalse(success)
 
     def test_send_ai_generated_email_invalid_port(self):
-        with patch.object(_email_svc_mod, "is_email_configured", return_value=True), \
+        with patch.object(_email_svc_mod, "has_email_provider_configured", return_value=True), \
              patch.object(_email_svc_mod, "get_secret", side_effect=lambda k: {
                  "SMTP_HOST": "smtp.test.com", "SMTP_PORT": "invalid",
                  "SMTP_USER": "user", "SMTP_PASSWORD": "pass",
@@ -266,9 +266,10 @@ class TestEmailServiceExtensions(unittest.TestCase):
             self.assertFalse(success)
             self.assertIn("SMTP_PORT", msg)
 
-    def test_send_followup_reminder_calls_send_email(self):
-        with patch.object(_email_svc_mod, "is_email_configured", return_value=True), \
-             patch.object(_email_svc_mod, "send_email", return_value=(True, "sent")) as mock_send:
+    def test_send_followup_reminder_calls_send_ai_generated_email(self):
+        """Follow-up reminders send through the provider chain (Resend->SendGrid->SMTP)."""
+        with patch.object(_email_svc_mod, "has_email_provider_configured", return_value=True), \
+             patch.object(_email_svc_mod, "send_ai_generated_email", return_value=(True, "sent")) as mock_send:
             _email_svc_mod.send_followup_reminder(
                 "sales@test.com", "Mike", "ABC Trading", "LED Light", 7, "Share new samples"
             )
@@ -291,14 +292,14 @@ class TestWorkflowReminders(unittest.TestCase):
         importlib.reload(_wf_mod)
 
     def test_send_due_reminders_email_not_configured(self):
-        with patch("utils.email_service.is_email_configured", return_value=False), \
+        with patch("utils.email_service.has_email_provider_configured", return_value=False), \
              patch.object(_wf_mod, "get_due_workflows", return_value=[]):
             sent, failed = _wf_mod.send_due_reminders("test@test.com")
             self.assertEqual(sent, 0)
             self.assertEqual(failed, 0)
 
     def test_send_due_reminders_no_due_items(self):
-        with patch("utils.email_service.is_email_configured", return_value=True), \
+        with patch("utils.email_service.has_email_provider_configured", return_value=True), \
              patch.object(_wf_mod, "get_due_workflows", return_value=[]):
             sent, failed = _wf_mod.send_due_reminders("test@test.com")
             self.assertEqual(sent, 0)
@@ -311,7 +312,7 @@ class TestWorkflowReminders(unittest.TestCase):
             {"customer": "Mary", "company": "XYZ", "product": "Solar",
              "_rule": {"hint": "Resend samples"}, "_days_elapsed": 3},
         ]
-        with patch("utils.email_service.is_email_configured", return_value=True), \
+        with patch("utils.email_service.has_email_provider_configured", return_value=True), \
              patch.object(_wf_mod, "get_due_workflows", return_value=due_items), \
              patch("utils.email_service.send_followup_reminder", return_value=(True, "ok")) as mock:
             sent, failed = _wf_mod.send_due_reminders("sales@test.com")
@@ -324,12 +325,85 @@ class TestWorkflowReminders(unittest.TestCase):
             {"customer": "John", "company": "ABC", "product": "LED",
              "_rule": {"hint": "Follow up"}, "_days_elapsed": 7},
         ]
-        with patch("utils.email_service.is_email_configured", return_value=True), \
+        with patch("utils.email_service.has_email_provider_configured", return_value=True), \
              patch.object(_wf_mod, "get_due_workflows", return_value=due_items), \
              patch("utils.email_service.send_followup_reminder", return_value=(False, "error")):
             sent, failed = _wf_mod.send_due_reminders("sales@test.com")
             self.assertEqual(sent, 0)
             self.assertEqual(failed, 1)
+
+
+# ---------------------------------------------------------------------------
+# Digest + important-forward consistency tests (P1 email gate unification)
+# ---------------------------------------------------------------------------
+import utils.notifications as _ntf_mod
+import utils.auto_outreach as _ao_mod
+
+
+class TestEmailGateConsistency(unittest.TestCase):
+
+    def test_send_digest_uses_provider_chain(self):
+        """Notification digest sends through the provider chain when any provider is set."""
+        with patch.object(_ntf_mod, "get_notification_preferences",
+                          return_value={"digest_frequency": "daily"}), \
+             patch.object(_ntf_mod, "load_user_json",
+                          return_value=[{"icon": "🔥", "title": "Test notice",
+                                         "created_at": "2025-01-01 10:00"}]), \
+             patch("utils.user_auth._load_users_db",
+                   return_value={"user1": {"email": "u@test.com"}}), \
+             patch("utils.email_service.has_email_provider_configured", return_value=True), \
+             patch("utils.email_service.send_ai_generated_email",
+                   return_value=(True, "sent")) as mock_send:
+            from utils.notifications import send_digest
+            ok, msg = send_digest("user1")
+            self.assertTrue(ok)
+            mock_send.assert_called_once()
+
+    def test_send_digest_without_provider_graceful(self):
+        """No provider -> digest reports failure without crashing."""
+        with patch.object(_ntf_mod, "get_notification_preferences",
+                          return_value={"digest_frequency": "daily"}), \
+             patch.object(_ntf_mod, "load_user_json",
+                          return_value=[{"icon": "🔥", "title": "Test notice",
+                                         "created_at": "2025-01-01 10:00"}]), \
+             patch("utils.user_auth._load_users_db",
+                   return_value={"user1": {"email": "u@test.com"}}), \
+             patch("utils.email_service.has_email_provider_configured", return_value=False):
+            from utils.notifications import send_digest
+            ok, _msg = send_digest("user1")
+            self.assertFalse(ok)
+
+    def test_forward_important_uses_provider_chain(self):
+        """Hot-lead forwarding sends through the provider chain when any provider is set."""
+        with patch("utils.email_service.has_email_provider_configured", return_value=True), \
+             patch("utils.email_service.send_ai_generated_email",
+                   return_value=(True, "sent")) as mock_send, \
+             patch("utils.notifications.notify") as mock_notify:
+            ok = _ao_mod._forward_important(
+                username="user1",
+                forward_to="fwd@test.com",
+                original_from="cust@x.com",
+                original_message="Tell me your MOQ",
+                intent="inquiry",
+                campaign_name="camp1",
+            )
+            self.assertTrue(ok)
+            mock_send.assert_called_once()
+            mock_notify.assert_called_once()
+
+    def test_forward_important_without_provider_graceful(self):
+        """No provider -> forwarding returns False without crashing."""
+        with patch("utils.email_service.has_email_provider_configured", return_value=False), \
+             patch("utils.notifications.notify"):
+            ok = _ao_mod._forward_important(
+                username="user1",
+                forward_to="fwd@test.com",
+                original_from="cust@x.com",
+                original_message="Tell me your MOQ",
+                intent="inquiry",
+                campaign_name="camp1",
+            )
+            self.assertFalse(ok)
 
 
 if __name__ == "__main__":

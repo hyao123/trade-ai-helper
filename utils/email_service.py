@@ -247,7 +247,7 @@ def send_followup_reminder(
         f"https://trade-ai-helper.streamlit.app\n\n"
         f"此邮件由外贸AI助手自动发送，请勿直接回复。"
     )
-    return send_email(to_email, subject, body)
+    return send_ai_generated_email(to_email, subject, body)
 
 
 def send_ai_generated_email(

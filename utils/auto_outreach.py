@@ -674,11 +674,11 @@ def _forward_important(
     campaign_name: str,
 ) -> bool:
     """转发重点邮件到指定邮箱。"""
-    from utils.email_service import is_email_configured, send_email
+    from utils.email_service import has_email_provider_configured, send_ai_generated_email
     from utils.notifications import notify
 
-    if not is_email_configured():
-        logger.warning("Cannot forward email - SMTP not configured")
+    if not has_email_provider_configured():
+        logger.warning("Cannot forward email - email service not configured")
         return False
 
     subject = f"🔥 [重点客户回复] {original_from} - {campaign_name}"
@@ -697,7 +697,7 @@ def _forward_important(
         f"登录外贸AI助手查看详情: https://trade-ai-helper.streamlit.app\n"
     )
 
-    ok, msg = send_email(forward_to, subject, body)
+    ok, msg = send_ai_generated_email(forward_to, subject, body)
 
     # 同时发送应用内通知
     try:

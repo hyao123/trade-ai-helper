@@ -208,7 +208,7 @@ def send_due_reminders(user_email: str) -> tuple[int, int]:
     Returns:
         (sent_count, failed_count)
     """
-    from utils.email_service import is_email_configured, send_followup_reminder
+    from utils.email_service import has_email_provider_configured, send_followup_reminder
 
     due = get_due_workflows()
     if not due:
@@ -230,7 +230,7 @@ def send_due_reminders(user_email: str) -> tuple[int, int]:
         logger.debug("Notification trigger failed (non-critical): %s", e)
 
     # ── Send email reminders ──
-    if not is_email_configured():
+    if not has_email_provider_configured():
         logger.warning("Email not configured — cannot send follow-up reminders")
         return 0, 0
 
