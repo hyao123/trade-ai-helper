@@ -77,14 +77,28 @@ def build_inquiry_prompt(
     customer_name: str = "",
     your_name: str = "",
     company_name: str = "",
+    product_info: str = "",
+    company_intro: str = "",
 ) -> tuple[str, str | None]:
     inquiry = sanitize_input(inquiry, max_length=2000)
     customer_name = sanitize_prompt_param(customer_name, "customer_name")
     your_name = sanitize_prompt_param(your_name, "your_name")
     company_name = sanitize_prompt_param(company_name, "company_name")
+    product_info = sanitize_prompt_param(product_info, "product_info")
+    company_intro = sanitize_prompt_param(company_intro, "company_intro")
+    
     customer_info = f"客户姓名：{customer_name}" if customer_name else "（客户姓名未提供）"
     signature_name = your_name if your_name else "[Your Name]"
     signature_company = company_name if company_name else "[Your Company]"
+    
+    # 构建上下文信息
+    context_parts = []
+    if product_info:
+        context_parts.append(f"产品信息：\n{product_info}\n")
+    if company_intro:
+        context_parts.append(f"公司介绍：\n{company_intro}\n")
+    context_section = "\n".join(context_parts) if context_parts else ""
+    
     system = "你是一位专业外贸业务员，善于用英文回复客户询盘，语气专业友好。"
     prompt = f"""请回复以下客户询盘：
 
@@ -92,6 +106,7 @@ def build_inquiry_prompt(
 询盘内容：
 {inquiry}
 
+{context_section}
 回复要求：
 1. 感谢客户询盘
 2. 逐条回答客户问题

@@ -55,6 +55,26 @@ with import_tab:
     st.markdown("### 导入客户邮件")
     source = st.radio("导入方式", ["粘贴邮件内容", "上传 .eml 文件"], horizontal=True)
     customer_id = st.text_input("关联客户ID（可选）", placeholder="例如 CRM 客户ID，后续可用于客户时间线")
+    
+    # B7: 关联推送任务（可选）
+    try:
+        from utils.auto_outreach import get_campaigns
+        campaigns = get_campaigns(username)
+        campaign_options = ["无"] + [f"{c['name']} ({c['id']})" for c in campaigns]
+        campaign_choice = st.selectbox(
+            "关联推送任务（可选，用于生成回复时提供产品/公司上下文）",
+            options=campaign_options,
+            key="inbound_campaign_select",
+        )
+        campaign_id = None
+        if campaign_choice != "无":
+            # 提取 campaign_id from "Name (id)"
+            import re
+            match = re.search(r"\(([^)]+)\)$", campaign_choice)
+            if match:
+                campaign_id = match.group(1)
+    except Exception:  # noqa: BLE001 - campaign fetch failure must not break import
+        campaign_id = None
 
     parsed = None
     if source == "粘贴邮件内容":
@@ -84,7 +104,9 @@ with import_tab:
 
     if parsed is not None:
         try:
-            created, record = create_inbound_record(username, parsed, customer_id=customer_id.strip())
+            created, record = create_inbound_record(
+                username, parsed, customer_id=customer_id.strip(), campaign_id=campaign_id
+            )
         except Exception as exc:  # noqa: BLE001
             st.error(f"⚠️ 保存失败：{exc}")
         else:

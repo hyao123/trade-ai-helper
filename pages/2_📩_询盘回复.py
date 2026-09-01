@@ -131,9 +131,25 @@ if generate_clicked:
             del st.session_state["_conv_inquiry_conv"]
 
         fname = f"询盘回复_{customer_name or '客户'}.txt"
+        
+        # B7: 获取 campaign 上下文（若入站邮件关联了推送任务）
+        product_info = ""
+        company_intro = ""
+        campaign_id = st.session_state.get("inquiry_campaign_id")
+        if campaign_id:
+            try:
+                from utils.auto_outreach import get_campaign
+                campaign = get_campaign(get_user_id(), campaign_id)
+                if campaign:
+                    product_info = campaign.get("product_info", "")
+                    company_intro = campaign.get("company_intro", "")
+            except Exception:  # noqa: BLE001 - campaign fetch failure must not break reply
+                pass
+        
         if stream_mode:
             result = reply_inquiry(
                 inquiry, customer_name, your_name, company_name,
+                product_info=product_info, company_intro=company_intro,
                 stream=True, user_id=get_user_id(),
             )
             show_result(
@@ -147,6 +163,7 @@ if generate_clicked:
             with st.spinner("🤖 AI 正在生成..."):
                 result = reply_inquiry(
                     inquiry, customer_name, your_name, company_name,
+                    product_info=product_info, company_intro=company_intro,
                     stream=False, user_id=get_user_id(),
                 )
             st.session_state.results["inquiry"] = result

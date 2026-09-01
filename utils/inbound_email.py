@@ -160,7 +160,9 @@ def parse_raw_email_text(raw_text: str) -> dict:
     return record
 
 
-def create_inbound_record(username: str, parsed_email: dict, *, customer_id: str = "") -> tuple[bool, dict]:
+def create_inbound_record(
+    username: str, parsed_email: dict, *, customer_id: str = "", campaign_id: str = ""
+) -> tuple[bool, dict]:
     """Persist an inbound email for the user idempotently by fingerprint."""
     if not username:
         return False, {"error": "username_required"}
@@ -179,6 +181,7 @@ def create_inbound_record(username: str, parsed_email: dict, *, customer_id: str
         "fingerprint": fingerprint,
         "status": "pending",  # pending / drafted / replied / archived
         "customer_id": customer_id,
+        "campaign_id": campaign_id,  # B7: optional campaign association
         "created_at": _now_iso(),
         "updated_at": _now_iso(),
         **parsed_email,
@@ -291,3 +294,7 @@ def seed_inquiry_session_state(st, inbound: dict) -> None:
     prefix = f"Subject: {subject}\n\n" if subject else ""
     st.session_state["inquiry_text_val"] = prefix + body
     st.session_state["inquiry_customer_val"] = display_name
+    # B7: pass campaign_id to inquiry page for product/company context
+    campaign_id = inbound.get("campaign_id")
+    if campaign_id:
+        st.session_state["inquiry_campaign_id"] = campaign_id

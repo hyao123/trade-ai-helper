@@ -97,7 +97,7 @@ pages/5 跟进邮件 / pages/10 跟进日历 / send_due_reminders（到期提醒
 | B4 | 高优先级意图无通知提醒 | inbox_ai 分类后无人触发 notify(hot_lead/…) | ✅ P2：触发 hot_lead |
 | B5 | 两套意图体系不一致 | inbox_ai.INTENT_CATEGORIES vs auto_reply 的 INTENT: | ✅ P3：统一 canonical key + legacy 映射 |
 | B6 | 三套存储并行、无统一事件流 | inbound / processed / tracking | ✅ P4a：customer_timeline 统一事件流 + 核心写入点 |
-| B7 | 入站邮件回复不关联 campaign/产品上下文 | inbound_email 无 campaign_id 字段 | 自动回复无产品/公司上下文，质量受限 |
+| B7 | 入站邮件回复不关联 campaign/产品上下文 | inbound_email 无 campaign_id 字段 | ✅ B7：关联推送任务 + 回复生成时带产品/公司上下文 |
 
 ---
 

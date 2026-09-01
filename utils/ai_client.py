@@ -578,10 +578,14 @@ def reply_inquiry(
     customer_name: str = "",
     your_name: str = "",
     company_name: str = "",
+    product_info: str = "",
+    company_intro: str = "",
     stream: bool = False,
     user_id: str = "default",
 ) -> str | Generator[str, None, None]:
-    prompt, system = build_inquiry_prompt(inquiry, customer_name, your_name, company_name)
+    prompt, system = build_inquiry_prompt(
+        inquiry, customer_name, your_name, company_name, product_info, company_intro
+    )
     return _call_with_style(prompt, system, user_id=user_id, stream=stream)
 
 
