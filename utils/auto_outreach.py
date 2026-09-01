@@ -30,6 +30,7 @@ from utils.auto_outreach_config import (
     SEND_INTERVAL_SECONDS,
 )
 from utils.logger import get_logger
+from utils.inbox_ai import HIGH_PRIORITY_INTENTS, intent_label, normalize_reply_intent
 from utils.repositories import (
     campaign_results_collection,
     load_campaign_results,
@@ -602,7 +603,7 @@ def auto_reply_to_customer(
         }
 
     # 解析AI回复结果
-    intent = _extract_section(result, "INTENT:")
+    intent = normalize_reply_intent(_extract_section(result, "INTENT:"))
     is_important = _check_importance(customer_message, intent)
     reply_subject = _extract_section(result, "REPLY_SUBJECT:")
     reply_body = _extract_section(result, "REPLY_BODY:")
@@ -639,6 +640,7 @@ def auto_reply_to_customer(
 
     return {
         "intent": intent,
+        "intent_label": intent_label(intent),
         "is_important": is_important,
         "reply_subject": reply_subject,
         "reply_body": reply_body,
@@ -651,9 +653,9 @@ def _check_importance(message: str, intent: str) -> bool:
     """判断邮件是否为重点邮件。"""
     message_lower = message.lower()
 
-    # 意图关键词
-    important_intents = ["下单", "purchase", "order", "buy", "sample", "样品", "采购"]
-    if any(kw in intent.lower() for kw in important_intents):
+    # 意图键已由 normalize_reply_intent 规范化；保持内容关键词作为
+    # 向后兼容的第二信号，防止模型低估明显采购语句。
+    if intent in HIGH_PRIORITY_INTENTS:
         return True
 
     # 内容关键词

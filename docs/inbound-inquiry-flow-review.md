@@ -80,10 +80,10 @@ pages/5 跟进邮件 / pages/10 跟进日历 / send_due_reminders（到期提醒
 |---|---|---|---|
 | `inbound_emails.json`（用户级） | inbound_email.py | 手动导入邮件 + status | pending→drafted→replied→archived |
 | `processed_*.json`（用户级） | inbox_ai.py | AI 分类缓存（intent/priority） | 200 条滑动窗口，与发送无关 |
-| `email_tracking.json`（全局） | email_tracking.py | 外发邮件追踪记录 | 有 idempotency，但入口A发送不经过它 |
-| （外发日志） | auto_outreach 的 outreach_log | 推送/自动回复事件 | 仅推送任务上下文，不覆盖收件箱直发 |
+| `email_tracking.json`（全局） | email_tracking.py | 外发邮件追踪记录 | email_service / inbox 直发均可创建 |
+| `outreach_log.json`（用户级） | outreach_log.py | 统一对外发送日志 | inbox/inbound/campaign 共用，最多500条 |
 
-**问题：** 同一个客户咨询邮件在不同入口会落入互不相通的存储，回复动作与追踪/CRM 无法形成一条可审计的线。
+**剩余问题：** 入站、分类缓存、追踪和统一发送日志仍是不同集合；P4 计划引入 customer_timeline 归一化事件流。
 
 ---
 
@@ -91,11 +91,11 @@ pages/5 跟进邮件 / pages/10 跟进日历 / send_due_reminders（到期提醒
 
 | # | 断点 | 位置 | 影响 |
 |---|---|---|---|
-| B1 | 入口A发送后不建 tracking、不落 outreach log | `pages/35:446` TODO | 回复无法追踪、无法审计、无法统计 |
-| B2 | 入口B无「发送」动作，草稿无法真正回信 | `pages/37` | 手动导入的咨询件流程断裂 |
-| B3 | 邮件链路不自动沉淀 CRM / 跟进工作流 | inbox/inbound 均无 add_customer 联动 | 商机依赖手动录入，易漏 |
-| B4 | 高优先级意图无通知提醒 | inbox_ai 分类后无人触发 notify(hot_lead/…) | 紧急询盘/投诉可能被淹没 |
-| B5 | 两套意图体系不一致 | inbox_ai.INTENT_CATEGORIES vs auto_reply 的 INTENT: | 同一邮件不同入口结论可能矛盾 |
+| B1 | 入口A发送后不建 tracking、不落 outreach log | `pages/35:446` TODO | ✅ P1：`send_via_provider` 自动记录 |
+| B2 | 入口B无「发送」动作，草稿无法真正回信 | `pages/37` | ✅ P1：新增直接回复按钮 |
+| B3 | 邮件链路不自动沉淀 CRM / 跟进工作流 | inbox/inbound 均无 add_customer 联动 | ✅ P2：高意图自动建客户+工作流 |
+| B4 | 高优先级意图无通知提醒 | inbox_ai 分类后无人触发 notify(hot_lead/…) | ✅ P2：触发 hot_lead |
+| B5 | 两套意图体系不一致 | inbox_ai.INTENT_CATEGORIES vs auto_reply 的 INTENT: | ✅ P3：统一 canonical key + legacy 映射 |
 | B6 | 三套存储并行、无统一事件流 | inbound / processed / tracking | 无法形成客户时间线（页面28 客户画像数据源受限） |
 | B7 | 入站邮件回复不关联 campaign/产品上下文 | inbound_email 无 campaign_id 字段 | 自动回复无产品/公司上下文，质量受限 |
 
@@ -103,15 +103,16 @@ pages/5 跟进邮件 / pages/10 跟进日历 / send_due_reminders（到期提醒
 
 ## 四、建议优化路线（按 ROI 排序，均可 TDD）
 
-**P1 — 打通「发送 → 记录」闭环（治 B1+B2）**
-- `send_via_provider` 返回 tracking_id（内部 create_tracking_record）；发送成功后写 unified outreach log（`{direction: out, tracking_id, to_email, subject, source: inbox|inbound, intent}`）
-- 入口B增加「发送回复」按钮：draft 文案 → `email_service.send_ai_generated_email`（Resend/SendGrid/SMTP 链）→ 状态置 replied + 写 log
+**P1 — 打通「发送 → 记录」闭环（治 B1+B2）——✅ 已完成（`eeb167e`）**
+- `send_via_provider` 成功后创建 tracking + 写 unified `outreach_log.json`
+- 入口B增加「发送回复」按钮：`email_service.send_ai_generated_email`（Resend/SendGrid/SMTP 链）→ 状态 replied + 写 log
 
-**P2 — 意图 → CRM/跟进联动（治 B3+B4）**
-- 在 process_inbox 分类后（或入口A/B 回复成功后），对 inquiry/order_intent/complaint/sample_request 高优先级意图自动 `add_customer`（按 from_email 去重）+ `create_workflow_from_customer` + `notify(hot_lead)`
+**P2 — 意图 → CRM/跟进联动（治 B3+B4）——✅ 已完成（`021d5ac`）**
+- 分类后，对高意图邮件自动按 email 去重创建 CRM 客户、跟进工作流和 `hot_lead` 通知
 
-**P3 — 统一意图体系（治 B5）**
-- 让 `auto_reply_to_customer` 复用 `inbox_ai.INTENT_CATEGORIES`（或输出映射层），消除双体系
+**P3 — 统一意图体系（治 B5）——✅ 已完成（`3e2d642`）**
+- `auto_reply_to_customer` 输出 `inbox_ai.INTENT_CATEGORIES` canonical key
+- 旧英文文案通过 `normalize_reply_intent` 兼容映射；页面显示中文 label
 
 **P4 — 统一事件流（治 B6，中长期）**
 - 引入归一化的 `customer_timeline` 集合（事件：收件/分类/回复/发送/跟进），供客户画像/分析消费

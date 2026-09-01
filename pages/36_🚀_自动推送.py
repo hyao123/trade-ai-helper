@@ -31,6 +31,7 @@ from utils.product_catalog import (
     get_catalog_industries,
 )
 from utils.ui_helpers import check_auth, copy_button, get_user_id, inject_css
+from utils.inbox_ai import intent_label
 
 st.set_page_config(page_title="自动推送 | 外贸AI助手", page_icon="🚀", layout="wide")
 inject_css()
@@ -633,7 +634,7 @@ with tab_auto_reply:
                 # 显示分析结果
                 col_intent, col_important = st.columns(2)
                 with col_intent:
-                    st.markdown(f"**🎯 识别意图:** {reply_data['intent']}")
+                    st.markdown(f"**🎯 识别意图:** {intent_label(reply_data['intent'])} ({reply_data['intent']})")
                 with col_important:
                     if reply_data["is_important"]:
                         st.markdown("**🔥 重要程度:** <span style='color:red;font-weight:bold;'>高优先级</span>", unsafe_allow_html=True)

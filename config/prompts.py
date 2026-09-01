@@ -1288,7 +1288,7 @@ Your Product/Service: {product_info}{company_info}
 
 Please analyze and output in EXACTLY this format (use the markers precisely):
 
-INTENT: [One of: Interested/Needs Info/Price Negotiation/Sample Request/Purchase Intent/Not Interested/Auto-Reply/Other]
+INTENT: [One of: inquiry (询盘/咨询), order_intent (下单意向), negotiation (价格谈判), sample_request (样品请求), complaint (投诉/问题), followup_needed (需要跟进), info_only (仅信息)]
 
 REPLY_SUBJECT: [Appropriate reply subject line]
 
@@ -1307,7 +1307,7 @@ Best regards,
 [Your Name]
 [Your Company]
 
-IMPORTANCE: [HIGH if purchase/sample/order intent, MEDIUM if interested/needs info, LOW if not interested/auto-reply]
+IMPORTANCE: [HIGH for order_intent/complaint/sample_request or clear buying signals, MEDIUM for inquiry/negotiation/followup_needed, LOW for info_only]
 
 Requirements:
 1. Be accurate in intent detection - look for buying signals

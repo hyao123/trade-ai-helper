@@ -114,6 +114,66 @@ INTENT_CATEGORIES = {
     },
 }
 
+# Canonical intents that represent a real business signal (shared with the
+# auto-reply importance gate and lead capture). Keys must exist in
+# INTENT_CATEGORIES above.
+HIGH_PRIORITY_INTENTS = frozenset(
+    {"inquiry", "order_intent", "negotiation", "sample_request", "complaint"}
+)
+
+# Historic English phrases used by the auto-reply prompt (utils/auto_outreach
+# + config.prompts.build_auto_reply_prompt) mapped onto the canonical keys so
+# both pipelines speak one taxonomy.
+LEGACY_REPLY_INTENT: dict[str, str] = {
+    "interested": "inquiry",
+    "needs info": "inquiry",
+    "need info": "inquiry",
+    "info request": "inquiry",
+    "price negotiation": "negotiation",
+    "negotiation": "negotiation",
+    "sample request": "sample_request",
+    "purchase intent": "order_intent",
+    "purchase": "order_intent",
+    "order": "order_intent",
+    "complaint": "complaint",
+    "follow-up": "followup_needed",
+    "auto-reply": "info_only",
+    "not interested": "info_only",
+    "other": "info_only",
+}
+
+
+def normalize_reply_intent(raw: str) -> str:
+    """Map any reply-intent token to one canonical INTENT_CATEGORIES key.
+
+    Accepts canonical keys, legacy English phrases, or a fuzzy substring
+    (e.g. ``INTENT: Price Negotiation``). Unknown input falls back to
+    ``info_only`` so downstream logic never sees an unhandled token.
+    """
+    token = (raw or "").strip().lower().rstrip(".")
+    if not token:
+        return "info_only"
+    if token in INTENT_CATEGORIES:
+        return token
+    if token in LEGACY_REPLY_INTENT:
+        return LEGACY_REPLY_INTENT[token]
+    for key in INTENT_CATEGORIES:
+        if key in token or token in key:
+            return key
+    for phrase, key in LEGACY_REPLY_INTENT.items():
+        if phrase in token or token in phrase:
+            return key
+    return "info_only"
+
+
+def intent_label(key: str) -> str:
+    """Return the Chinese display label for a canonical intent key."""
+    info = INTENT_CATEGORIES.get(key)
+    if info and info.get("label"):
+        return info["label"]
+    return key
+
+
 _PROCESSED_FILE = "inbox_processed.json"
 
 # ---------------------------------------------------------------------------
