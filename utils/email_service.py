@@ -42,6 +42,27 @@ def is_email_configured() -> bool:
     return all(get_secret(var) for var in required_vars)
 
 
+def has_email_provider_configured() -> bool:
+    """Return True when any outbound email provider is configured.
+
+    Checks the full provider chain used by send_ai_generated_email:
+    Resend, then SendGrid, then SMTP. A single configured provider is enough.
+    """
+    try:
+        from utils.email_resend import is_resend_configured
+        if is_resend_configured():
+            return True
+    except ImportError:
+        pass
+    try:
+        from utils.email_sendgrid import is_sendgrid_configured
+        if is_sendgrid_configured():
+            return True
+    except ImportError:
+        pass
+    return is_email_configured()
+
+
 def send_email(to_email: str, subject: str, body: str) -> tuple[bool, str]:
     """
     Send a plain-text email via SMTP (no attachments).
@@ -162,6 +183,11 @@ def send_verification_email(to_email: str, token: str) -> tuple[bool, str]:
     """
     Send an email verification message containing the token.
 
+    Sends through the full provider chain (Resend -> SendGrid -> SMTP) so the
+    verification email works whenever any provider is configured — not only
+    when SMTP is set up. Without any provider it reports the SMTP fallback
+    message so callers can surface a friendly notice.
+
     Returns (success, message) tuple.
     """
     subject = "Email Verification - Trade AI Assistant"
@@ -172,12 +198,15 @@ def send_verification_email(to_email: str, token: str) -> tuple[bool, str]:
         "Please enter this token on the Account Management page to verify your email.\n\n"
         "If you did not register for this service, please ignore this email."
     )
-    return send_email(to_email, subject, body)
+    return send_ai_generated_email(to_email, subject, body)
 
 
 def send_password_reset_email(to_email: str, token: str) -> tuple[bool, str]:
     """
     Send a password reset email containing the token.
+
+    Sends through the full provider chain (Resend -> SendGrid -> SMTP) so the
+    reset email works whenever any provider is configured.
 
     Returns (success, message) tuple.
     """
@@ -189,7 +218,7 @@ def send_password_reset_email(to_email: str, token: str) -> tuple[bool, str]:
         "Please enter this token to reset your password.\n\n"
         "If you did not request this, please ignore this email."
     )
-    return send_email(to_email, subject, body)
+    return send_ai_generated_email(to_email, subject, body)
 
 
 

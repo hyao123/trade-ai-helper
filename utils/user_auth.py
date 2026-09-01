@@ -394,8 +394,8 @@ def register_user(username: str, password: str, email: str = "") -> tuple[bool, 
     user_dir = get_user_data_dir(username)
     user_dir.mkdir(parents=True, exist_ok=True)
 
-    from utils.email_service import is_email_configured, send_verification_email
-    if is_email_configured():
+    from utils.email_service import has_email_provider_configured, send_verification_email
+    if has_email_provider_configured():
         send_verification_email(email, verification_token)
 
     st.session_state["authenticated"] = True
@@ -523,8 +523,8 @@ def update_account_email(username: str, email: str) -> tuple[bool, str]:
     if st.session_state.get("current_user", {}).get("username") == username:
         st.session_state["current_user"] = _build_public_user_info(user)
 
-    from utils.email_service import is_email_configured, send_verification_email
-    if is_email_configured():
+    from utils.email_service import has_email_provider_configured, send_verification_email
+    if has_email_provider_configured():
         send_verification_email(email, verification_token)
 
     audit_event("account_email_changed", "success", user_id=username)
@@ -601,9 +601,9 @@ def resend_verification_email(username: str) -> tuple[bool, str]:
         audit_event("email_verification_resend", "rate_limited", user_id=username, severity="warning")
         return True, "Verification email sent"
 
-    from utils.email_service import is_email_configured, send_verification_email
-    if not is_email_configured():
-        return False, "Email service is not configured"
+    from utils.email_service import has_email_provider_configured, send_verification_email
+    if not has_email_provider_configured():
+        return False, "邮件服务未配置，暂无法发送验证邮件。请联系管理员配置邮箱服务。"
 
     new_token = secrets.token_urlsafe(32)
     expires = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
@@ -679,8 +679,8 @@ def request_password_reset(email_or_username: str) -> tuple[bool, str]:
     users[username]["reset_token"] = _build_token_record(token, expires)
     _save_users_db(users)
 
-    from utils.email_service import is_email_configured, send_password_reset_email
-    if is_email_configured():
+    from utils.email_service import has_email_provider_configured, send_password_reset_email
+    if has_email_provider_configured():
         send_password_reset_email(user_email, token)
 
     logger.info("Password reset requested for user: %s", username)

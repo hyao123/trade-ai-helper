@@ -19,7 +19,17 @@ def is_verified_email_user(username: str | None) -> bool:
         return True
     user = load_user(username.strip().lower())
     email = str(user.get("email", "")).strip() if user else ""
-    return bool(email and user.get("email_verified") is True)
+    if not email:
+        return False
+    if user.get("email_verified") is True:
+        return True
+    # No mail provider configured means verification emails cannot be delivered.
+    # Locking users out would deadlock the product (register -> verify -> use AI),
+    # so without a provider the gate treats the email as effectively usable.
+    from utils.email_service import has_email_provider_configured
+    if not has_email_provider_configured():
+        return True
+    return False
 
 
 def verified_email_error_message() -> str:

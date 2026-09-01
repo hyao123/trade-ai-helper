@@ -58,7 +58,8 @@ class TestPricing:
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "unverified", "free", verified=False)
-            with patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            with patch("utils.storage.get_data_dir", return_value=tmp_dir), \
+                 patch("utils.email_service.has_email_provider_configured", return_value=True):
                 from utils.pricing import get_daily_usage, increment_usage
                 ok, msg = increment_usage("unverified")
                 assert ok is False
@@ -113,7 +114,8 @@ class TestPricing:
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "unverified2", "enterprise", verified=False)
-            with patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            with patch("utils.storage.get_data_dir", return_value=tmp_dir), \
+                 patch("utils.email_service.has_email_provider_configured", return_value=True):
                 from utils.pricing import check_feature_access
                 assert check_feature_access("unverified2", "basic") is False
                 assert check_feature_access("unverified2", "priority_support") is False

@@ -373,7 +373,7 @@ class TestUserAuth:
                      "utils.user_auth.secrets.token_urlsafe",
                      side_effect=["initial-token", "resend-1", "resend-2", "resend-3"],
                  ), \
-                 patch("utils.email_service.is_email_configured", return_value=True), \
+                 patch("utils.email_service.has_email_provider_configured", return_value=True), \
                  patch("utils.email_service.send_verification_email", return_value=(True, "sent")) as send_email, \
                  patch("utils.user_auth.audit_event") as audit:
                 from utils.user_auth import register_user, resend_verification_email
@@ -396,7 +396,7 @@ class TestUserAuth:
             with patch("utils.user_auth.st", _mock_st), \
                  self._patch_storage(tmp_dir), \
                  patch("utils.user_auth.secrets.token_urlsafe", side_effect=["initial-token", "resend-token"]), \
-                 patch("utils.email_service.is_email_configured", return_value=True), \
+                 patch("utils.email_service.has_email_provider_configured", return_value=True), \
                  patch("utils.email_service.send_verification_email", return_value=(True, "sent")):
                 from utils.user_auth import (
                     _email_verification_request_key,

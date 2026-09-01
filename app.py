@@ -161,6 +161,13 @@ def _render_email_verification_banner(st) -> None:
         )
         return
 
+    # No mail provider configured means verification emails cannot be delivered.
+    # The feature gate is relaxed in that case (see utils.email_gate), so the
+    # home banner must not nag users about a verification they cannot complete.
+    from utils.email_service import has_email_provider_configured
+    if not has_email_provider_configured():
+        return
+
     email = latest_user.get("email") or current_user.get("email") or "你的邮箱"
     safe_username = html.escape(username)
     safe_email = html.escape(email)

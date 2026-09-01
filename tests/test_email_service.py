@@ -161,7 +161,9 @@ class TestEmailService:
         mock_smtp_class = MagicMock(return_value=mock_smtp_instance)
 
         with patch("utils.email_service.get_secret", side_effect=mock_get_secret), \
-             patch("utils.email_service.smtplib.SMTP", mock_smtp_class):
+             patch("utils.email_service.smtplib.SMTP", mock_smtp_class), \
+             patch("utils.email_resend.is_resend_configured", return_value=False), \
+             patch("utils.email_sendgrid.is_sendgrid_configured", return_value=False):
             from utils.email_service import send_verification_email
             token = "test-verification-token-abc123"
             success, msg = send_verification_email("user@test.com", token)
@@ -196,7 +198,9 @@ class TestEmailService:
         mock_smtp_class = MagicMock(return_value=mock_smtp_instance)
 
         with patch("utils.email_service.get_secret", side_effect=mock_get_secret), \
-             patch("utils.email_service.smtplib.SMTP", mock_smtp_class):
+             patch("utils.email_service.smtplib.SMTP", mock_smtp_class), \
+             patch("utils.email_resend.is_resend_configured", return_value=False), \
+             patch("utils.email_sendgrid.is_sendgrid_configured", return_value=False):
             from utils.email_service import send_password_reset_email
             token = "reset-token-xyz789"
             success, msg = send_password_reset_email("user@test.com", token)
@@ -211,6 +215,50 @@ class TestEmailService:
                     body = part.get_payload(decode=True).decode("utf-8")
                     break
             assert token in body
+
+    def test_has_email_provider_configured_smtp_only(self):
+        """SMTP-only config still counts as a configured provider."""
+        def mock_get_secret(key, default=""):
+            secrets_map = {
+                "SMTP_HOST": "smtp.example.com",
+                "SMTP_PORT": "587",
+                "SMTP_USER": "user@example.com",
+                "SMTP_PASSWORD": "password123",
+                "SMTP_FROM_EMAIL": "noreply@example.com",
+            }
+            return secrets_map.get(key, default)
+
+        with patch("utils.email_service.get_secret", side_effect=mock_get_secret), \
+             patch("utils.email_resend.is_resend_configured", return_value=False), \
+             patch("utils.email_sendgrid.is_sendgrid_configured", return_value=False):
+            from utils.email_service import has_email_provider_configured
+            assert has_email_provider_configured() is True
+
+    def test_has_email_provider_configured_resend_only(self):
+        """Resend-only config counts as a configured provider."""
+        with patch("utils.email_resend.is_resend_configured", return_value=True), \
+             patch("utils.email_sendgrid.is_sendgrid_configured", return_value=False), \
+             patch("utils.email_service.get_secret", return_value=""):
+            from utils.email_service import has_email_provider_configured
+            assert has_email_provider_configured() is True
+
+    def test_has_email_provider_configured_none(self):
+        """No provider configured returns False."""
+        with patch("utils.email_resend.is_resend_configured", return_value=False), \
+             patch("utils.email_sendgrid.is_sendgrid_configured", return_value=False), \
+             patch("utils.email_service.get_secret", return_value=""):
+            from utils.email_service import has_email_provider_configured
+            assert has_email_provider_configured() is False
+
+    def test_send_verification_email_prefers_resend(self):
+        """Verification email uses the Resend provider when configured."""
+        with patch("utils.email_resend.is_resend_configured", return_value=True), \
+             patch("utils.email_resend.send_resend_email", return_value=(True, "sent", "tid")) as send_resend, \
+             patch("utils.email_service._SENDING_RESEND_EMAIL", False):
+            from utils.email_service import send_verification_email
+            ok, msg = send_verification_email("user@test.com", "tok-resend-1")
+            assert ok is True
+            send_resend.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

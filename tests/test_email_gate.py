@@ -49,9 +49,34 @@ class TestEmailGate:
         with self._setup() as tmp_str:
             tmp_dir = Path(tmp_str)
             self._create_user(tmp_dir, "pending", verified=False)
-            with patch("utils.storage.get_data_dir", return_value=tmp_dir):
+            with patch("utils.storage.get_data_dir", return_value=tmp_dir), \
+                 patch("utils.email_service.has_email_provider_configured", return_value=True):
                 from utils.email_gate import require_verified_email
                 allowed, message = require_verified_email("pending")
+                assert allowed is False
+                assert "验证邮箱" in message
+
+    def test_unverified_user_allowed_without_provider(self):
+        """Without any mail provider the gate cannot send tokens, so it must not lock users out."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            self._create_user(tmp_dir, "pending2", verified=False)
+            with patch("utils.storage.get_data_dir", return_value=tmp_dir), \
+                 patch("utils.email_service.has_email_provider_configured", return_value=False):
+                from utils.email_gate import require_verified_email
+                allowed, message = require_verified_email("pending2")
+                assert allowed is True
+                assert message == ""
+
+    def test_verified_user_blocked_when_no_email(self):
+        """A user without any email stays blocked even without a mail provider."""
+        with self._setup() as tmp_str:
+            tmp_dir = Path(tmp_str)
+            self._create_user(tmp_dir, "noemail2", verified=True, email="")
+            with patch("utils.storage.get_data_dir", return_value=tmp_dir), \
+                 patch("utils.email_service.has_email_provider_configured", return_value=False):
+                from utils.email_gate import require_verified_email
+                allowed, message = require_verified_email("noemail2")
                 assert allowed is False
                 assert "验证邮箱" in message
 
