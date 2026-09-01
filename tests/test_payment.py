@@ -43,7 +43,7 @@ class TestPayment:
              patch("utils.email_gate.require_verified_email", return_value=(True, "")):
             success, msg = create_checkout_session("testuser", "pro")
             assert success is False
-            assert "Stripe not installed" in msg
+            assert "支付服务未安装" in msg
 
     def test_create_checkout_session_requires_verified_email(self):
         self._setup()
@@ -78,7 +78,7 @@ class TestPayment:
              patch("utils.email_gate.require_verified_email", return_value=(True, "")):
             success, msg = create_checkout_session("testuser", "pro")
             assert success is False
-            assert "not configured" in msg
+            assert "支付服务未配置" in msg
 
     def test_create_checkout_session_success(self):
         self._setup()

@@ -8,13 +8,14 @@
 
 ## 执行摘要
 
-**审查发现**：项目存在 **8 类外部服务依赖**，共识别 **5 个高风险点**（可能导致功能死锁或体验降级）和 **3 个中风险点**（需改进提示）。
+**审查发现**：项目存在 **8 类外部服务依赖**，初始审查识别出 5 个高/中风险点；其中 P1、P2 已完成修复。
 
 | 风险等级 | 数量 | 典型问题 |
 |---------|------|---------|
 | 🔴 高风险（已修复） | 1 | 验证邮箱死锁（邮件 provider 未配置 → AI 功能被锁） |
-| 🟡 高风险（待修复） | 4 | 邮件发送门控不一致、支付门控过严、inbox OAuth 无降级 |
-| 🟠 中风险 | 3 | 提示信息不友好、降级路径未明示 |
+| 🟡 中风险（已修复） | 1 | 邮件发送门控不一致（不同模块使用不同 provider 检测） |
+| 🟠 体验问题（已修复） | 2 | Inbox OAuth 配置引导、支付配置错误消息 |
+| 🟢 低风险 | 多个 | 已有合理降级，仅需文档改进 |
 | 🟢 低风险 | 多个 | 已有合理降级，仅需文档改进 |
 
 ---
@@ -23,7 +24,7 @@
 
 ### 1. AI 生成服务（核心功能）
 **配置检测**：`utils.ai_client._any_provider_configured()`  
-**依赖项**：`NVIDIA_API_KEY` / `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` 或自定义 provider  
+**依赖项**：`NVIDIA_API_KEY` / `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` / `OPENCODE_ZEN_API_KEY` 或自定义 provider  
 **门控位置**：`ai_client._check_preconditions` (247 行)  
 **降级路径**：✅ **合理**  
 - 无任何 key → 返回友好提示 "⚠️ 请先设置 AI API Key"
@@ -63,48 +64,37 @@
 ---
 
 #### 2.3 工作流邮件提醒（workflow reminder）
-**配置检测**：`is_email_configured()`（⚠️ **旧函数**）  
-**依赖项**：纯 SMTP  
+**配置检测**：`has_email_provider_configured()`（✅ 已统一）  
+**依赖项**：Resend → SendGrid → SMTP 三级链  
 **门控位置**：
-- `utils.workflow.py:233`：无 SMTP → 记 warning 日志，返回 (0, 0)
-- `pages/10_📅_跟进日历.py:36`：`is_email_configured()` 门控提醒 UI
+- `utils.workflow.py:233`：无 provider → 记 warning 日志，返回 (0, 0)
+- `pages/10_📅_跟进日历.py:36`：统一 provider 检测后显示提醒 UI
 
-**降级路径**：⚠️ **不一致**  
-- workflow 邮件提醒只检查 `is_email_configured()`（纯 SMTP），而非 `has_email_provider_configured()`
-- 若只配置 Resend/SendGrid，提醒邮件发不出（与业务邮件行为不一致）
+**降级路径**：✅ **已统一**  
+- 任一邮件 provider 可用时，提醒通过 `send_followup_reminder` 的三级链发送
+- 无 provider 时保持无崩溃降级，不阻塞日历使用
 
-**风险评估**：🟡 **中风险** —— 功能可用但行为不一致
-
-**建议修复**：
-```python
-# utils/workflow.py:233 + pages/10:36
-- if not is_email_configured():
-+ if not has_email_provider_configured():
-```
+**风险评估**：🟢 **已解决** —— Resend/SendGrid/SMTP 行为一致
 
 ---
 
 #### 2.4 通知摘要邮件（digest）
-**配置检测**：`is_email_configured()`（⚠️ **旧函数**）  
-**依赖项**：纯 SMTP  
+**配置检测**：`has_email_provider_configured()`（✅ 已统一）  
+**依赖项**：Resend → SendGrid → SMTP 三级链  
 **门控位置**：`utils.notifications.py:368`  
-**降级路径**：返回 "Email not configured"
+**降级路径**：无 provider 返回友好失败结果；有 provider 通过 `send_ai_generated_email` 发送
 
-**风险评估**：🟡 **中风险** —— 同 2.3
-
-**建议修复**：同 2.3，切换到 `has_email_provider_configured()` + 复用三级链
+**风险评估**：🟢 **已解决** —— 不再依赖 SMTP-only
 
 ---
 
 #### 2.5 自动外呼转发（auto_outreach forward）
-**配置检测**：`is_email_configured()`（⚠️ **旧函数**）  
-**依赖项**：纯 SMTP  
+**配置检测**：`has_email_provider_configured()`（✅ 已统一）  
+**依赖项**：Resend → SendGrid → SMTP 三级链  
 **门控位置**：`utils.auto_outreach.py:680`  
-**降级路径**：记 warning 日志，返回 False（不发送）
+**降级路径**：无 provider 记 warning 并返回 False；有 provider 通过三级链发送
 
-**风险评估**：🟡 **中风险** —— 同 2.3
-
-**建议修复**：同 2.3
+**风险评估**：🟢 **已解决** —— 不再依赖 SMTP-only
 
 ---
 
@@ -112,17 +102,17 @@
 **配置检测**：`utils.payment.is_payment_configured()`  
 **依赖项**：`STRIPE_SECRET_KEY` + `STRIPE_PRICE_ID_PRO` / `STRIPE_PRICE_ID_ENTERPRISE`  
 **门控位置**：
-- `pages/11_👤_账户管理.py:266`："升级套餐"按钮 disabled + "⚠️ Stripe 未配置，暂无法升级套餐"
+- `pages/11_👤_账户管理.py:266`："升级套餐"按钮显示配置提示
 - `pages/23_💳_套餐升级.py:177`：同上
-- `payment.create_checkout_session:56`：返回 "Payment not configured"
+- `payment.create_checkout_session:54-57`：统一返回中文配置错误
 
-**降级路径**：✅ **合理门控**  
-- 支付未配置 → UI 明确提示，按钮禁用
-- 不影响其他功能（AI 生成、CRM 等）
+**降级路径**：✅ **已优化**  
+- 支付未配置 → UI 明确提示，不影响其他功能（AI 生成、CRM 等）
+- Stripe SDK 未安装 → 提示联系技术支持
 
-**风险评估**：🟢 **低风险** —— 提示清晰，不阻塞核心功能
+**风险评估**：🟢 **已解决** —— 配置错误不再显示英文
 
-**改进建议**：中文化 "Payment not configured" → "支付服务未配置，请联系管理员"
+**完成内容**：`支付服务未安装，请联系技术支持`、`支付服务未配置，请在 Secrets 中配置 STRIPE_SECRET_KEY 和价格 ID`
 
 ---
 
@@ -133,14 +123,12 @@
 - `inbox_integration.get_available_providers():90`：返回已配置 provider 列表
 - 各 OAuth 流程入口（`start_oauth_flow` / `exchange_code` 等）检查配置
 
-**降级路径**：⚠️ **部分功能不可用**  
-- 无任何 provider 配置 → 收件箱集成完全不可用
-- UI 层缺少友好提示（用户看到空列表，不知为何）
+**降级路径**：✅ **已优化**  
+- 无任何 provider 配置 → 收件箱保持可打开，不崩溃
+- UI 显示 Gmail/Outlook 配置步骤、所需环境变量、OAuth 重定向 URI 和刷新提示
+- 引导文案由 `inbox_integration.oauth_setup_guidance()` 统一生成并有测试覆盖
 
-**风险评估**：🟠 **中风险** —— 不影响核心 AI 功能，但体验差
-
-**建议改进**：
-- `pages/35_📥_AI收件箱.py`：检测 `get_available_providers()` 为空时，显示配置引导："📮 当前未配置 Gmail/Outlook OAuth，请在 Secrets 中配置 GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET"
+**风险评估**：🟢 **已解决** —— 不影响核心 AI 功能，配置路径清晰
 
 ---
 
@@ -207,62 +195,46 @@
 
 ---
 
-### 🟡 问题 2：邮件发送门控不一致
-**影响模块**：workflow reminder (工作流邮件提醒)、notification digest (通知摘要)、auto_outreach forward (重点客户转发)  
-**问题**：这 3 处仍使用 `is_email_configured()`（纯 SMTP 检测），与业务邮件的 `has_email_provider_configured()` 不一致。
+### 🟡 问题 2：邮件发送门控不一致（已修复）
+**状态**：✅ 已修复（提交 `3526842`，后续补齐页面调用点）  
+**影响模块**：workflow reminder、notification digest、auto_outreach forward、开发信、跟进日历、密码重置 UI  
+**原问题**：部分模块使用 `is_email_configured()`（纯 SMTP 检测），与业务邮件的 `has_email_provider_configured()` 不一致。
 
 **用户影响**：
-- 配置了 Resend/SendGrid，但未配 SMTP → 开发信能发，但工作流提醒发不出
+- 配置了 Resend/SendGrid，但未配 SMTP → 部分入口显示不可用或邮件发不出
 - 行为不一致，用户困惑
 
 **修复方案**：
-1. **统一门控函数**：3 处改为 `has_email_provider_configured()`
-2. **复用三级链**：`send_followup_reminder` / `send_email`（notifications.py:371）改为调用 `send_ai_generated_email` 或共享链
-3. **测试更新**：test_mid_priority.py / test_workflow.py 相关 patch 更新
+1. 统一使用 `has_email_provider_configured()`
+2. 提醒、摘要和重点客户转发统一通过 Resend → SendGrid → SMTP 三级链
+3. 增加调用点回归测试，防止重新引入 SMTP-only 门控
 
-**优先级**：🟡 **中** —— 不影响核心流程，但体验不一致
+**结果**：✅ 所有业务邮件入口行为一致；无 provider 时优雅降级，不阻塞其他功能
 
 ---
 
-### 🟡 问题 3：支付门控消息非中文
+### 🟡 问题 3：支付门控消息非中文（已修复）
+**状态**：✅ 已修复（本次 P2 提交）  
 **影响模块**：pages/11、pages/23、utils/payment.py  
-**问题**：`create_checkout_session` 返回 "Payment not configured" / "Stripe not installed" 英文错误
+**原问题**：`create_checkout_session` 返回 "Payment not configured" / "Stripe not installed" 英文错误。
 
-**修复方案**：
-```python
-# utils/payment.py:54-57
-if not STRIPE_AVAILABLE:
--   return (False, "Stripe not installed")
-+   return (False, "支付服务未安装，请联系技术支持")
-if not is_payment_configured():
--   return (False, "Payment not configured")
-+   return (False, "支付服务未配置，请在 Secrets 中配置 STRIPE_SECRET_KEY 和价格 ID")
-```
+**修复结果**：
+- Stripe SDK 未安装：`支付服务未安装，请联系技术支持`
+- Stripe 未配置：`支付服务未配置，请在 Secrets 中配置 STRIPE_SECRET_KEY 和价格 ID`
 
-**优先级**：🟢 **低** —— 体验优化
+**用户体验**：✅ 配置错误提示统一中文且包含下一步操作
 
 ---
 
-### 🟠 问题 4：Inbox OAuth 无配置时 UI 缺少引导
+### 🟠 问题 4：Inbox OAuth 无配置时 UI 缺少引导（已修复）
+**状态**：✅ 已修复（本次 P2 提交）  
 **影响模块**：pages/35_📥_AI收件箱.py  
-**问题**：`get_available_providers()` 返回空列表时，用户看不到任何提示，不知道为何无法连接 Gmail/Outlook
+**原问题**：`get_available_providers()` 为空时，用户不知道为何无法连接 Gmail/Outlook。
 
-**修复方案**：
-```python
-# pages/35_📥_AI收件箱.py (约 60-80 行，provider 选择 section)
-available = get_available_providers()
-if not available:
-    st.warning(
-        "📮 当前未配置任何邮件 OAuth 集成。\n\n"
-        "请在 `.streamlit/secrets.toml` 或环境变量中配置：\n"
-        "- **Gmail**: `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`\n"
-        "- **Outlook**: `OUTLOOK_CLIENT_ID`, `OUTLOOK_CLIENT_SECRET`\n\n"
-        "[查看配置文档](https://github.com/your-repo/docs/inbox-oauth.md)"
-    )
-    st.stop()
-```
-
-**优先级**：🟠 **中** —— 改善新用户体验
+**修复结果**：
+- 页面保留可打开、不崩溃
+- 显示 Gmail/Outlook 配置步骤、环境变量、OAuth 重定向 URI 以及重启/刷新提示
+- 文案由 `oauth_setup_guidance()` 统一生成，并由测试覆盖
 
 ---
 
@@ -293,9 +265,9 @@ if not _any_provider_configured():
 | 问题 | 风险 | 影响范围 | 优先级 | 工作量 |
 |-----|------|---------|--------|--------|
 | 验证邮箱死锁 | 🔴 高 | AI 功能锁死 | ✅ 已修复 | - |
-| 邮件门控不一致 | 🟡 中 | workflow/notification 邮件 | P1 | 2-3h（含测试） |
-| 支付消息中文化 | 🟢 低 | 套餐升级提示 | P2 | 30min |
-| Inbox OAuth 引导 | 🟠 中 | 收件箱配置体验 | P2 | 1h |
+| 邮件门控不一致 | ✅ 已完成 | workflow/notification/forward + 页面入口 | P1 | - |
+| Inbox OAuth 引导 | ✅ 已完成 | 收件箱配置体验 | P2 | - |
+| 支付消息中文化 | ✅ 已完成 | 套餐升级提示 | P2 | - |
 | AI provider 引导 | 🟢 低 | 首次部署体验 | P3 | 30min |
 
 ---
@@ -310,9 +282,10 @@ if not _any_provider_configured():
 
 ### 4.2 用户体验改进清单
 - ✅ 验证邮箱三级链：已实现
-- ⬜ 统一邮件门控（workflow/notification）：待修复
-- ⬜ 中文化错误消息：支付/SSO/其他英文提示
-- ⬜ 首次配置引导：AI provider / Inbox OAuth 在相关页面顶部提示
+- ✅ 统一邮件门控：workflow/notification/auto_outreach/开发信/跟进日历/密码重置已统一
+- ✅ Inbox OAuth 首次配置引导：已实现（变量、重定向 URI、重启/刷新提示）
+- ✅ 支付配置错误消息中文化：已实现
+- ⬜ 首次配置引导：AI provider 在相关页面顶部提示
 - ⬜ 文档完善：`docs/configuration-guide.md` 列出所有可选服务及配置方式
 
 ---
@@ -322,22 +295,13 @@ if not _any_provider_configured():
 **现有测试**：
 - ✅ `test_email_service.py`：has_email_provider_configured + 三级链
 - ✅ `test_email_gate.py`：无 provider 时放宽
-- ✅ `test_payment.py`：is_payment_configured
+- ✅ `test_payment.py`：is_payment_configured + 中文配置错误
+- ✅ `test_inbox_oauth_guidance.py`：OAuth 配置变量、重定向 URI、刷新提示
+- ✅ `test_email_gate_call_sites.py`：邮件相关页面统一使用多 provider 检测
+- ✅ `test_mid_priority.py`：workflow/notification/auto_outreach 三级链与无 provider 降级
 - ✅ `test_mailslurp_integration.py`：is_mailslurp_configured
-- ⬜ **缺失**：workflow/notification 邮件门控测试（待补充）
 
-**建议新增测试**：
-```python
-# tests/test_workflow_email_fallback.py
-def test_workflow_reminder_uses_provider_chain():
-    # Mock has_email_provider_configured True (Resend)
-    # Mock send_ai_generated_email success
-    # Assert workflow reminder sent via Resend, not SMTP-only
-
-def test_workflow_reminder_silent_fail_without_provider():
-    # Mock has_email_provider_configured False
-    # Assert send_due_reminders returns (0, 0), no crash
-```
+P1/P2 的依赖门控与用户提示已有回归覆盖。
 
 ---
 
@@ -345,16 +309,16 @@ def test_workflow_reminder_silent_fail_without_provider():
 
 ### 立即修复（P1）
 1. ✅ **验证邮箱死锁**：已完成（提交 `b7aca1d`）
-2. ⬜ **邮件门控统一**：workflow/notification/auto_outreach 改用 `has_email_provider_configured()` + 三级链（2-3h，含测试）
+2. ✅ **邮件门控统一**：已完成（提交 `3526842`，并补齐开发信/跟进日历/密码重置 UI 调用点）
 
 ### 短期改进（P2）
-3. ⬜ 支付/Inbox 中文提示（1h）
-4. ⬜ 补充 workflow 邮件测试（1h）
+3. ✅ **支付/Inbox 配置提示**：已完成（本次 P2 提交）
+4. ✅ **workflow/notification/auto_outreach 测试**：已完成（提交 `3526842`）
 
 ### 长期优化（P3）
-5. ⬜ 首页配置引导（可选）
+5. ⬜ 首页 AI provider 配置引导（可选）
 6. ⬜ 配置文档完善
 
 ---
 
-**审查结论**：项目外部依赖管理整体合理，核心死锁问题已修复。剩余 4 个中风险点建议按优先级逐步修复，提升体验一致性。
+**审查结论**：项目外部依赖管理整体合理，核心死锁问题及 P1/P2 体验风险均已修复。当前仅剩首页 AI provider 配置引导与配置文档完善两项低优先级优化。

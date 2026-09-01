@@ -52,9 +52,9 @@ def create_checkout_session(username: str, target_tier: str) -> tuple[bool, str]
     if not allowed:
         return (False, message)
     if not STRIPE_AVAILABLE:
-        return (False, "Stripe not installed")
+        return (False, "支付服务未安装，请联系技术支持")
     if not is_payment_configured():
-        return (False, "Payment not configured")
+        return (False, "支付服务未配置，请在 Secrets 中配置 STRIPE_SECRET_KEY 和价格 ID")
 
     price_id = get_price_id(target_tier)
     if not price_id:

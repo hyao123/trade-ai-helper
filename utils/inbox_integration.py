@@ -90,6 +90,24 @@ def get_available_providers() -> list[str]:
     return [p for p in PROVIDERS if is_provider_configured(p)]
 
 
+def oauth_setup_guidance(redirect_uri: str) -> str:
+    """Return actionable setup guidance when no inbox OAuth provider is ready."""
+    return (
+        "在项目的 `.env` 文件里填入任一组 OAuth 凭证并**重启应用**即可启用。\n\n"
+        "**选项 A — Gmail：**\n"
+        "1. 到 [Google Cloud Console](https://console.cloud.google.com/apis/credentials) 创建 OAuth 2.0 客户端（Web 应用）\n"
+        "2. 把下方「重定向 URI」添加到该客户端的**已授权重定向 URI** 列表\n"
+        "3. 在 `.env` 中填 `GMAIL_CLIENT_ID` 和 `GMAIL_CLIENT_SECRET`\n\n"
+        "**选项 B — Outlook / Microsoft 365：**\n"
+        "1. 到 [Azure 门户](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) 注册应用\n"
+        "2. 把下方「重定向 URI」添加到该应用的**重定向 URI**（Web 平台）\n"
+        "3. 在 `.env` 中填 `OUTLOOK_CLIENT_ID` 和 `OUTLOOK_CLIENT_SECRET`\n\n"
+        "> 💡 本机开发也可用：应用以 `localhost:8501` 运行时，重定向 URI 同样适用（Google/Azure 均支持本地回环）。\n\n"
+        f"**重定向 URI（配置 OAuth 应用时需填写）：**\n`{redirect_uri}`\n\n"
+        "配置完成后刷新本页面，「连接按钮」即会出现。"
+    )
+
+
 def get_auth_url(provider: str, redirect_uri: str, state: str = "") -> str:
     """
     Generate the OAuth2 authorization URL for the user to visit.

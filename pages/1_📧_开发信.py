@@ -8,7 +8,7 @@ import streamlit as st
 
 from utils.ai_client import generate_email
 from utils.conversation import Conversation, stream_with_context
-from utils.email_service import is_email_configured, send_ai_generated_email
+from utils.email_service import has_email_provider_configured, send_ai_generated_email
 from utils.templates import (
     delete_template,
     get_template_data,
@@ -242,7 +242,7 @@ last_email_result = st.session_state.results.get("email", "")
 if last_email_result and not last_email_result.startswith("⚠️"):
     st.markdown("---")
     st.markdown("### 📨 直接发送邮件")
-    if not is_email_configured():
+    if not has_email_provider_configured():
         st.caption("💡 在 Secrets 中配置 SMTP_HOST / SMTP_USER / SMTP_PASSWORD 等参数后可直接发送邮件。")
     else:
         with st.expander("📨 发送此邮件给客户", expanded=False):

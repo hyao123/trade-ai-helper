@@ -5,7 +5,7 @@ pages/10_📅_跟进日历.py
 import streamlit as st
 
 from utils.customers import find_customer, update_customer_stage
-from utils.email_service import is_email_configured
+from utils.email_service import has_email_provider_configured
 from utils.ui_helpers import check_auth, inject_css
 from utils.user_auth import get_current_user
 from utils.workflow import (
@@ -33,7 +33,7 @@ st.markdown("""
 
 # ── 邮件提醒发送 ──────────────────────────────────────
 current_user = get_current_user()
-if current_user and current_user.get("email") and is_email_configured():
+if current_user and current_user.get("email") and has_email_provider_configured():
     user_email = current_user["email"]
     due_count = len(_safe_read(get_due_workflows, []))
     if due_count > 0:

@@ -308,11 +308,11 @@ def check_auth() -> None:
 
 def _show_forgot_password_view() -> None:
     """Show the forgot password form for requesting a reset email."""
-    from utils.email_service import is_email_configured
+    from utils.email_service import has_email_provider_configured
 
     with st.form("forgot_password_form"):
         st.subheader(f"🔑 {t('forgot_password')}")
-        if not is_email_configured():
+        if not has_email_provider_configured():
             st.warning(f"⚠️ {t('email_not_configured')}")
         email_or_user = st.text_input(t("enter_email_or_username"), placeholder=t("enter_email_or_username"), key="_forgot_input")
         if st.form_submit_button(t("send_reset_email"), use_container_width=True, type="primary"):
