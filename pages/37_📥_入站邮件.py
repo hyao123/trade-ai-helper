@@ -13,6 +13,7 @@ from utils.inbound_email import (
     parse_eml_bytes,
     parse_raw_email_text,
     seed_inquiry_session_state,
+    send_inbound_reply,
     update_inbound_status,
 )
 from utils.ui_helpers import check_auth, inject_css
@@ -164,6 +165,34 @@ with queue_tab:
                             st.error(f"⚠️ 归档失败：{exc}")
                         else:
                             st.rerun()
+
+                # ── 直接回复（走 Resend → SendGrid → SMTP 发信链）──
+                st.markdown("**💬 直接回复**")
+                reply_body = st.text_area(
+                    "回复内容",
+                    key=f"reply_body_{item['id']}",
+                    height=100,
+                    placeholder="输入回复内容后点击「发送回复」，系统将自动记录到对外发送日志…",
+                )
+                if st.button(
+                    "发送回复",
+                    key=f"send_reply_{item['id']}",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=not (reply_body or "").strip(),
+                ):
+                    try:
+                        ok, msg = send_inbound_reply(
+                            username, item["id"], (reply_body or "").strip(),
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        st.error(f"⚠️ 发送失败：{exc}")
+                    else:
+                        if ok:
+                            st.success(msg)
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {msg}")
 
 st.markdown("---")
 st.markdown('<div class="footer">💼 外贸AI助手 · 入站邮件 Intake</div>', unsafe_allow_html=True)

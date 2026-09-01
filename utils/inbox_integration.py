@@ -30,7 +30,9 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 
+from utils.email_tracking import create_tracking_record
 from utils.logger import get_logger
+from utils.outreach_log import append_outreach_log
 from utils.secrets import get_secret
 from utils.storage import load_user_json, save_user_json
 
@@ -356,14 +358,37 @@ def send_via_provider(
 
     try:
         if provider == "gmail":
-            return _send_gmail(token, to_email, subject, body)
+            ok, msg = _send_gmail(token, to_email, subject, body)
         elif provider == "outlook":
-            return _send_outlook(token, to_email, subject, body)
+            ok, msg = _send_outlook(token, to_email, subject, body)
         else:
             return False, f"Unsupported provider: {provider}"
     except Exception as e:
         logger.error("Send failed for %s: %s", username, e)
         return False, f"Send failed: {e}"
+
+    if ok:
+        # Record the send: create a tracking record and append to the unified
+        # per-user outreach log so direct replies are auditable.
+        try:
+            tracking_id = create_tracking_record(
+                user_id=username,
+                to_email=to_email,
+                subject=subject,
+            )
+        except Exception as exc:  # noqa: BLE001 - tracking must not break the send result
+            logger.debug("Tracking record creation failed for %s: %s", username, exc)
+            tracking_id = ""
+        append_outreach_log(username, {
+            "direction": "out",
+            "source": "inbox",
+            "provider": provider,
+            "tracking_id": tracking_id,
+            "to_email": to_email,
+            "subject": subject,
+            "status": "sent",
+        })
+    return ok, msg
 
 
 # ---------------------------------------------------------------------------

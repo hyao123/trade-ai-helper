@@ -14,6 +14,8 @@ from email import policy
 from email.parser import BytesParser, Parser
 from email.utils import parseaddr
 
+from utils.email_service import send_ai_generated_email
+from utils.outreach_log import append_outreach_log
 from utils.repositories import load_inbound_emails, save_inbound_emails
 
 MAX_INBOUND_EMAILS_PER_USER = 1000
@@ -216,6 +218,61 @@ def get_inbound_email(username: str, inbound_id: str) -> dict | None:
         if email.get("id") == inbound_id:
             return email
     return None
+
+
+def send_inbound_reply(
+    username: str,
+    inbound_id: str,
+    reply_body: str,
+    subject: str = "",
+) -> tuple[bool, str]:
+    """Send a reply to an inbound inquiry, then mark it replied and log it.
+
+    Sends through the standard provider chain (Resend -> SendGrid -> SMTP),
+    which also creates an email tracking record. On success the inbound record
+    is marked ``replied`` and one entry is appended to the unified per-user
+    outreach log (source=inbound) so the whole inquiry->reply is auditable.
+
+    Returns:
+        (True, message) on success; (False, reason) otherwise.
+    """
+    inbound = get_inbound_email(username, inbound_id)
+    if not inbound:
+        return False, "入站邮件不存在或已删除"
+
+    from_email = (inbound.get("from_email") or "").strip()
+    # "Name <email@x.com>" guard: keep only the bare address if present.
+    m = re.search(r"<([^>]+)>", from_email)
+    to_email = m.group(1).strip() if m else from_email
+    if not to_email:
+        return False, "无法确定收件人邮箱"
+
+    original_subject = (inbound.get("subject") or "").strip()
+    if subject.strip():
+        reply_subject = subject.strip()
+    elif original_subject.lower().startswith("re:"):
+        reply_subject = original_subject
+    else:
+        reply_subject = f"Re: {original_subject}" if original_subject else "Re: Your inquiry"
+
+    ok, msg = send_ai_generated_email(
+        to_email=to_email,
+        subject=reply_subject,
+        body=reply_body,
+    )
+    if not ok:
+        return False, msg
+
+    update_inbound_status(username, inbound_id, "replied")
+    append_outreach_log(username, {
+        "direction": "out",
+        "source": "inbound",
+        "inbound_id": inbound_id,
+        "to_email": to_email,
+        "subject": reply_subject,
+        "status": "sent",
+    })
+    return True, f"回复已发送到 {to_email}"
 
 
 def seed_inquiry_session_state(st, inbound: dict) -> None:

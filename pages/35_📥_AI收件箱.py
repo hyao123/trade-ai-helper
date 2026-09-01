@@ -443,7 +443,8 @@ with tab_inbox:
                         st.success(f"✅ 已发送给 {to_email}")
                         # 清空草稿
                         st.session_state.pop(draft_key, None)
-                        # TODO: 关联原 tracking_id 后记录到 outreach log。
+                        # send_via_provider 内部已创建 tracking 并写入统一对外发送日志
+                        # (utils.outreach_log)，无需在此重复记录。
                     else:
                         st.error(f"❌ 发送失败: {send_msg}")
 
