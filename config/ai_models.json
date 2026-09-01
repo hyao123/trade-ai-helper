@@ -65,7 +65,8 @@
       "base_url": "https://opencode.ai/zen/go/v1",
       "key_env": "OPENCODE_ZEN_API_KEY",
       "models": {
-        "deepseek-v4-flash": "deepseek-v4-flash"
+        "deepseek-v4-flash": "deepseek-v4-flash",
+        "deepseek-v3": "deepseek-v3"
       },
       "default_model": "deepseek-v4-flash",
       "cost_per_1k_tokens": 0.0
