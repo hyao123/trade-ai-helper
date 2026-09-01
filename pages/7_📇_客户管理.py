@@ -15,7 +15,8 @@ from utils.customers import (
     get_customers,
     remove_tag,
 )
-from utils.ui_helpers import check_auth, inject_css
+from utils.customer_timeline import get_timeline
+from utils.ui_helpers import check_auth, inject_css, get_user_id
 from utils.workflow import create_workflow_from_customer
 
 
@@ -164,6 +165,41 @@ else:
             st.caption(f"添加日期: {cust['created_at']} | 最后联系: {cust['last_contact']}")
             if cust.get("notes"):
                 st.write(f"📝 {cust['notes']}")
+
+            # 互动时间线
+            if cust.get("email"):
+                st.markdown("---")
+                st.markdown("**📅 互动时间线：**")
+                username = get_user_id()
+                timeline = get_timeline(username, cust["email"], limit=10)
+                if timeline:
+                    event_labels = {
+                        "lead_captured": "🎯 线索捕获",
+                        "email_sent": "📤 发送邮件",
+                        "email_replied": "💬 回复邮件",
+                        "workflow_created": "📋 创建工作流",
+                        "email_classified": "🔍 邮件分类",
+                    }
+                    for evt in timeline:
+                        ts = evt.get("timestamp", "")[:16].replace("T", " ")  # 2026-09-01T10:30 -> 2026-09-01 10:30
+                        evt_type = evt.get("event_type", "")
+                        label = event_labels.get(evt_type, evt_type)
+                        data = evt.get("data", {})
+                        # 构建简要描述
+                        summary_parts = []
+                        if evt_type == "lead_captured":
+                            summary_parts.append(f"意图: {data.get('intent', '—')}")
+                            if data.get("workflow_created"):
+                                summary_parts.append("已创建跟进")
+                        elif evt_type == "email_sent":
+                            summary_parts.append(f"主题: {data.get('subject', '—')}")
+                        elif evt_type == "email_replied":
+                            summary_parts.append(f"主题: {data.get('subject', '—')}")
+                        summary = " | ".join(summary_parts) if summary_parts else ""
+                        st.caption(f"{ts}  {label}  {summary}")
+                else:
+                    st.caption("暂无互动记录")
+
 
             # 标签管理
             st.markdown("**🏷️ 标签：**")

@@ -114,13 +114,14 @@ pages/5 跟进邮件 / pages/10 跟进日历 / send_due_reminders（到期提醒
 - `auto_reply_to_customer` 输出 `inbox_ai.INTENT_CATEGORIES` canonical key
 - 旧英文文案通过 `normalize_reply_intent` 兼容映射；页面显示中文 label
 
-**P4a — 统一事件流基础（治 B6）——✅ 已完成（待提交）**
+**P4a — 统一事件流基础（治 B6）——✅ 已完成（`5bd47f9`）**
 - 新建 `customer_timeline.json`（用户级，最多 1000 条事件）
 - 核心写入点：lead_capture 成功、inbox send_via_provider、inbound send_reply
 - 事件类型：lead_captured / email_sent / email_replied（timestamp + data + source）
 
-**P4b — 客户画像时间线展示（可选后续）**
-- pages/28 客户画像消费 timeline 展示完整互动历史
+**P4b — 客户画像时间线展示——✅ 已完成（待提交）**
+- pages/7 客户管理：每个客户 expander 内展示最近 10 条互动事件
+- 时间 + 事件类型 + 简要信息（主题/意图/工作流状态）
 
 **P4c — 历史数据回填（可选后续）**
 
