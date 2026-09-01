@@ -96,7 +96,7 @@ pages/5 跟进邮件 / pages/10 跟进日历 / send_due_reminders（到期提醒
 | B3 | 邮件链路不自动沉淀 CRM / 跟进工作流 | inbox/inbound 均无 add_customer 联动 | ✅ P2：高意图自动建客户+工作流 |
 | B4 | 高优先级意图无通知提醒 | inbox_ai 分类后无人触发 notify(hot_lead/…) | ✅ P2：触发 hot_lead |
 | B5 | 两套意图体系不一致 | inbox_ai.INTENT_CATEGORIES vs auto_reply 的 INTENT: | ✅ P3：统一 canonical key + legacy 映射 |
-| B6 | 三套存储并行、无统一事件流 | inbound / processed / tracking | 无法形成客户时间线（页面28 客户画像数据源受限） |
+| B6 | 三套存储并行、无统一事件流 | inbound / processed / tracking | ✅ P4a：customer_timeline 统一事件流 + 核心写入点 |
 | B7 | 入站邮件回复不关联 campaign/产品上下文 | inbound_email 无 campaign_id 字段 | 自动回复无产品/公司上下文，质量受限 |
 
 ---
@@ -114,8 +114,15 @@ pages/5 跟进邮件 / pages/10 跟进日历 / send_due_reminders（到期提醒
 - `auto_reply_to_customer` 输出 `inbox_ai.INTENT_CATEGORIES` canonical key
 - 旧英文文案通过 `normalize_reply_intent` 兼容映射；页面显示中文 label
 
-**P4 — 统一事件流（治 B6，中长期）**
-- 引入归一化的 `customer_timeline` 集合（事件：收件/分类/回复/发送/跟进），供客户画像/分析消费
+**P4a — 统一事件流基础（治 B6）——✅ 已完成（待提交）**
+- 新建 `customer_timeline.json`（用户级，最多 1000 条事件）
+- 核心写入点：lead_capture 成功、inbox send_via_provider、inbound send_reply
+- 事件类型：lead_captured / email_sent / email_replied（timestamp + data + source）
+
+**P4b — 客户画像时间线展示（可选后续）**
+- pages/28 客户画像消费 timeline 展示完整互动历史
+
+**P4c — 历史数据回填（可选后续）**
 
 ---
 

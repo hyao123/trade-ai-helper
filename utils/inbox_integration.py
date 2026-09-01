@@ -30,6 +30,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 
+from utils.customer_timeline import append_event
 from utils.email_tracking import create_tracking_record
 from utils.logger import get_logger
 from utils.outreach_log import append_outreach_log
@@ -388,6 +389,13 @@ def send_via_provider(
             "subject": subject,
             "status": "sent",
         })
+        append_event(
+            username,
+            customer_email=to_email,
+            event_type="email_sent",
+            data={"subject": subject, "tracking_id": tracking_id, "provider": provider},
+            source="inbox",
+        )
     return ok, msg
 
 

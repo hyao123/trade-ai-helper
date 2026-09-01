@@ -15,6 +15,7 @@ from email.parser import BytesParser, Parser
 from email.utils import parseaddr
 
 from utils.email_service import send_ai_generated_email
+from utils.customer_timeline import append_event
 from utils.outreach_log import append_outreach_log
 from utils.repositories import load_inbound_emails, save_inbound_emails
 
@@ -272,6 +273,13 @@ def send_inbound_reply(
         "subject": reply_subject,
         "status": "sent",
     })
+    append_event(
+        username,
+        customer_email=to_email,
+        event_type="email_replied",
+        data={"inbound_id": inbound_id, "subject": reply_subject},
+        source="inbound",
+    )
     return True, f"回复已发送到 {to_email}"
 
 

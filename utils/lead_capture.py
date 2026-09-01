@@ -16,6 +16,7 @@ import re
 from datetime import datetime
 
 from utils.customers import add_customer, get_customers
+from utils.customer_timeline import append_event
 from utils.logger import get_logger
 from utils.notifications import notify_hot_lead
 from utils.workflow import create_workflow_from_customer
@@ -106,6 +107,13 @@ def capture_lead_from_email(
         logger.debug("Hot-lead notification skipped for %s: %s", email, exc)
 
     logger.info("Lead captured from email intent=%s email=%s workflow=%s", intent, email, workflow_created)
+    append_event(
+        username,
+        customer_email=email,
+        event_type="lead_captured",
+        data={"intent": intent, "company": customer["company"], "workflow_created": workflow_created},
+        source="lead_capture",
+    )
     return {
         "created": True,
         "customer": customer,
