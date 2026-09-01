@@ -36,6 +36,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Generator
 
+from utils.lead_capture import capture_leads_from_inbox
 from utils.logger import get_logger
 from utils.sanitize import sanitize_input
 from utils.storage import load_user_json, save_user_json
@@ -341,6 +342,26 @@ def process_inbox(
 
     logger.info("Processed %d emails for %s", len(results), username)
     return results
+
+
+def process_inbox_with_lead_capture(
+    username: str,
+    emails: list[dict],
+    force_reprocess: bool = False,
+) -> list[dict]:
+    """Classify an inbox batch and auto-capture high-intent senders as leads.
+
+    Wraps :func:`process_inbox` and then runs the CRM/notification pipeline
+    (:func:`utils.lead_capture.capture_leads_from_inbox`). Lead capture is
+    best-effort: classification results are returned unchanged even when
+    capture fails (e.g. storage hiccup).
+    """
+    processed = process_inbox(username, emails, force_reprocess=force_reprocess)
+    try:
+        capture_leads_from_inbox(username, processed)
+    except Exception as exc:  # noqa: BLE001 - capture must never break classification
+        logger.debug("Lead capture skipped for %s: %s", username, exc)
+    return processed
 
 
 def get_prioritized_inbox(username: str, limit: int = 20) -> list[dict]:

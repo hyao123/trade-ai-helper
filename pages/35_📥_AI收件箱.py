@@ -12,7 +12,7 @@ from utils.inbox_ai import (
     generate_reply_suggestion,
     get_inbox_analytics,
     get_prioritized_inbox,
-    process_inbox,
+    process_inbox_with_lead_capture,
 )
 from utils.inbox_integration import (
     PROVIDERS,
@@ -251,8 +251,9 @@ with tab_inbox:
                 st.session_state["_inbox_processed"] = []
             else:
                 progress = st.progress(0, text=f"AI 正在分析 {len(emails)} 封邮件...")
-                # process_inbox 会用缓存避免重复分类已处理过的邮件
-                processed = process_inbox(username, emails, force_reprocess=False)
+                # process_inbox_with_lead_capture 会用缓存避免重复分类已处理过的邮件，
+                # 并对高优先级询盘自动沉淀到 CRM（utils.lead_capture）
+                processed = process_inbox_with_lead_capture(username, emails, force_reprocess=False)
                 progress.progress(1.0, text=f"✅ 完成！共处理 {len(processed)} 封邮件")
                 st.session_state["_inbox_processed"] = processed
                 # 一行汇总
